@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --ink: #2a2620;
   --dim: #7a736a;
   --paper: #f7f2e8;
@@ -237,14 +237,14 @@ input, textarea { font: inherit; color: inherit; }
 /* ---------- 指路牌（立牌 + 指向箭头） ---------- */
 .rail-post { display: flex; flex-direction: column; align-items: center; pointer-events: all; }
 .rail-board {
-  display: inline-flex; align-items: center; gap: 6px; max-width: 240px;
-  background: #fffdf7; border: 1.5px solid #2a2620; border-radius: 6px;
-  padding: 4px 10px 4px 8px; font-size: 11.5px; color: #2a2620; cursor: pointer;
-  box-shadow: 2px 3px 0 rgba(42,38,32,.18); white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 5px; max-width: 230px;
+  background: rgba(255,253,247,.8); border: 1px solid #b6a894; border-radius: 5px;
+  padding: 3px 9px 3px 7px; font-size: 10.5px; color: #6f6252; cursor: pointer;
+  box-shadow: 1px 2px 0 rgba(42,38,32,.10); white-space: nowrap;
 }
-.rail-board:hover { background: #2a2620; color: #fffdf7; }
+.rail-board:hover { background: #efe6d6; color: #3f382e; }
 .rail-board-arrow { display: inline-block; font-size: 13px; line-height: 1; transform-origin: 50% 50%; }
 .rail-board-text { overflow: hidden; text-overflow: ellipsis; }
-.rail-stem { width: 2px; height: 14px; background: #2a2620; opacity: .75; }
+.rail-stem { width: 1.5px; height: 12px; background: #8a7a63; opacity: .55; }
 .rail-post.dir .rail-board { border-style: dashed; color: #7a6f60; }
 .rail-post.suggest .rail-board { border-color: #8a8278; }

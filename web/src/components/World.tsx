@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Background,
   Controls,
@@ -155,16 +155,18 @@ export default function World() {
     return [...base, ...bs, ...dirs];
   }, [nodes, buildings, edges, lod]);
 
-  // libavoid 正交避障：把节点当障碍，边绕开
+  // libavoid 正交避障：用"渲染后的节点坐标"当障碍（含去重叠位移），保证线端贴岛
   useEffect(() => {
     let alive = true;
-    const boxes = [...nodes.map((n) => ({
-      id: n.id,
-      x: n.x * SPREAD,
-      y: n.y * SPREAD,
-      w: NODE_W,
-      h: NODE_H,
-    }))];
+    const boxes = rfNodes
+      .filter((n) => n.type !== "direction")
+      .map((n) => ({
+        id: n.id,
+        x: n.position.x,
+        y: n.position.y,
+        w: NODE_W,
+        h: NODE_H,
+      }));
     const links = edges
       .filter((e) => e.kind !== "direction")
       .map((e) => ({ id: e.id, src: e.src, dst: e.dst }));
@@ -174,7 +176,7 @@ export default function World() {
     return () => {
       alive = false;
     };
-  }, [nodes, edges]);
+  }, [rfNodes, edges]);
 
   // 路牌全局排布：沿路径错位放置，再做简单碰撞避让，避免牌子互相压/压岛
   const signPos = useMemo<Record<string, { x: number; y: number }>>(() => {

@@ -1,10 +1,17 @@
 import { EdgeLabelRenderer, type EdgeProps } from "@xyflow/react";
 
 const COLORS: Record<string, string> = {
-  formal: "#2a2620",
-  source: "#4f7a9a",
-  suggest: "#8a8278",
-  direction: "#a79e90",
+  // 地面小路：低对比墨色/土色，比岛弱一档
+  formal: "#8a7a63",
+  source: "#8fa3a0",
+  suggest: "#b0a390",
+  direction: "#b9ab97",
+};
+const OPACITY: Record<string, number> = {
+  formal: 0.55,
+  source: 0.5,
+  suggest: 0.52,
+  direction: 0.45,
 };
 
 type Pt = { x: number; y: number };
@@ -17,7 +24,6 @@ function normalOf(pos?: string): Pt {
   return { x: 0, y: 1 };
 }
 
-/** 手写备用折线（libavoid 不可用时） */
 function fallbackRoute(s: Pt, t: Pt, n1: Pt, n2: Pt, bend: number): Pt[] {
   const d = 34 + Math.abs(bend) * 14;
   const p1 = { x: s.x + n1.x * d, y: s.y + n1.y * d };
@@ -35,7 +41,6 @@ function hashOf(s: string) {
   return Math.abs(h);
 }
 
-/** 三次贝塞尔采样（曲线模式：像地面上的道路） */
 function curvePoints(s: Pt, t: Pt, id: string, bend: number): Pt[] {
   const dx = t.x - s.x;
   const dy = t.y - s.y;
@@ -48,9 +53,8 @@ function curvePoints(s: Pt, t: Pt, id: string, bend: number): Pt[] {
   const c1 = { x: s.x + dx * 0.33 + nx * bow, y: s.y + dy * 0.33 + ny * bow };
   const c2 = { x: s.x + dx * 0.66 + nx * bow, y: s.y + dy * 0.66 + ny * bow };
   const out: Pt[] = [];
-  const steps = 28;
-  for (let i = 0; i <= steps; i++) {
-    const u = i / steps;
+  for (let i = 0; i <= 28; i++) {
+    const u = i / 28;
     const v = 1 - u;
     out.push({
       x: v * v * v * s.x + 3 * v * v * u * c1.x + 3 * v * u * u * c2.x + u * u * u * t.x,
@@ -60,9 +64,9 @@ function curvePoints(s: Pt, t: Pt, id: string, bend: number): Pt[] {
   return out;
 }
 
-/** Catmull-Rom → 平滑路径，让曲线更自然 */
 function smoothPath(points: Pt[]) {
-  if (points.length < 3) return `M ${points[0].x} ${points[0].y} L ${points[points.length - 1].x} ${points[points.length - 1].y}`;
+  if (points.length < 3)
+    return `M ${points[0].x} ${points[0].y} L ${points[points.length - 1].x} ${points[points.length - 1].y}`;
   let d = `M ${points[0].x} ${points[0].y}`;
   for (let i = 0; i < points.length - 1; i++) {
     const p0 = points[Math.max(0, i - 1)];
@@ -97,17 +101,6 @@ function toPath(points: Pt[], r = 12) {
   return d;
 }
 
-function offsetLine(points: Pt[], off: number) {
-  return points.map((p, i) => {
-    const prev = points[Math.max(0, i - 1)];
-    const next = points[Math.min(points.length - 1, i + 1)];
-    const dx = next.x - prev.x;
-    const dy = next.y - prev.y;
-    const l = Math.hypot(dx, dy) || 1;
-    return { x: p.x + (-dy / l) * off, y: p.y + (dx / l) * off };
-  });
-}
-
 export default function RailEdge(props: EdgeProps) {
   const {
     id,
@@ -122,6 +115,7 @@ export default function RailEdge(props: EdgeProps) {
   const d = (data ?? {}) as any;
   const kind: string = d.kind ?? "formal";
   const color = COLORS[kind] ?? COLORS.formal;
+  const alpha = OPACITY[kind] ?? 0.5;
   const bend: number = d.bend ?? 0;
   const isDir = kind === "direction";
   const lod: number = d.lod ?? 2;
@@ -129,18 +123,15 @@ export default function RailEdge(props: EdgeProps) {
 
   let pts: Pt[];
   let path: string;
-  let isCurve = false;
   if (mode === "straight") {
     pts = [{ x: sourceX, y: sourceY }, { x: targetX, y: targetY }];
     path = toPath(pts);
   } else if (mode === "curve") {
     const routed = d.route as Pt[] | undefined;
     if (routed && routed.length > 2) {
-      // 先按避障折线走，再把拐角圆滑成曲线
       pts = routed;
       path = smoothPath(pts);
     } else {
-      // 同一节点发出的多条曲线错开起点，避免都从同一点扇形散开
       const seed2 = hashOf(id);
       const vx = targetX - sourceX;
       const vy = targetY - sourceY;
@@ -157,7 +148,6 @@ export default function RailEdge(props: EdgeProps) {
       );
       path = smoothPath(pts);
     }
-    isCurve = true;
   } else {
     const routed = d.route as Pt[] | undefined;
     pts =
@@ -173,10 +163,6 @@ export default function RailEdge(props: EdgeProps) {
     path = toPath(pts);
   }
 
-  const leftPath = isCurve ? smoothPath(offsetLine(pts, 2.8)) : toPath(offsetLine(pts, 2.8));
-  const rightPath = isCurve ? smoothPath(offsetLine(pts, -2.8)) : toPath(offsetLine(pts, -2.8));
-
-  // 路牌：沿路径按 id 哈希错位；优先用 World 全局避让后的位置
   const seed = hashOf(id);
   const frac = 0.3 + ((seed % 34) / 100);
   const total = pts.reduce(
@@ -217,25 +203,26 @@ export default function RailEdge(props: EdgeProps) {
   const ax = ux / ul;
   const ay = uy / ul;
   const arrowTip = { x: end.x - ax * 2, y: end.y - ay * 2 };
-  const arrowA = { x: end.x - ax * 12 - ay * 5.5, y: end.y - ay * 12 + ax * 5.5 };
-  const arrowB = { x: end.x - ax * 12 + ay * 5.5, y: end.y - ay * 12 - ax * 5.5 };
+  const arrowA = { x: end.x - ax * 9 - ay * 4, y: end.y - ay * 9 + ax * 4 };
+  const arrowB = { x: end.x - ax * 9 + ay * 4, y: end.y - ay * 9 - ax * 4 };
 
   return (
     <>
-      {/* 单线条：一条线 + 箭头 + 路标 */}
+      {/* 地面小路：细墨线，不垫底、不加粗 */}
       <path
         d={path}
         fill="none"
         stroke={color}
-        strokeWidth={2.2}
+        strokeWidth={1.4}
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeDasharray={kind === "suggest" ? "7 6" : kind === "direction" ? "2 6" : undefined}
-        opacity={0.92}
+        strokeDasharray={kind === "suggest" ? "4 6" : kind === "direction" ? "1 6" : undefined}
+        opacity={alpha}
       />
       <polygon
         points={`${arrowTip.x},${arrowTip.y} ${arrowA.x},${arrowA.y} ${arrowB.x},${arrowB.y}`}
         fill={color}
+        opacity={alpha * 0.9}
       />
 
       {showSign && (
