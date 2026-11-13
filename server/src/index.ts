@@ -37,6 +37,8 @@ import { deepseekLLM } from "./providers/deepseek.js";
 import { doubaoASR } from "./providers/doubao.js";
 import { mockASR, mockLLM } from "./providers/mock.js";
 import { elkLayout, wfcLayout } from "./layout.js";
+import { placeAround } from "./placement.js";
+import { simulateExplore } from "./explore.js";
 
 seedDemoIfEmpty();
 
@@ -101,22 +103,27 @@ app.post("/api/worlds/:id/extract", async (req, res) => {
 
   const createdNodes: NodeRow[] = [];
   const createdEdges: unknown[] = [];
-  const baseAngle = graph.nodes.length * 0.9;
-  result.entities.forEach((ent, i) => {
+  // 增量放置：每个新实体围绕焦点节点现场算位置（避开已有节点、朝外生长）
+  const placed = graph.nodes.map((n) => ({ id: n.id, x: n.x, y: n.y }));
+  result.entities.forEach((ent) => {
     const name = ent.name.trim();
     if (!name) return;
     if (graph.nodes.some((n) => n.name.toLowerCase() === name.toLowerCase())) return;
-    const angle = baseAngle + i * 0.8;
-    const radius = 280 + i * 70;
+    const pos = placeAround(
+      placed,
+      { id: focus.id, x: focus.x, y: focus.y },
+      { preferAngle: (placed.length * 1.7) % (Math.PI * 2) },
+    );
     const node = addNode(
       world.id,
       name,
-      focus.x + Math.cos(angle) * radius,
-      focus.y + Math.sin(angle) * radius,
+      pos.x,
+      pos.y,
       ent.hint ? `## ${name}\n\n> ${ent.hint}` : "",
     );
     createdNodes.push(node);
     graph.nodes.push(node);
+    placed.push({ id: node.id, x: pos.x, y: pos.y });
   });
 
   const findNode = (name: string) =>
@@ -334,7 +341,14 @@ app.post("/api/dev/world", (req, res) => {
   res.json({ ok: true, world });
 });
 
-/** 探索模拟：按轮次"探索 → 生成节点 → 连线"，再跑布局与副本检测 */
+/** 探索模拟（增量放置版）：新节点围绕焦点现场算位置，不做全局重排 */
+app.post("/api/dev/explore", async (req, res) => {
+  const rounds = Math.max(6, Math.min(60, Number(req.body?.rounds ?? 24)));
+  const result = await simulateExplore(rounds, detectBuildings);
+  res.json(result);
+});
+
+/** 旧版探索模拟（保留占位） */
 app.post("/api/dev/explore", async (req, res) => {
   const rounds = Math.max(6, Math.min(60, Number(req.body?.rounds ?? 24)));
   const world = createWorld(`探索模拟 · ${rounds} 轮`, "起点");
