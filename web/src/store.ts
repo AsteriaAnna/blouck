@@ -11,7 +11,7 @@ import {
   type WorldPayload,
 } from "./api";
 
-type Drawer = { kind: "node" | "building"; id: string } | null;
+type Drawer = { kind: "node" | "building" | "edge"; id: string } | null;
 
 type State = {
   view: "home" | "world";
@@ -37,6 +37,7 @@ type State = {
   backHome: () => Promise<void>;
   openNode: (id: string) => Promise<void>;
   openBuilding: (id: string) => Promise<void>;
+  openEdge: (id: string) => void;
   closeDrawer: () => void;
   extract: (text: string) => Promise<void>;
   saveMd: (id: string, md: string) => Promise<void>;
@@ -103,6 +104,10 @@ export const useStore = create<State>((set, getState) => ({
     history.replaceState(null, "", "#");
     set({ view: "home", world: null, drawer: null, challenge: null });
     await getState().loadWorlds();
+  },
+
+  openEdge(id: string) {
+    set({ drawer: { kind: "edge", id }, challenge: null });
   },
 
   async openNode(id) {

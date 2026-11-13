@@ -11,7 +11,8 @@ import { useStore } from "../store";
 import IslandNode from "./IslandNode";
 import BuildingNode from "./BuildingNode";
 import DirectionNode from "./DirectionNode";
-import KwEdge from "./KwEdge";
+import RailEdge from "./RailEdge";
+import RelationDrawer from "./RelationDrawer";
 import InputBar from "./InputBar";
 import NodeDrawer from "./NodeDrawer";
 import BuildingDrawer from "./BuildingDrawer";
@@ -19,7 +20,7 @@ import BuildingDrawer from "./BuildingDrawer";
 const SPREAD = 1.28;
 const EDGE_COLORS: Record<string, string> = { formal: "#2a2620", source: "#6e8fa8", suggest: "#8a8278", direction: "#a79e90" };
 const nodeTypes = { island: IslandNode, building: BuildingNode, direction: DirectionNode };
-const edgeTypes = { kw: KwEdge };
+const edgeTypes = { rail: RailEdge };
 
 export default function World() {
   const world = useStore((s) => s.world);
@@ -111,9 +112,9 @@ export default function World() {
         if (!a || !b) return null;
         const dx = b.x - a.x;
         const dy = b.y - a.y;
-        const horiz = Math.abs(dx) >= Math.abs(dy);
-        const sourceHandle = horiz ? (dx >= 0 ? "r" : "l") : (dy >= 0 ? "b" : "t");
-        const targetHandle = horiz ? (dx >= 0 ? "l" : "r") : (dy >= 0 ? "t" : "b");
+        // 铁路统一从岛底尖端出发、落到下方再走横向
+        const sourceHandle = "b";
+        const targetHandle = isDir ? undefined : "b";
         const key = isDir ? "d:" + e.id : [e.src, e.dst].sort().join("|");
         const idx = counts[key] ?? 0;
         counts[key] = idx + 1;
@@ -123,12 +124,13 @@ export default function World() {
           target: isDir ? "d:" + e.id : e.dst,
           sourceHandle,
           targetHandle,
-          type: "kw",
+          type: "rail",
           data: {
             kind: e.kind,
             label: e.label,
             question: e.question,
             bend: bends[idx % bends.length],
+            onSign: (id: string) => useStore.getState().openEdge(id),
           },
         } as Edge;
       })

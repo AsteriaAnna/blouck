@@ -14,16 +14,19 @@ export const env = {
   deepseekBaseUrl: process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com",
   deepseekModel: process.env.DEEPSEEK_MODEL ?? "deepseek-chat",
 
-  // ---- 实时语音（豆包流式 ASR）----
+  // ---- 实时语音（豆包 / 火山引擎 Seed ASR Streaming 2.0）----
   doubaoAppId: process.env.DOUBAO_ASR_APP_ID ?? "",
   doubaoToken: process.env.DOUBAO_ASR_TOKEN ?? "",
   doubaoWsUrl:
     process.env.DOUBAO_ASR_WS_URL ??
-    "wss://openspeech.bytedance.com/api/v2/asr",
-  doubaoCluster: process.env.DOUBAO_ASR_CLUSTER ?? "volcengine_input_common",
+    "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async",
+  doubaoResourceId:
+    process.env.DOUBAO_ASR_RESOURCE_ID ?? "volc.seedasr.sauc.duration",
+  doubaoModel: process.env.DOUBAO_ASR_MODEL ?? "bigmodel",
+  doubaoCluster: process.env.DOUBAO_ASR_CLUSTER ?? "",
 };
 
 export const providers = {
   llm: env.deepseekApiKey ? "deepseek" : "mock",
-  asr: env.doubaoAppId && env.doubaoToken ? "doubao" : "mock",
+  asr: env.doubaoToken ? "doubao" : "mock",
 } as const;

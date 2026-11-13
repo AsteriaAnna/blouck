@@ -178,6 +178,18 @@ export function updateNodeMd(id: string, freeMd: string) {
   db.prepare("UPDATE nodes SET free_md=? WHERE id=?").run(freeMd, id);
 }
 
+export function setNodePosition(id: string, x: number, y: number) {
+  db.prepare("UPDATE nodes SET x=?, y=? WHERE id=?").run(x, y, id);
+}
+
+export function updateEdgeMd(id: string, md: string, label?: string) {
+  if (typeof label === "string") {
+    db.prepare("UPDATE edges SET md=?, label=? WHERE id=?").run(md, label, id);
+  } else {
+    db.prepare("UPDATE edges SET md=? WHERE id=?").run(md, id);
+  }
+}
+
 export function setNodeHidden(id: string, hidden: number) {
   db.prepare("UPDATE nodes SET hidden=? WHERE id=?").run(hidden, id);
 }

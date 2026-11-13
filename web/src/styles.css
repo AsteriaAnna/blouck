@@ -217,3 +217,20 @@ input, textarea { font: inherit; color: inherit; }
 
 
 .react-flow__handle{opacity:0!important;pointer-events:none}
+
+/* ---------- 铁路 + 路牌 ---------- */
+.react-flow__edgelabel-renderer { z-index: 12 !important; pointer-events: none; }
+.rail-sign {
+  display: inline-flex; align-items: center; gap: 5px; max-width: 230px;
+  background: #fffdf7; border: 1px solid #2a2620; border-radius: 7px;
+  padding: 5px 11px; font-size: 12px; color: #2a2620; cursor: pointer;
+  box-shadow: 0 4px 10px rgba(90,70,40,.16); z-index: 20;
+}
+.rail-sign:hover { background: #2a2620; color: #fffdf7; }
+.rail-sign-icon {
+  display: inline-grid; place-items: center; width: 16px; height: 16px; flex: none;
+  border: 1px solid currentColor; border-radius: 4px; font-size: 10px;
+}
+.rail-sign-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-sign.dir { border-style: dashed; color: #8a8278; }
+.rail-sign.suggest { border-color: #8a8278; color: #6e6558; }

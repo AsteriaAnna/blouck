@@ -24,6 +24,8 @@ import {
   seedDemoIfEmpty,
   setBuildingStatus,
   setNodeHidden,
+  setNodePosition,
+  updateEdgeMd,
   updateBuildingMd,
   updateEdgeKind,
   updateNodeMd,
@@ -34,6 +36,7 @@ import {
 import { deepseekLLM } from "./providers/deepseek.js";
 import { doubaoASR } from "./providers/doubao.js";
 import { mockASR, mockLLM } from "./providers/mock.js";
+import { wfcLayout } from "./layout.js";
 
 seedDemoIfEmpty();
 
@@ -273,6 +276,35 @@ app.post("/api/edges/:id/accept", (req, res) => {
   if (edge.kind !== "suggest") return res.status(400).json({ error: "只能接受虚线建议" });
   updateEdgeKind(edge.id, "formal");
   res.json({ ok: true });
+});
+
+/* ---------------- 关系编辑 / WFC 布局 ---------------- */
+app.patch("/api/edges/:id", (req, res) => {
+  const edge = db.prepare("SELECT * FROM edges WHERE id=?").get(req.params.id) as
+    | { id: string; md: string; label: string }
+    | undefined;
+  if (!edge) return res.status(404).json({ error: "edge not found" });
+  const md = typeof req.body?.md === "string" ? req.body.md : edge.md;
+  const label = typeof req.body?.label === "string" ? req.body.label : undefined;
+  updateEdgeMd(edge.id, md, label);
+  res.json({ ok: true });
+});
+
+app.post("/api/worlds/:id/layout", (req, res) => {
+  const world = getWorld(req.params.id);
+  if (!world) return res.status(404).json({ error: "world not found" });
+  const { nodes, edges } = getGraph(world.id);
+  const placed = wfcLayout(nodes, edges);
+  for (const p of placed) setNodePosition(p.id, p.x, p.y);
+  const fresh = getGraph(world.id);
+  res.json({
+    ok: true,
+    nodes: fresh.nodes.map((n) => ({
+      ...n,
+      passed: countPassed(n.id),
+      tier: computeTier(n.id),
+    })),
+  });
 });
 
 /* ---------------- 副本 ---------------- */
