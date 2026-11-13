@@ -131,6 +131,101 @@ function Building({
   );
 }
 
+function makeBoardTexture(text: string) {
+  const font = "500 30px 'Microsoft YaHei','Segoe UI',system-ui,sans-serif";
+  const pad = 22;
+  const probe = document.createElement("canvas").getContext("2d")!;
+  probe.font = font;
+  const rawW = Math.ceil(probe.measureText(text).width);
+  const W = Math.min(520, Math.max(150, rawW + pad * 2));
+  const H = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = W * 2;
+  canvas.height = H * 2;
+  const ctx = canvas.getContext("2d")!;
+  ctx.scale(2, 2);
+  ctx.font = font;
+  ctx.fillStyle = "#fffdf7";
+  ctx.strokeStyle = "#8a7a63";
+  ctx.lineWidth = 2;
+  const r = 8;
+  ctx.beginPath();
+  ctx.moveTo(r, 1);
+  ctx.lineTo(W - r, 1);
+  ctx.quadraticCurveTo(W - 1, 1, W - 1, r);
+  ctx.lineTo(W - 1, H - r);
+  ctx.quadraticCurveTo(W - 1, H - 1, W - r, H - 1);
+  ctx.lineTo(r, H - 1);
+  ctx.quadraticCurveTo(1, H - 1, 1, H - r);
+  ctx.lineTo(1, r);
+  ctx.quadraticCurveTo(1, 1, r, 1);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#4a4034";
+  ctx.textBaseline = "middle";
+  let shown = text;
+  while (probe.measureText(shown).width > W - pad * 2 && shown.length > 2) {
+    shown = shown.slice(0, -1);
+  }
+  if (shown !== text) shown = shown.slice(0, -1) + "…";
+  ctx.fillText(shown, pad, H / 2 + 1);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return { tex, width: W * 0.32, height: H * 0.32 };
+}
+
+/** 立体路牌：木柱 + 牌面（Canvas 文字），始终转向相机，可点击 */
+function SignPost({
+  position,
+  label,
+  onOpen,
+}: {
+  position: [number, number, number];
+  label: string;
+  onOpen: () => void;
+}) {
+  const ref = useRef<THREE.Group>(null);
+  const { tex, width, height } = useMemo(() => makeBoardTexture(label || "方向"), [label]);
+  useFrame(({ camera }) => {
+    if (!ref.current) return;
+    ref.current.rotation.y = Math.atan2(
+      camera.position.x - position[0],
+      camera.position.z - position[2],
+    );
+  });
+  return (
+    <group
+      ref={ref}
+      position={position}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        onOpen();
+      }}
+      onPointerOver={() => (document.body.style.cursor = "pointer")}
+      onPointerOut={() => (document.body.style.cursor = "auto")}
+    >
+      <mesh position={[0, 11, 0]} castShadow>
+        <cylinderGeometry args={[1.6, 2.0, 22, 8]} />
+        <meshStandardMaterial color="#a08a6a" flatShading />
+      </mesh>
+      <mesh position={[0, 26, 0]} castShadow>
+        <boxGeometry args={[width, height, 1.6]} />
+        <meshStandardMaterial color="#fffdf7" />
+      </mesh>
+      <mesh position={[0, 26, 0.95]}>
+        <planeGeometry args={[width - 1.4, height - 1.4]} />
+        <meshBasicMaterial map={tex} transparent />
+      </mesh>
+      <mesh position={[0, 26, -0.95]} rotation={[0, Math.PI, 0]}>
+        <planeGeometry args={[width - 1.4, height - 1.4]} />
+        <meshBasicMaterial map={tex} transparent />
+      </mesh>
+    </group>
+  );
+}
+
 function Edge({
   a,
   b,
@@ -145,9 +240,17 @@ function Edge({
   onSign: () => void;
 }) {
   const curve = useMemo(() => {
-    const mid = a.clone().add(b).multiplyScalar(0.5);
-    mid.y += Math.min(140, a.distanceTo(b) * 0.18);
-    return new THREE.QuadraticBezierCurve3(a, mid, b);
+    // 完全贴地：所有点高度 y=0，只在 XZ 平面里弯
+    const s = a.clone().setY(0);
+    const t = b.clone().setY(0);
+    const mid = s.clone().add(t).multiplyScalar(0.5);
+    const dx = t.x - s.x;
+    const dz = t.z - s.z;
+    const len = Math.hypot(dx, dz) || 1;
+    const bow = Math.min(60, len * 0.12);
+    mid.x += (-dz / len) * bow;
+    mid.z += (dx / len) * bow;
+    return new THREE.QuadraticBezierCurve3(s, mid, t);
   }, [a, b]);
   const pts = useMemo(
     () => curve.getPoints(26).map((p) => [p.x, p.y, p.z] as [number, number, number]),
@@ -178,11 +281,7 @@ function Edge({
         <meshBasicMaterial color={color} transparent opacity={0.65} />
       </mesh>
       {(kind === "direction" || kind === "suggest") && label ? (
-        <Html center position={[mid.x, 20, mid.z]}>
-          <button className="rail-board sign3d" onClick={onSign}>
-            {label}
-          </button>
-        </Html>
+        <SignPost position={[mid.x, 0, mid.z]} label={label} onOpen={onSign} />
       ) : null}
     </group>
   );
