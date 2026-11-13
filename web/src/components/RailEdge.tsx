@@ -1,4 +1,4 @@
-﻿import { EdgeLabelRenderer, type EdgeProps } from "@xyflow/react";
+import { EdgeLabelRenderer, type EdgeProps } from "@xyflow/react";
 
 const COLORS: Record<string, string> = {
   formal: "#2a2620",
@@ -80,8 +80,9 @@ export default function RailEdge(props: EdgeProps) {
   const lod: number = d.lod ?? 2;
 
   const routed = d.route as Pt[] | undefined;
-  const pts =
-    routed && routed.length > 1
+  const pts = d.straight
+    ? [{ x: sourceX, y: sourceY }, { x: targetX, y: targetY }]
+    : routed && routed.length > 1
       ? routed
       : fallbackRoute(
           { x: sourceX, y: sourceY },
