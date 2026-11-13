@@ -1,0 +1,15 @@
+{
+  "name": "blouck",
+  "private": true,
+  "version": "0.1.0",
+  "description": "知识世界 · 桌面 Web MVP（React + TS + Vite 前端，Node 服务端，DeepSeek / 豆包 预留位）",
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "build": "pnpm -r run build",
+    "start:server": "pnpm --filter @blouck/server start",
+    "typecheck": "pnpm -r run typecheck"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  }
+}
