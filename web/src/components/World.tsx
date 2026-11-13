@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Background,
   Controls,
@@ -37,7 +37,7 @@ export default function World() {
   const backHome = useStore((s) => s.backHome);
   const [provider, setProvider] = useState("mock");
   const [zoom, setZoom] = useState(1);
-  const [straight, setStraight] = useState(true);
+  const [mode, setMode] = useState<"curve" | "straight" | "rail">("curve");
   const [routes, setRoutes] = useState<Record<string, { x: number; y: number }[]>>({});
 
   // 缩放分级：0 简略 / 1 中等 / 2 完整
@@ -295,7 +295,7 @@ export default function World() {
             question: e.question,
             bend: bends[idx % bends.length],
             lod,
-            straight,
+            mode,
             route: routes[e.id],
             signPos: signPos[e.id],
             onSign: (id: string) => useStore.getState().openEdge(id),
@@ -313,7 +313,7 @@ export default function World() {
       data: { kind: "source", label: "", lod, bend: 0, noSign: true },
     }));
     return [...mapped, ...linkEdges];
-  }, [nodes, edges, routes, lod, buildings, signPos, straight]);
+  }, [nodes, edges, routes, lod, buildings, signPos, mode]);
 
   const onNodeClick = useCallback(
     (evt: any, node: Node) => {
@@ -368,8 +368,13 @@ export default function World() {
         <span className="badge">{edges.length} 关系</span>
         <span className="badge">{buildings.length} 副本</span>
         <span className="badge">LLM/ASR: {provider}</span>
-        <button className="ghost-btn" onClick={() => setStraight((v) => !v)}>
-          {straight ? "切到轨道" : "切到直线"}
+        <button
+          className="ghost-btn"
+          onClick={() =>
+            setMode((m) => (m === "curve" ? "straight" : m === "straight" ? "rail" : "curve"))
+          }
+        >
+          连线：{mode === "curve" ? "曲线" : mode === "straight" ? "直线" : "轨道"}
         </button>
         <button
           className="ghost-btn"

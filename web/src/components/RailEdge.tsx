@@ -17,7 +17,7 @@ function normalOf(pos?: string): Pt {
   return { x: 0, y: 1 };
 }
 
-/** 备用路由：从岛尖端沿法线出线，正交折线接到目标尖端 */
+/** 手写备用折线（libavoid 不可用时） */
 function fallbackRoute(s: Pt, t: Pt, n1: Pt, n2: Pt, bend: number): Pt[] {
   const d = 34 + Math.abs(bend) * 14;
   const p1 = { x: s.x + n1.x * d, y: s.y + n1.y * d };
@@ -27,6 +27,53 @@ function fallbackRoute(s: Pt, t: Pt, n1: Pt, n2: Pt, bend: number): Pt[] {
     return [s, p1, { x: mx, y: p1.y }, { x: mx, y: p3.y }, p3, t];
   }
   return [s, p1, { x: p1.x, y: p3.y + bend * 18 }, p3, t];
+}
+
+function hashOf(s: string) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+/** 三次贝塞尔采样（曲线模式：像地面上的道路） */
+function curvePoints(s: Pt, t: Pt, id: string, bend: number): Pt[] {
+  const dx = t.x - s.x;
+  const dy = t.y - s.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const seed = hashOf(id);
+  const side = (seed % 2 === 0 ? 1 : -1) * (bend !== 0 ? Math.sign(bend) : 1);
+  const bow = Math.min(160, 40 + len * 0.18) * side;
+  const nx = -dy / len;
+  const ny = dx / len;
+  const c1 = { x: s.x + dx * 0.33 + nx * bow, y: s.y + dy * 0.33 + ny * bow };
+  const c2 = { x: s.x + dx * 0.66 + nx * bow, y: s.y + dy * 0.66 + ny * bow };
+  const out: Pt[] = [];
+  const steps = 28;
+  for (let i = 0; i <= steps; i++) {
+    const u = i / steps;
+    const v = 1 - u;
+    out.push({
+      x: v * v * v * s.x + 3 * v * v * u * c1.x + 3 * v * u * u * c2.x + u * u * u * t.x,
+      y: v * v * v * s.y + 3 * v * v * u * c1.y + 3 * v * u * u * c2.y + u * u * u * t.y,
+    });
+  }
+  return out;
+}
+
+/** Catmull-Rom → 平滑路径，让曲线更自然 */
+function smoothPath(points: Pt[]) {
+  if (points.length < 3) return `M ${points[0].x} ${points[0].y} L ${points[points.length - 1].x} ${points[points.length - 1].y}`;
+  let d = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(0, i - 1)];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(points.length - 1, i + 2)];
+    const c1 = { x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6 };
+    const c2 = { x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6 };
+    d += ` C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
+  }
+  return d;
 }
 
 function toPath(points: Pt[], r = 12) {
@@ -78,29 +125,64 @@ export default function RailEdge(props: EdgeProps) {
   const bend: number = d.bend ?? 0;
   const isDir = kind === "direction";
   const lod: number = d.lod ?? 2;
+  const mode: "straight" | "curve" | "rail" = d.mode ?? "curve";
 
-  const routed = d.route as Pt[] | undefined;
-  const pts = d.straight
-    ? [{ x: sourceX, y: sourceY }, { x: targetX, y: targetY }]
-    : routed && routed.length > 1
-      ? routed
-      : fallbackRoute(
-          { x: sourceX, y: sourceY },
-          { x: targetX, y: targetY },
-          normalOf(sourcePosition),
-          normalOf(targetPosition),
-          bend,
-        );
+  let pts: Pt[];
+  let path: string;
+  let isCurve = false;
+  if (mode === "straight") {
+    pts = [{ x: sourceX, y: sourceY }, { x: targetX, y: targetY }];
+    path = toPath(pts);
+  } else if (mode === "curve") {
+    const routed = d.route as Pt[] | undefined;
+    if (routed && routed.length > 2) {
+      // 先按避障折线走，再把拐角圆滑成曲线
+      pts = routed;
+      path = smoothPath(pts);
+    } else {
+      // 同一节点发出的多条曲线错开起点，避免都从同一点扇形散开
+      const seed2 = hashOf(id);
+      const vx = targetX - sourceX;
+      const vy = targetY - sourceY;
+      const vl = Math.hypot(vx, vy) || 1;
+      const nx = -vy / vl;
+      const ny = vx / vl;
+      const k1 = (((seed2 >> 2) % 7) - 3) * 7;
+      const k2 = (((seed2 >> 5) % 7) - 3) * 7;
+      pts = curvePoints(
+        { x: sourceX + nx * k1, y: sourceY + ny * k1 },
+        { x: targetX + nx * k2, y: targetY + ny * k2 },
+        id,
+        bend,
+      );
+      path = smoothPath(pts);
+    }
+    isCurve = true;
+  } else {
+    const routed = d.route as Pt[] | undefined;
+    pts =
+      routed && routed.length > 1
+        ? routed
+        : fallbackRoute(
+            { x: sourceX, y: sourceY },
+            { x: targetX, y: targetY },
+            normalOf(sourcePosition),
+            normalOf(targetPosition),
+            bend,
+          );
+    path = toPath(pts);
+  }
 
-  const left = toPath(offsetLine(pts, 2.8));
-  const right = toPath(offsetLine(pts, -2.8));
-  const path = toPath(pts);
+  const leftPath = isCurve ? smoothPath(offsetLine(pts, 2.8)) : toPath(offsetLine(pts, 2.8));
+  const rightPath = isCurve ? smoothPath(offsetLine(pts, -2.8)) : toPath(offsetLine(pts, -2.8));
 
-  // 路牌沿路径按 id 哈希错位，避免同一走廊上的牌子叠在一起
-  let seed = 0;
-  for (let i = 0; i < id.length; i++) seed = (seed * 31 + id.charCodeAt(i)) | 0;
-  const frac = 0.3 + ((Math.abs(seed) % 34) / 100);
-  const total = pts.reduce((acc, p, i) => (i === 0 ? 0 : acc + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y)), 0);
+  // 路牌：沿路径按 id 哈希错位；优先用 World 全局避让后的位置
+  const seed = hashOf(id);
+  const frac = 0.3 + ((seed % 34) / 100);
+  const total = pts.reduce(
+    (acc, p, i) => (i === 0 ? 0 : acc + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y)),
+    0,
+  );
   let walked = 0;
   let best = { x: pts[0].x, y: pts[0].y, angle: 0 };
   for (let i = 1; i < pts.length; i++) {
@@ -118,12 +200,11 @@ export default function RailEdge(props: EdgeProps) {
     }
     walked += len;
   }
-  // 垂直方向再错开一点；World 会传全局避让后的 signPos
   const rad = (best.angle * Math.PI) / 180;
-  const side = Math.abs(seed) % 2 === 0 ? 1 : -1;
-  const sp = d.signPos as { x: number; y: number } | undefined;
-  const signX = sp ? sp.x : best.x + Math.sin(rad) * 14 * side;
-  const signY = sp ? sp.y : best.y - Math.cos(rad) * 14 * side;
+  const side = seed % 2 === 0 ? 1 : -1;
+  const sp = d.signPos as Pt | undefined;
+  const signX = sp ? sp.x : best.x + Math.sin(rad) * 16 * side;
+  const signY = sp ? sp.y : best.y - Math.cos(rad) * 16 * side;
 
   const label = isDir ? d.question || "下一步方向" : d.label || "关系";
   const showSign = !d.noSign && lod > 0 && (isDir || kind === "suggest");
@@ -136,13 +217,17 @@ export default function RailEdge(props: EdgeProps) {
   const ax = ux / ul;
   const ay = uy / ul;
   const arrowTip = { x: end.x - ax * 2, y: end.y - ay * 2 };
-  const arrowA = { x: end.x - ax * 11 - ay * 5, y: end.y - ay * 11 + ax * 5 };
-  const arrowB = { x: end.x - ax * 11 + ay * 5, y: end.y - ay * 11 - ax * 5 };
+  const arrowA = { x: end.x - ax * 12 - ay * 5.5, y: end.y - ay * 12 + ax * 5.5 };
+  const arrowB = { x: end.x - ax * 12 + ay * 5.5, y: end.y - ay * 12 - ax * 5.5 };
 
   return (
     <>
-      <path d={left} fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />
-      <path d={right} fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />
+      {/* 道路底：浅色路床，让曲线像"地上的路" */}
+      {isCurve && (
+        <path d={path} fill="none" stroke="#efe3cc" strokeWidth={13} strokeLinecap="round" opacity={0.85} />
+      )}
+      <path d={leftPath} fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />
+      <path d={rightPath} fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />
       {kind === "suggest" && (
         <path d={path} fill="none" stroke="#fffdf7" strokeWidth={1.2} strokeDasharray="5 8" opacity={0.9} />
       )}
