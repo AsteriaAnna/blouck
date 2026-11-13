@@ -1,4 +1,4 @@
-import { Handle, Position } from "@xyflow/react";
+﻿import { Handle, Position } from "@xyflow/react";
 
 const INK = "#2a2620";
 const TOP = "#fffdf7";
@@ -101,6 +101,7 @@ export default function IslandNode({ data }: any) {
   const half = 68;
 
   const lod: number = data.lod ?? 2;
+  const depth: number = data.depth ?? 0.5;
 
   if (lod === 0) {
     return (
@@ -129,7 +130,7 @@ export default function IslandNode({ data }: any) {
       <Handle id="r" type="target" position={Position.Right} style={{ opacity: 0 }} />
       <Handle id="b" type="target" position={Position.Bottom} style={{ opacity: 0 }} />
       <Handle id="l" type="target" position={Position.Left} style={{ opacity: 0 }} />
-      <svg width={190} height={150} viewBox="0 0 190 150">
+      <svg width={190} height={150} viewBox="0 0 190 150" style={{ transform: `scale(${0.9 + depth * 0.2})`, transformOrigin: "95px 75px" }}>
         <ellipse cx={cx} cy={138} rx={60} ry={8} fill="rgba(0,0,0,.10)" />
         <path d="M56 118 L70 112 L78 122 L64 130 Z" fill={SIDE} stroke={INK} strokeWidth="1" opacity=".8" />
         <path d="M118 120 L130 116 L136 126 L122 131 Z" fill={SIDE} stroke={INK} strokeWidth="1" opacity=".7" />
@@ -156,7 +157,7 @@ export default function IslandNode({ data }: any) {
           {passed.short}/5 · {passed.judge}/10
         </div>
       )}
-      '<Handle id="t" type="source" position={Position.Top} style={{ opacity: 0 }} />
+      <Handle id="t" type="source" position={Position.Top} style={{ opacity: 0 }} />
       <Handle id="r" type="source" position={Position.Right} style={{ opacity: 0 }} />
       <Handle id="b" type="source" position={Position.Bottom} style={{ opacity: 0 }} />
       <Handle id="l" type="source" position={Position.Left} style={{ opacity: 0 }} />'

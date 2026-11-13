@@ -1,4 +1,4 @@
-import { EdgeLabelRenderer, type EdgeProps } from "@xyflow/react";
+﻿import { EdgeLabelRenderer, type EdgeProps } from "@xyflow/react";
 
 const COLORS: Record<string, string> = {
   // 地面小路：低对比墨色/土色，比岛弱一档
@@ -41,13 +41,14 @@ function hashOf(s: string) {
   return Math.abs(h);
 }
 
-function curvePoints(s: Pt, t: Pt, id: string, bend: number): Pt[] {
+function curvePoints(s: Pt, t: Pt, id: string, bend: number, depth = 0.5): Pt[] {
   const dx = t.x - s.x;
   const dy = t.y - s.y;
   const len = Math.hypot(dx, dy) || 1;
   const seed = hashOf(id);
   const side = (seed % 2 === 0 ? 1 : -1) * (bend !== 0 ? Math.sign(bend) : 1);
-  const bow = Math.min(160, 40 + len * 0.18) * side;
+  // 近处弯得更明显，远处更平（近大远小）
+  const bow = Math.min(160, 40 + len * 0.18) * side * (0.5 + depth * 1.15);
   const nx = -dy / len;
   const ny = dx / len;
   const c1 = { x: s.x + dx * 0.33 + nx * bow, y: s.y + dy * 0.33 + ny * bow };
@@ -116,6 +117,7 @@ export default function RailEdge(props: EdgeProps) {
   const kind: string = d.kind ?? "formal";
   const color = COLORS[kind] ?? COLORS.formal;
   const alpha = OPACITY[kind] ?? 0.5;
+  const depth = typeof d.depth === "number" ? d.depth : 0.5;
   const bend: number = d.bend ?? 0;
   const isDir = kind === "direction";
   const lod: number = d.lod ?? 2;
@@ -145,6 +147,7 @@ export default function RailEdge(props: EdgeProps) {
         { x: targetX + nx * k2, y: targetY + ny * k2 },
         id,
         bend,
+        depth,
       );
       path = smoothPath(pts);
     }
@@ -213,11 +216,11 @@ export default function RailEdge(props: EdgeProps) {
         d={path}
         fill="none"
         stroke={color}
-        strokeWidth={1.4}
+        strokeWidth={0.9 + depth * 1.9}
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeDasharray={kind === "suggest" ? "4 6" : kind === "direction" ? "1 6" : undefined}
-        opacity={alpha}
+        opacity={Math.min(0.92, alpha * (0.5 + depth * 0.95))}
       />
       <polygon
         points={`${arrowTip.x},${arrowTip.y} ${arrowA.x},${arrowA.y} ${arrowB.x},${arrowB.y}`}
