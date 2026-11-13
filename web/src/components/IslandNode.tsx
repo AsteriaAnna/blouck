@@ -1,4 +1,4 @@
-﻿import { Handle, Position } from "@xyflow/react";
+import { Handle, Position } from "@xyflow/react";
 
 const INK = "#2a2620";
 const TOP = "#fffdf7";
@@ -100,12 +100,35 @@ export default function IslandNode({ data }: any) {
   const bottom = 128;
   const half = 68;
 
+  const lod: number = data.lod ?? 2;
+
+  if (lod === 0) {
+    return (
+      <div className={"island-wrap" + (hidden || unknown ? " dim" : "")}>
+        <Handle id="t" type="target" position={Position.Top} style={{ opacity: 0 }} />
+        <Handle id="r" type="target" position={Position.Right} style={{ opacity: 0 }} />
+        <Handle id="b" type="target" position={Position.Bottom} style={{ opacity: 0 }} />
+        <Handle id="l" type="target" position={Position.Left} style={{ opacity: 0 }} />
+        <svg width={120} height={96} viewBox="0 0 120 96">
+          <path d="M60 18 L106 44 L60 70 L14 44 Z" fill="#fffdf7" stroke="#2a2620" strokeWidth="1.4" />
+          <path d="M14 44 L60 70 L60 82 L14 56 Z" fill="#e2d8c6" stroke="#2a2620" strokeWidth="1" />
+          <path d="M106 44 L60 70 L60 82 L106 56 Z" fill="#d6cbb8" stroke="#2a2620" strokeWidth="1" />
+        </svg>
+        <div className="island-label">{unknown ? "???" : name}</div>
+        <Handle id="t" type="source" position={Position.Top} style={{ opacity: 0 }} />
+        <Handle id="r" type="source" position={Position.Right} style={{ opacity: 0 }} />
+        <Handle id="b" type="source" position={Position.Bottom} style={{ opacity: 0 }} />
+        <Handle id="l" type="source" position={Position.Left} style={{ opacity: 0 }} />
+      </div>
+    );
+  }
+
   return (
     <div className={"island-wrap" + (hidden || unknown ? " dim" : "")}>
-      '<Handle id="t" type="target" position={Position.Top} style={{ opacity: 0 }} />
+      <Handle id="t" type="target" position={Position.Top} style={{ opacity: 0 }} />
       <Handle id="r" type="target" position={Position.Right} style={{ opacity: 0 }} />
       <Handle id="b" type="target" position={Position.Bottom} style={{ opacity: 0 }} />
-      <Handle id="l" type="target" position={Position.Left} style={{ opacity: 0 }} />'
+      <Handle id="l" type="target" position={Position.Left} style={{ opacity: 0 }} />
       <svg width={190} height={150} viewBox="0 0 190 150">
         <ellipse cx={cx} cy={138} rx={60} ry={8} fill="rgba(0,0,0,.10)" />
         <path d="M56 118 L70 112 L78 122 L64 130 Z" fill={SIDE} stroke={INK} strokeWidth="1" opacity=".8" />

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Background,
   Controls,
@@ -16,8 +16,11 @@ import RelationDrawer from "./RelationDrawer";
 import InputBar from "./InputBar";
 import NodeDrawer from "./NodeDrawer";
 import BuildingDrawer from "./BuildingDrawer";
+import { routeWithLibavoid } from "../routing";
 
 const SPREAD = 1.28;
+const NODE_W = 190;
+const NODE_H = 170;
 const EDGE_COLORS: Record<string, string> = { formal: "#2a2620", source: "#6e8fa8", suggest: "#8a8278", direction: "#a79e90" };
 const nodeTypes = { island: IslandNode, building: BuildingNode, direction: DirectionNode };
 const edgeTypes = { rail: RailEdge };
@@ -33,6 +36,11 @@ export default function World() {
   const acceptEdge = useStore((s) => s.acceptEdge);
   const backHome = useStore((s) => s.backHome);
   const [provider, setProvider] = useState("mock");
+  const [zoom, setZoom] = useState(1);
+  const [routes, setRoutes] = useState<Record<string, { x: number; y: number }[]>>({});
+
+  // 缩放分级：0 简略 / 1 中等 / 2 完整
+  const lod = zoom < 0.55 ? 0 : zoom < 1.0 ? 1 : 2;
 
   useEffect(() => {
     fetch("/api/health")
@@ -47,20 +55,55 @@ export default function World() {
       id: n.id,
       type: "island",
       position: { x: n.x * SPREAD, y: n.y * SPREAD },
-      data: { ...n, unknown: false },
+      data: { ...n, unknown: false, lod },
       draggable: false,
       selectable: true,
     }));
-    const bs: Node[] = buildings.map((b, i) => {
+    /* 副本位置：挂在所属节点旁边，但先在候选方位里挑一个不压节点/其他副本的位置 */
+    const nodePos = base.map((n) => n.position);
+    const placedBld: { x: number; y: number }[] = [];
+    const bs: Node[] = buildings.map((b) => {
       const anchor = nodes.find((n) => n.id === b.anchor);
+      const ax = (anchor?.x ?? 120) * SPREAD + NODE_W / 2;
+      const ay = (anchor?.y ?? 0) * SPREAD + NODE_H / 2;
+      // 偏好：右 → 下 → 上 → 左，取第一个"不压别人"的最近位置
+      const candidates: [number, number][] = [
+        [250, 0], [250, 170], [250, -170],
+        [-250, 0], [-250, 170], [-250, -170],
+        [0, 200], [0, -220], [380, 0], [-380, 0], [380, 200], [-380, 200],
+      ];
+      let best = { x: ax + 250, y: ay };
+      let bestClear = -Infinity;
+      for (const [dx, dy] of candidates) {
+        const pos = { x: ax + dx, y: ay + dy };
+        let clear = Infinity;
+        for (const p of nodePos) {
+          clear = Math.min(
+            clear,
+            Math.max(
+              Math.abs(p.x + NODE_W / 2 - pos.x) - NODE_W,
+              Math.abs(p.y + NODE_H / 2 - pos.y) - NODE_H,
+            ),
+          );
+        }
+        for (const p of placedBld) {
+          clear = Math.min(clear, Math.max(Math.abs(p.x - pos.x) - NODE_W, Math.abs(p.y - pos.y) - NODE_H));
+        }
+        if (clear >= 10) {
+          best = pos;
+          break;
+        }
+        if (clear > bestClear) {
+          bestClear = clear;
+          best = pos;
+        }
+      }
+      placedBld.push(best);
       return {
         id: "b:" + b.id,
         type: "building",
-        position: {
-          x: (anchor?.x ?? 120) * SPREAD + 330,
-          y: (anchor?.y ?? 0) * SPREAD - 110 + i * 130,
-        },
-        data: { ...b },
+        position: { x: best.x - NODE_W / 2, y: best.y - NODE_H / 2 },
+        data: { ...b, lod },
         draggable: false,
         selectable: false,
       };
@@ -109,7 +152,28 @@ export default function World() {
       }
     }
     return [...base, ...bs, ...dirs];
-  }, [nodes, buildings, edges]);
+  }, [nodes, buildings, edges, lod]);
+
+  // libavoid 正交避障：把节点当障碍，边绕开
+  useEffect(() => {
+    let alive = true;
+    const boxes = [...nodes.map((n) => ({
+      id: n.id,
+      x: n.x * SPREAD,
+      y: n.y * SPREAD,
+      w: NODE_W,
+      h: NODE_H,
+    }))];
+    const links = edges
+      .filter((e) => e.kind !== "direction")
+      .map((e) => ({ id: e.id, src: e.src, dst: e.dst }));
+    routeWithLibavoid(boxes, links).then((r) => {
+      if (alive && r) setRoutes(r);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [nodes, edges]);
 
   const rfEdges = useMemo<Edge[]>(() => {
     const center = (id: string) => {
@@ -128,7 +192,7 @@ export default function World() {
     };
     const counts: Record<string, number> = {};
     const bends = [0, 1, -1, 2, -2];
-    return edges
+    const mapped = edges
       .map((e) => {
         const isDir = e.kind === "direction";
         const a = center(e.src);
@@ -159,12 +223,24 @@ export default function World() {
             label: e.label,
             question: e.question,
             bend: bends[idx % bends.length],
+            lod,
+            route: routes[e.id],
             onSign: (id: string) => useStore.getState().openEdge(id),
           },
         } as Edge;
       })
       .filter(Boolean) as Edge[];
-  }, [nodes, edges]);
+
+    // 副本挂靠线：从所属节点指向副本，细线且不显示路牌
+    const linkEdges: Edge[] = buildings.map((b) => ({
+      id: "bl:" + b.id,
+      source: b.anchor,
+      target: "b:" + b.id,
+      type: "rail",
+      data: { kind: "source", label: "", lod, bend: 0, noSign: true },
+    }));
+    return [...mapped, ...linkEdges];
+  }, [nodes, edges, routes, lod, buildings]);
 
   const onNodeClick = useCallback(
     (evt: any, node: Node) => {
