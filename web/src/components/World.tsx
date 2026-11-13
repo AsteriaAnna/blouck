@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Background,
   Controls,
@@ -13,6 +13,7 @@ import BuildingNode from "./BuildingNode";
 import DirectionNode from "./DirectionNode";
 import RailEdge from "./RailEdge";
 import RelationDrawer from "./RelationDrawer";
+import World3D from "./World3D";
 import InputBar from "./InputBar";
 import NodeDrawer from "./NodeDrawer";
 import BuildingDrawer from "./BuildingDrawer";
@@ -38,6 +39,7 @@ export default function World() {
   const [provider, setProvider] = useState("mock");
   const [zoom, setZoom] = useState(1);
   const [mode, setMode] = useState<"curve" | "straight" | "rail">("curve");
+  const [view3d, setView3d] = useState(true);
   const [routes, setRoutes] = useState<Record<string, { x: number; y: number }[]>>({});
 
   // 缩放分级：0 简略 / 1 中等 / 2 完整
@@ -370,6 +372,9 @@ export default function World() {
         <span className="badge">{edges.length} 关系</span>
         <span className="badge">{buildings.length} 副本</span>
         <span className="badge">LLM/ASR: {provider}</span>
+        <button className="ghost-btn" onClick={() => setView3d((v) => !v)}>
+          {view3d ? "2D 视图" : "3D 视图"}
+        </button>
         <button
           className="ghost-btn"
           onClick={() =>
@@ -394,6 +399,9 @@ export default function World() {
       </div>
 
       <div className="flow-wrap">
+        {view3d ? (
+          <World3D />
+        ) : (
         <ReactFlow
           nodes={rfNodes}
           edges={rfEdges}
@@ -410,6 +418,7 @@ export default function World() {
           <Background color="#ded3c0" gap={26} size={1} />
           <Controls showInteractive={false} />
         </ReactFlow>
+        )}
         <div className="legend">
           <div><b>线型</b></div>
           <div className="li"><i className="sw" />正式关系（实线，不可删除）</div>

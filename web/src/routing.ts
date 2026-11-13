@@ -10,7 +10,7 @@ let loading: Promise<void> | null = null;
 async function getAvoid() {
   if (avoid) return avoid;
   if (!loading) {
-    loading = AvoidLib.load()
+    loading = AvoidLib.load("/libavoid.wasm")
       .then(() => {
         avoid = AvoidLib.getInstance();
       })
