@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Background,
   Controls,
@@ -175,6 +175,76 @@ export default function World() {
     };
   }, [nodes, edges]);
 
+  // 路牌全局排布：沿路径错位放置，再做简单碰撞避让，避免牌子互相压/压岛
+  const signPos = useMemo<Record<string, { x: number; y: number }>>(() => {
+    const items: { id: string; x: number; y: number; w: number; h: number }[] = [];
+    for (const e of edges) {
+      const route = routes[e.id];
+      if (!route || route.length < 2) continue;
+      const label = e.kind === "direction" ? e.question || "下一步方向" : e.label || "";
+      if (!label) continue;
+      let seed = 0;
+      for (let i = 0; i < e.id.length; i++) seed = (seed * 31 + e.id.charCodeAt(i)) | 0;
+      const frac = 0.3 + ((Math.abs(seed) % 34) / 100);
+      const total = route.reduce(
+        (acc, p, i) => (i === 0 ? 0 : acc + Math.hypot(p.x - route[i - 1].x, p.y - route[i - 1].y)),
+        0,
+      );
+      let walked = 0;
+      let px = route[0].x;
+      let py = route[0].y;
+      for (let i = 1; i < route.length; i++) {
+        const a = route[i - 1];
+        const b = route[i];
+        const len = Math.hypot(b.x - a.x, b.y - a.y);
+        if (walked + len >= total * frac) {
+          const t = len ? (total * frac - walked) / len : 0;
+          px = a.x + (b.x - a.x) * t;
+          py = a.y + (b.y - a.y) * t;
+          break;
+        }
+        walked += len;
+      }
+      const w = Math.min(240, label.length * 7 + 44);
+      items.push({ id: e.id, x: px, y: py - 18, w, h: 26 });
+    }
+    // 避开节点
+    for (const it of items) {
+      for (const n of nodes) {
+        const bx = n.x * SPREAD;
+        const by = n.y * SPREAD;
+        if (
+          it.x + it.w / 2 > bx &&
+          it.x - it.w / 2 < bx + NODE_W &&
+          it.y + it.h / 2 > by &&
+          it.y - it.h / 2 < by + NODE_H
+        ) {
+          it.y = by - it.h / 2 - 12;
+        }
+      }
+    }
+    // 牌子之间互相推开
+    for (let iter = 0; iter < 10; iter++) {
+      for (let i = 0; i < items.length; i++) {
+        for (let j = i + 1; j < items.length; j++) {
+          const a = items[i];
+          const b = items[j];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const minX = (a.w + b.w) / 2 + 8;
+          const minY = (a.h + b.h) / 2 + 6;
+          if (Math.abs(dx) >= minX || Math.abs(dy) >= minY) continue;
+          const pushY = (minY - Math.abs(dy)) * (dy >= 0 ? 1 : -1) * 0.55;
+          a.y -= pushY;
+          b.y += pushY;
+        }
+      }
+    }
+    const out: Record<string, { x: number; y: number }> = {};
+    for (const it of items) out[it.id] = { x: it.x, y: it.y };
+    return out;
+  }, [edges, routes, nodes]);
+
   const rfEdges = useMemo<Edge[]>(() => {
     const center = (id: string) => {
       const n = nodes.find((x) => x.id === id);
@@ -240,7 +310,7 @@ export default function World() {
       data: { kind: "source", label: "", lod, bend: 0, noSign: true },
     }));
     return [...mapped, ...linkEdges];
-  }, [nodes, edges, routes, lod, buildings]);
+  }, [nodes, edges, routes, lod, buildings, signPos]);
 
   const onNodeClick = useCallback(
     (evt: any, node: Node) => {
@@ -256,12 +326,10 @@ export default function World() {
 
   const onEdgeClick = useCallback(
     (evt: any, edge: Edge) => {
-      const kind = (edge.data as any)?.kind;
-      if (kind === "suggest") {
-        if (window.confirm("接受这条虚线建议，建立正式关系？")) acceptEdge(edge.id);
-      }
+      // 正式/来源/建议线：点线打开关系 MD；方向线点悬空 ? 打开问题
+      useStore.getState().openEdge(edge.id);
     },
-    [acceptEdge],
+    [],
   );
 
   if (!world) return null;

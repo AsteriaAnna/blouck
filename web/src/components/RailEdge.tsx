@@ -95,24 +95,37 @@ export default function RailEdge(props: EdgeProps) {
   const right = toPath(offsetLine(pts, -2.8));
   const path = toPath(pts);
 
-  // 路牌放在最长的一段上
-  let best = { x: 0, y: 0, len: 0, angle: 0 };
-  for (let i = 0; i < pts.length - 1; i++) {
-    const a = pts[i];
-    const b = pts[i + 1];
+  // 路牌沿路径按 id 哈希错位，避免同一走廊上的牌子叠在一起
+  let seed = 0;
+  for (let i = 0; i < id.length; i++) seed = (seed * 31 + id.charCodeAt(i)) | 0;
+  const frac = 0.3 + ((Math.abs(seed) % 34) / 100);
+  const total = pts.reduce((acc, p, i) => (i === 0 ? 0 : acc + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y)), 0);
+  let walked = 0;
+  let best = { x: pts[0].x, y: pts[0].y, angle: 0 };
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1];
+    const b = pts[i];
     const len = Math.hypot(b.x - a.x, b.y - a.y);
-    if (len > best.len) {
+    if (walked + len >= total * frac) {
+      const t = len ? (total * frac - walked) / len : 0;
       best = {
-        x: (a.x + b.x) / 2,
-        y: (a.y + b.y) / 2,
-        len,
+        x: a.x + (b.x - a.x) * t,
+        y: a.y + (b.y - a.y) * t,
         angle: (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI,
       };
+      break;
     }
+    walked += len;
   }
+  // 垂直方向再错开一点；World 会传全局避让后的 signPos
+  const rad = (best.angle * Math.PI) / 180;
+  const side = Math.abs(seed) % 2 === 0 ? 1 : -1;
+  const sp = d.signPos as { x: number; y: number } | undefined;
+  const signX = sp ? sp.x : best.x + Math.sin(rad) * 14 * side;
+  const signY = sp ? sp.y : best.y - Math.cos(rad) * 14 * side;
 
   const label = isDir ? d.question || "下一步方向" : d.label || "关系";
-  const showSign = !d.noSign && lod > 0 && (lod === 2 || isDir || kind === "suggest");
+  const showSign = !d.noSign && lod > 0 && (isDir || kind === "suggest");
 
   const end = pts[pts.length - 1];
   const prev = pts[pts.length - 2] ?? end;
@@ -143,7 +156,7 @@ export default function RailEdge(props: EdgeProps) {
             className={"rail-post" + (isDir ? " dir" : "") + (kind === "suggest" ? " suggest" : "")}
             style={{
               position: "absolute",
-              transform: `translate(-50%,-100%) translate(${best.x}px,${best.y - 8}px)`,
+              transform: `translate(-50%,-50%) translate(${signX}px,${signY}px)`,
               pointerEvents: "all",
             }}
           >
