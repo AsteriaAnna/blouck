@@ -178,7 +178,7 @@ function Edge({
         <meshBasicMaterial color={color} transparent opacity={0.65} />
       </mesh>
       {(kind === "direction" || kind === "suggest") && label ? (
-        <Html center position={[mid.x, mid.y + 18, mid.z]}>
+        <Html center position={[mid.x, 20, mid.z]}>
           <button className="rail-board sign3d" onClick={onSign}>
             {label}
           </button>
@@ -248,8 +248,8 @@ export default function World3D() {
           return (
             <Edge
               key={e.id}
-              a={a.clone().setY(26)}
-              b={b.clone().setY(26)}
+              a={a.clone().setY(0)}
+              b={b.clone().setY(0)}
               kind={e.kind}
               label={label}
               onSign={() => openEdge(e.id)}
