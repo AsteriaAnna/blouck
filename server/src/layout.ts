@@ -1,4 +1,4 @@
-import ELKModule from "elkjs/lib/elk.bundled.js";
+﻿import ELKModule from "elkjs/lib/elk.bundled.js";
 import type { EdgeRow, NodeRow } from "./db.js";
 
 const ELK: any = (ELKModule as any).default ?? ELKModule;
@@ -32,11 +32,31 @@ export async function elkLayout(nodes: NodeRow[], edges: EdgeRow[]) {
       })),
   };
   const laid = (await elk.layout(graph as any)) as any;
-  return (laid.children ?? []).map((c: any) => ({
+  const raw: { id: string; x: number; y: number }[] = (laid.children ?? []).map((c: any) => ({
     id: c.id as string,
     x: Number(c.x ?? 0),
     y: Number(c.y ?? 0),
   }));
+
+  // 压紧：ELK 会把大图拉得很开（47 节点可达 7000px），
+  // 这里按 ELK 的相对顺序重建紧凑网格，保证屏幕比例合适且不重叠。
+  const n = raw.length;
+  if (n > 18) {
+    const maxX = Math.max(...raw.map((p) => p.x));
+    const maxY = Math.max(...raw.map((p) => p.y));
+    if (maxX > 2600 || maxY > 2000) {
+      const cols = Math.max(4, Math.ceil(Math.sqrt(n * 1.5)));
+      const ordered = [...raw].sort(
+        (a, b) => Math.round(a.y / 140) - Math.round(b.y / 140) || a.x - b.x,
+      );
+      return ordered.map((p, i) => ({
+        id: p.id,
+        x: 200 + (i % cols) * 270 + (Math.floor(i / cols) % 2 ? 55 : 0),
+        y: 170 + Math.floor(i / cols) * 245,
+      }));
+    }
+  }
+  return raw;
 }
 
 /**

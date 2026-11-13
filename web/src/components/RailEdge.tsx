@@ -222,15 +222,17 @@ export default function RailEdge(props: EdgeProps) {
 
   return (
     <>
-      {/* 道路底：浅色路床，让曲线像"地上的路" */}
-      {isCurve && (
-        <path d={path} fill="none" stroke="#efe3cc" strokeWidth={13} strokeLinecap="round" opacity={0.85} />
-      )}
-      <path d={leftPath} fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />
-      <path d={rightPath} fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />
-      {kind === "suggest" && (
-        <path d={path} fill="none" stroke="#fffdf7" strokeWidth={1.2} strokeDasharray="5 8" opacity={0.9} />
-      )}
+      {/* 单线条：一条线 + 箭头 + 路标 */}
+      <path
+        d={path}
+        fill="none"
+        stroke={color}
+        strokeWidth={2.2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeDasharray={kind === "suggest" ? "7 6" : kind === "direction" ? "2 6" : undefined}
+        opacity={0.92}
+      />
       <polygon
         points={`${arrowTip.x},${arrowTip.y} ${arrowA.x},${arrowA.y} ${arrowB.x},${arrowB.y}`}
         fill={color}

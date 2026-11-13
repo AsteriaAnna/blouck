@@ -1,4 +1,4 @@
-import express from "express";
+﻿import express from "express";
 import { createServer } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
 import { env, providers } from "./env.js";
@@ -332,6 +332,98 @@ app.post("/api/dev/world", (req, res) => {
     addEdge(world.id, a, b, "suggest", "可能关联");
   }
   res.json({ ok: true, world });
+});
+
+/** 探索模拟：按轮次"探索 → 生成节点 → 连线"，再跑布局与副本检测 */
+app.post("/api/dev/explore", async (req, res) => {
+  const rounds = Math.max(6, Math.min(60, Number(req.body?.rounds ?? 24)));
+  const world = createWorld(`探索模拟 · ${rounds} 轮`, "起点");
+  const ids: string[] = [world.root_node_id];
+  const frontier: string[] = [world.root_node_id];
+  const vocab = [
+    "检索", "重排", "评测", "记忆", "工具调用", "多模态", "推理", "规划",
+    "幻觉", "上下文窗口", "向量库", "索引", "分块", "微调", "对齐", "蒸馏",
+    "Agent", "工作流", "提示词", "召回", "精排", "生成", "事实性", "延迟",
+  ];
+  let mi = 0;
+  for (let r = 0; r < rounds; r++) {
+    const focus = frontier.length ? frontier.shift()! : ids[Math.floor(Math.random() * ids.length)];
+    const k = 1 + (r % 2);
+    for (let j = 0; j < k; j++) {
+      const name = vocab[mi % vocab.length] + (mi >= vocab.length ? `·${mi}` : "");
+      mi++;
+      const node = addNode(world.id, name, 0, 0);
+      ids.push(node.id);
+      // 探索来源/正式关系
+      addEdge(world.id, focus, node.id, j === 0 ? "formal" : "source", "探索延伸");
+      // 跨链接：模拟"发现关联"
+      if (ids.length > 3) {
+        const other = ids[Math.floor(Math.random() * ids.length)];
+        if (other !== node.id) {
+          addEdge(world.id, node.id, other, r % 3 === 0 ? "suggest" : "formal", "发现关联");
+        }
+      }
+      frontier.push(node.id);
+    }
+    frontier.push(focus);
+    // 偶发方向线：下一步往哪探索
+    if (r % 6 === 0) {
+      addEdge(world.id, focus, focus, "direction", "下一步可以探索什么？");
+    }
+  }
+
+  // 结构化两条链 + 一个簇：让副本检测能命中（流程/领域）
+  const chain = [];
+  for (let i = 0; i < 4; i++) chain.push(addNode(world.id, `流程步骤${i + 1}`, 0, 0).id);
+  for (let i = 0; i < 3; i++) addEdge(world.id, chain[i], chain[i + 1], "formal", "步骤");
+  const cluster = addNode(world.id, "领域中心", 0, 0).id;
+  for (let i = 0; i < 5; i++) {
+    const n = addNode(world.id, `领域节点${i + 1}`, 0, 0).id;
+    addEdge(world.id, cluster, n, "formal", "属于");
+    if (i > 0) addEdge(world.id, n, cluster, "formal", "关联");
+  }
+
+  const graph = getGraph(world.id);
+  let engine = "elk";
+  let placed;
+  try {
+    placed = await elkLayout(graph.nodes, graph.edges);
+  } catch {
+    engine = "wfc";
+    placed = wfcLayout(graph.nodes, graph.edges);
+  }
+  for (const p of placed) setNodePosition(p.id, p.x, p.y);
+
+  const nodes = getGraph(world.id).nodes;
+  detectBuildings(world.id, nodes[0], nodes);
+
+  // 重叠检查（屏幕坐标：x*1.28，节点 190×170）
+  const W = 190, H = 170, SP = 1.28;
+  let overlaps = 0;
+  let minGap = Infinity;
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const dx = Math.abs(nodes[i].x - nodes[j].x) * SP;
+      const dy = Math.abs(nodes[i].y - nodes[j].y) * SP;
+      if (dx < W && dy < H) overlaps++;
+      minGap = Math.min(minGap, Math.max(dx - W, dy - H));
+    }
+  }
+  const buildings = listBuildings(world.id);
+  res.json({
+    ok: true,
+    world,
+    layoutEngine: engine,
+    stats: {
+      nodes: nodes.length,
+      edges: getGraph(world.id).edges.length,
+      rounds,
+      overlaps,
+      minGap: Number.isFinite(minGap) ? Math.round(minGap) : null,
+      buildings: buildings.length,
+      buildingKinds: buildings.map((b) => b.kind),
+    },
+  });
 });
 
 /* ---------------- 副本 ---------------- */
