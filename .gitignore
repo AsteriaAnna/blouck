@@ -1,7 +1,10 @@
-node_modules/
+﻿node_modules/
 dist/
 .env
 .env.local
 server/data/
 .DS_Store
 *.log
+
+# 本地 Blender 安装（几百 MB，不进仓库）
+prototype/tools/blender-*/

@@ -1,0 +1,157 @@
+[
+ {
+  "id": "rag",
+  "tier": 2,
+  "landmark": "library",
+  "palette": 0,
+  "file": "island_rag.glb"
+ },
+ {
+  "id": "retrieval",
+  "tier": 3,
+  "landmark": "beacon",
+  "palette": 1,
+  "file": "island_retrieval.glb"
+ },
+ {
+  "id": "vectordb",
+  "tier": 2,
+  "landmark": "crystals",
+  "palette": 2,
+  "file": "island_vectordb.glb"
+ },
+ {
+  "id": "embedding",
+  "tier": 3,
+  "landmark": "crystal_tower",
+  "palette": 3,
+  "file": "island_embedding.glb"
+ },
+ {
+  "id": "chunking",
+  "tier": 1,
+  "landmark": "mill",
+  "palette": 4,
+  "file": "island_chunking.glb"
+ },
+ {
+  "id": "bm25",
+  "tier": 1,
+  "landmark": "well",
+  "palette": 5,
+  "file": "island_bm25.glb"
+ },
+ {
+  "id": "docparse",
+  "tier": 1,
+  "landmark": "book_tower",
+  "palette": 0,
+  "file": "island_docparse.glb"
+ },
+ {
+  "id": "clean",
+  "tier": 1,
+  "landmark": "pond",
+  "palette": 1,
+  "file": "island_clean.glb"
+ },
+ {
+  "id": "kg",
+  "tier": 1,
+  "landmark": "big_tree",
+  "palette": 2,
+  "file": "island_kg.glb"
+ },
+ {
+  "id": "generation",
+  "tier": 2,
+  "landmark": "fountain",
+  "palette": 3,
+  "file": "island_generation.glb"
+ },
+ {
+  "id": "hallucination",
+  "tier": 1,
+  "landmark": "crooked_tower",
+  "palette": 4,
+  "file": "island_hallucination.glb"
+ },
+ {
+  "id": "ctx",
+  "tier": 2,
+  "landmark": "gate_arch",
+  "palette": 5,
+  "file": "island_ctx.glb"
+ },
+ {
+  "id": "prompt",
+  "tier": 1,
+  "landmark": "monolith",
+  "palette": 0,
+  "file": "island_prompt.glb"
+ },
+ {
+  "id": "eval",
+  "tier": 2,
+  "landmark": "balance",
+  "palette": 1,
+  "file": "island_eval.glb"
+ },
+ {
+  "id": "recall",
+  "tier": 1,
+  "landmark": "lighthouse",
+  "palette": 2,
+  "file": "island_recall.glb"
+ },
+ {
+  "id": "qa",
+  "tier": 2,
+  "landmark": "clock_tower",
+  "palette": 3,
+  "file": "island_qa.glb"
+ },
+ {
+  "id": "finetune",
+  "tier": 1,
+  "landmark": "workshop",
+  "palette": 4,
+  "file": "island_finetune.glb"
+ },
+ {
+  "id": "agent",
+  "tier": 2,
+  "landmark": "castle",
+  "palette": 5,
+  "file": "island_agent.glb"
+ },
+ {
+  "id": "workflow",
+  "tier": 1,
+  "landmark": "waterwheel",
+  "palette": 0,
+  "file": "island_workflow.glb"
+ },
+ {
+  "id": "multimodal",
+  "tier": 1,
+  "landmark": "twin_towers",
+  "palette": 1,
+  "file": "island_multimodal.glb"
+ },
+ {
+  "id": "longctx",
+  "tier": 1,
+  "landmark": "arcade",
+  "palette": 2,
+  "file": "island_longctx.glb"
+ },
+ {
+  "id": "gate_domain",
+  "file": "gate_domain.glb"
+ },
+ {
+  "id": "gate_flow",
+  "file": "gate_flow.glb"
+ }
+]

@@ -1,17 +1,11 @@
-import { useMemo, useRef, useState } from "react";
+﻿import { Suspense, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Html, Line, OrbitControls } from "@react-three/drei";
+import { Html, Line, OrbitControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { useStore } from "../store";
+import { buildingModelUrl, islandModelUrl } from "../models3d";
 
-const PALETTES = [
-  { roof: "#c97b6b", accent: "#6fa8b8" },
-  { roof: "#7e8fa8", accent: "#c98a5e" },
-  { roof: "#a76b6b", accent: "#8e7bb0" },
-  { roof: "#6e8c83", accent: "#c9a05b" },
-  { roof: "#b0805a", accent: "#6b8fa8" },
-  { roof: "#8a7080", accent: "#a88a5e" },
-];
+const ACCENTS = ["#c97b6b", "#7e8fa8", "#a76b6b", "#6e8c83", "#b0805a", "#8a7080"];
 
 function hash(s: string) {
   let h = 0;
@@ -26,26 +20,52 @@ const EDGE_COLORS: Record<string, string> = {
   direction: "#b0a390",
 };
 
+/** 加载 GLB 并归一化：底部落在 y=0，尺寸缩放到 target */
+function Model({ url, target, tint }: { url: string; target: number; tint?: string }) {
+  const { scene } = useGLTF(url);
+  const object = useMemo(() => {
+    const src = scene.clone(true);
+    src.traverse((o: any) => {
+      if (o.isMesh) {
+        o.castShadow = true;
+        o.receiveShadow = true;
+        if (o.material) o.material.side = THREE.FrontSide;
+      }
+    });
+    const box = new THREE.Box3().setFromObject(src);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const k = target / Math.max(size.x, size.z, 0.001);
+    src.scale.setScalar(k);
+    src.position.set(-center.x * k, -box.min.y * k, -center.z * k);
+    const group = new THREE.Group();
+    group.add(src);
+    return group;
+  }, [scene, target]);
+  return <primitive object={object} />;
+}
+
 function Island({
   position,
   node,
-  pal,
   onOpen,
 }: {
   position: [number, number, number];
   node: any;
-  pal: { roof: string; accent: string };
   onOpen: () => void;
 }) {
   const [hover, setHover] = useState(false);
   const ref = useRef<THREE.Group>(null);
+  const seed = hash(node.id);
+  const accent = ACCENTS[seed % ACCENTS.length];
+  const tier = node.tier ?? 0;
+
   useFrame((_, dt) => {
     if (!ref.current) return;
-    const target = hover ? 1.12 : 1;
+    const target = hover ? 1.1 : 1;
     ref.current.scale.lerp(new THREE.Vector3(target, target, target), Math.min(1, dt * 8));
-    ref.current.position.y += Math.sin(performance.now() / 1400 + position[0]) * 0.02;
   });
-  const tier = node.tier ?? 0;
+
   return (
     <group
       position={position}
@@ -64,61 +84,19 @@ function Island({
       }}
     >
       <group ref={ref}>
-        {/* 岛体 */}
-        <mesh castShadow receiveShadow position={[0, -8, 0]}>
-          <cylinderGeometry args={[52, 40, 16, 7]} />
-          <meshStandardMaterial color="#e4d8c2" flatShading />
-        </mesh>
-        <mesh castShadow receiveShadow position={[0, 2, 0]}>
-          <cylinderGeometry args={[50, 50, 6, 7]} />
-          <meshStandardMaterial color="#fffdf7" flatShading />
-        </mesh>
-        {/* 地标 */}
-        {tier >= 3 ? (
-          <group>
-            <mesh position={[0, 28, 0]} castShadow>
-              <boxGeometry args={[22, 40, 22]} />
-              <meshStandardMaterial color="#fffdf7" />
-            </mesh>
-            <mesh position={[0, 52, 0]} castShadow>
-              <coneGeometry args={[18, 18, 4]} />
-              <meshStandardMaterial color={pal.roof} />
-            </mesh>
-          </group>
-        ) : (
-          <group>
-            <mesh position={[0, 20, 0]} castShadow>
-              <boxGeometry args={[26, 24, 26]} />
-              <meshStandardMaterial color="#fffdf7" />
-            </mesh>
-            <mesh position={[0, 36, 0]} castShadow>
-              <coneGeometry args={[20, 14, 4]} />
-              <meshStandardMaterial color={pal.roof} />
-            </mesh>
-          </group>
-        )}
-        {/* 树 */}
-        <group position={[30, 4, -16]}>
-          <mesh position={[0, 10, 0]}>
-            <cylinderGeometry args={[2.4, 2.4, 16, 6]} />
-            <meshStandardMaterial color="#8a7a63" />
-          </mesh>
-          <mesh position={[0, 22, 0]} castShadow>
-            <sphereGeometry args={[9, 10, 8]} />
-            <meshStandardMaterial color="#7f9a74" flatShading />
-          </mesh>
-        </group>
-        {/* 等级环 */}
+        <Suspense fallback={null}>
+          <Model url={islandModelUrl(node.name ?? "", node.id)} target={120} tint={accent} />
+        </Suspense>
         {tier >= 1 && (
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 4, 0]}>
-            <torusGeometry args={[tier >= 3 ? 64 : 56, 1.4, 8, 48]} />
-            <meshStandardMaterial color={pal.accent} transparent opacity={0.8} />
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 3, 0]}>
+            <torusGeometry args={[tier >= 3 ? 70 : 60, 1.3, 8, 48]} />
+            <meshStandardMaterial color={accent} transparent opacity={0.85} />
           </mesh>
         )}
       </group>
-      <Html center position={[0, 72, 0]} zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
+      <Html center position={[0, 92, 0]} zIndexRange={[30, 0]} style={{ pointerEvents: "none" }}>
         <div className="n3d-label">
-          <span className="dot" style={{ background: pal.roof }} />
+          <span className="dot" style={{ background: accent }} />
           {node.name}
         </div>
       </Html>
@@ -135,7 +113,6 @@ function Building({
   building: any;
   onOpen: () => void;
 }) {
-  const isFlow = building.kind === "flow";
   return (
     <group
       position={position}
@@ -144,38 +121,10 @@ function Building({
         onOpen();
       }}
     >
-      <mesh castShadow receiveShadow position={[0, -4, 0]}>
-        <cylinderGeometry args={[44, 36, 12, 7]} />
-        <meshStandardMaterial color="#e4d8c2" flatShading />
-      </mesh>
-      {isFlow ? (
-        <group>
-          <mesh position={[-18, 26, 0]} castShadow>
-            <boxGeometry args={[8, 52, 8]} />
-            <meshStandardMaterial color="#cfc4ae" />
-          </mesh>
-          <mesh position={[18, 26, 0]} castShadow>
-            <boxGeometry args={[8, 52, 8]} />
-            <meshStandardMaterial color="#cfc4ae" />
-          </mesh>
-          <mesh position={[0, 56, 0]} castShadow>
-            <boxGeometry args={[52, 8, 10]} />
-            <meshStandardMaterial color="#8e7bb0" />
-          </mesh>
-        </group>
-      ) : (
-        <group>
-          <mesh position={[0, 30, 0]} castShadow>
-            <cylinderGeometry args={[16, 20, 48, 8]} />
-            <meshStandardMaterial color="#fffdf7" />
-          </mesh>
-          <mesh position={[0, 62, 0]} castShadow>
-            <coneGeometry args={[22, 22, 6]} />
-            <meshStandardMaterial color="#6fa8b8" />
-          </mesh>
-        </group>
-      )}
-      <Html center position={[0, 92, 0]} style={{ pointerEvents: "none" }}>
+      <Suspense fallback={null}>
+        <Model url={buildingModelUrl(building.kind)} target={150} />
+      </Suspense>
+      <Html center position={[0, 118, 0]} style={{ pointerEvents: "none" }}>
         <div className="b3d-label">{building.kind === "flow" ? "流程副本" : "领域副本"}</div>
       </Html>
     </group>
@@ -200,7 +149,10 @@ function Edge({
     mid.y += Math.min(140, a.distanceTo(b) * 0.18);
     return new THREE.QuadraticBezierCurve3(a, mid, b);
   }, [a, b]);
-  const pts = useMemo(() => curve.getPoints(26).map((p) => [p.x, p.y, p.z] as [number, number, number]), [curve]);
+  const pts = useMemo(
+    () => curve.getPoints(26).map((p) => [p.x, p.y, p.z] as [number, number, number]),
+    [curve],
+  );
   const end = pts[pts.length - 1];
   const prev = pts[pts.length - 2];
   const q = useMemo(() => {
@@ -208,7 +160,6 @@ function Edge({
     return new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
   }, [end, prev]);
   const mid = curve.getPoint(0.5);
-  const dashed = kind === "suggest";
   const color = EDGE_COLORS[kind] ?? EDGE_COLORS.formal;
   return (
     <group>
@@ -218,7 +169,7 @@ function Edge({
         lineWidth={1.4}
         transparent
         opacity={kind === "direction" ? 0.35 : 0.55}
-        dashed={dashed}
+        dashed={kind === "suggest"}
         dashSize={6}
         gapSize={6}
       />
@@ -246,7 +197,7 @@ export default function World3D() {
   const openEdge = useStore((s) => s.openEdge);
 
   const { cx, cy, scale } = useMemo(() => {
-    if (!nodes.length) return { cx: 0, cy: 0, scale: 0.8 };
+    if (!nodes.length) return { cx: 0, cy: 0, scale: 0.85 };
     const xs = nodes.map((n) => n.x);
     const ys = nodes.map((n) => n.y);
     return {
@@ -277,27 +228,18 @@ export default function World3D() {
       >
         <color attach="background" args={["#f7f2e8"]} />
         <fog attach="fog" args={["#f7f2e8", 1400, 4200]} />
-        <ambientLight intensity={0.85} />
-        <hemisphereLight args={["#fffdf7", "#d8cbb5", 0.5]} />
+        <ambientLight intensity={0.9} />
+        <hemisphereLight args={["#fffdf7", "#d8cbb5", 0.55]} />
         <directionalLight
           position={[700, 1200, 500]}
-          intensity={1.15}
+          intensity={1.2}
           castShadow
           shadow-mapSize-width={2048}
           shadow-mapSize-height={2048}
         />
-        {nodes.map((n) => {
-          const seed = hash(n.id);
-          return (
-            <Island
-              key={n.id}
-              position={posOf(n.x, n.y)}
-              node={n}
-              pal={PALETTES[seed % PALETTES.length]}
-              onOpen={() => openNode(n.id)}
-            />
-          );
-        })}
+        {nodes.map((n) => (
+          <Island key={n.id} position={posOf(n.x, n.y)} node={n} onOpen={() => openNode(n.id)} />
+        ))}
         {edges.map((e) => {
           const a = nodePos.get(e.src);
           const b = nodePos.get(e.dst);
@@ -321,7 +263,7 @@ export default function World3D() {
           return (
             <Building
               key={b.id}
-              position={[x + 170, 0, z + 60]}
+              position={[x + 190, 0, z + 70]}
               building={b}
               onOpen={() => openBuilding(b.id)}
             />

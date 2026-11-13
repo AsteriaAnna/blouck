@@ -10,6 +10,12 @@
 > React Flow + SVG 自定义节点实现二维图谱；仓库里没有 3D 依赖。
 > 3D 浮岛样片只作为视觉参考，不进入本 MVP。
 
+## 3D 资产与原型
+
+- 3D 视图使用 web/public/assets3d/ 里的 GLB（21 浮岛 + 2 副本门），资产已入库；
+- 原型 HTML 与生成脚本在 prototype/；
+- 细节见 [docs/ASSETS.md](docs/ASSETS.md)。
+
 ## 界面
 
 ![world](docs/screenshots/05-world.png)
