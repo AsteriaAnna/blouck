@@ -84,6 +84,30 @@ export default function World() {
           selectable: false,
         };
       });
+    // 去重叠：WFC 之后仍有视觉挤压，这里在屏幕空间把节点/建筑互相推开
+    const solid = [...base, ...bs];
+    for (let iter = 0; iter < 8; iter++) {
+      for (let i = 0; i < solid.length; i++) {
+        for (let j = i + 1; j < solid.length; j++) {
+          const a = solid[i] as any;
+          const b = solid[j] as any;
+          const ddx = b.position.x - a.position.x;
+          const ddy = b.position.y - a.position.y;
+          const minX = 230;
+          const minY = 200;
+          if (Math.abs(ddx) >= minX || Math.abs(ddy) >= minY) continue;
+          const pushX = (minX - Math.abs(ddx)) * (ddx >= 0 ? 1 : -1) * 0.5;
+          const pushY = (minY - Math.abs(ddy)) * (ddy >= 0 ? 1 : -1) * 0.5;
+          if (Math.abs(ddx) / minX > Math.abs(ddy) / minY) {
+            a.position.x -= pushX;
+            b.position.x += pushX;
+          } else {
+            a.position.y -= pushY;
+            b.position.y += pushY;
+          }
+        }
+      }
+    }
     return [...base, ...bs, ...dirs];
   }, [nodes, buildings, edges]);
 
@@ -112,9 +136,14 @@ export default function World() {
         if (!a || !b) return null;
         const dx = b.x - a.x;
         const dy = b.y - a.y;
-        // 铁路统一从岛底尖端出发、落到下方再走横向
-        const sourceHandle = "b";
-        const targetHandle = isDir ? undefined : "b";
+        // 铁路从靠近目标的那个"尖尖"出线，四个方向都走
+        const horiz = Math.abs(dx) >= Math.abs(dy);
+        const sourceHandle = horiz ? (dx >= 0 ? "r" : "l") : (dy >= 0 ? "b" : "t");
+        const targetHandle = isDir
+          ? undefined
+          : horiz
+            ? (dx >= 0 ? "l" : "r")
+            : (dy >= 0 ? "t" : "b");
         const key = isDir ? "d:" + e.id : [e.src, e.dst].sort().join("|");
         const idx = counts[key] ?? 0;
         counts[key] = idx + 1;

@@ -1,4 +1,4 @@
-﻿import { EdgeLabelRenderer, type EdgeProps } from "@xyflow/react";
+import { EdgeLabelRenderer, type EdgeProps } from "@xyflow/react";
 
 const COLORS: Record<string, string> = {
   formal: "#2a2620",
@@ -7,22 +7,30 @@ const COLORS: Record<string, string> = {
   direction: "#a79e90",
 };
 
-/** 折线铁路：从节点底部尖端出发，落地、横向、再抬起到目标底部尖端 */
-function railPoints(sx: number, sy: number, tx: number, ty: number, bend: number) {
-  const drop = 34 + Math.abs(bend) * 18;
-  const mid = sx + (tx - sx) / 2 + bend * 44;
-  return [
-    { x: sx, y: sy },
-    { x: sx, y: sy + drop },
-    { x: mid, y: sy + drop },
-    { x: mid, y: ty + drop },
-    { x: tx, y: ty + drop },
-    { x: tx, y: ty },
-  ];
+type Pt = { x: number; y: number };
+
+function normalOf(pos?: string): Pt {
+  if (pos === "top") return { x: 0, y: -1 };
+  if (pos === "right") return { x: 1, y: 0 };
+  if (pos === "bottom") return { x: 0, y: 1 };
+  if (pos === "left") return { x: -1, y: 0 };
+  return { x: 0, y: 1 };
 }
 
-function toPath(points: { x: number; y: number }[], r = 10) {
-  // 圆角折线
+/** 从岛的尖端沿法线出去，再用正交折线接到目标尖端 */
+function route(s: Pt, t: Pt, n1: Pt, n2: Pt, bend: number): Pt[] {
+  const d = 34 + Math.abs(bend) * 14;
+  const p1 = { x: s.x + n1.x * d, y: s.y + n1.y * d };
+  const p3 = { x: t.x + n2.x * d, y: t.y + n2.y * d };
+  if (n1.x !== 0) {
+    const mx = p3.x + bend * 18;
+    return [s, p1, { x: mx, y: p1.y }, { x: mx, y: p3.y }, p3, t];
+  }
+  return [s, p1, { x: p1.x, y: p3.y + bend * 18 }, p3, t];
+}
+
+function toPath(points: Pt[], r = 12) {
+  if (points.length < 2) return "";
   let d = `M ${points[0].x} ${points[0].y}`;
   for (let i = 1; i < points.length - 1; i++) {
     const p = points[i];
@@ -42,7 +50,7 @@ function toPath(points: { x: number; y: number }[], r = 10) {
   return d;
 }
 
-function offsetLine(points: { x: number; y: number }[], off: number) {
+function offsetLine(points: Pt[], off: number) {
   return points.map((p, i) => {
     const prev = points[Math.max(0, i - 1)];
     const next = points[Math.min(points.length - 1, i + 1)];
@@ -53,8 +61,8 @@ function offsetLine(points: { x: number; y: number }[], off: number) {
   });
 }
 
-function sampleAlong(points: { x: number; y: number }[], step: number) {
-  const out: { x: number; y: number; nx: number; ny: number }[] = [];
+function sleepers(points: Pt[], step: number) {
+  const out: (Pt & { nx: number; ny: number })[] = [];
   for (let i = 0; i < points.length - 1; i++) {
     const a = points[i];
     const b = points[i + 1];
@@ -72,62 +80,98 @@ function sampleAlong(points: { x: number; y: number }[], step: number) {
 }
 
 export default function RailEdge(props: EdgeProps) {
-  const { id, sourceX, sourceY, targetX, targetY, data } = props;
+  const {
+    id,
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    sourcePosition,
+    targetPosition,
+    data,
+  } = props;
   const d = (data ?? {}) as any;
   const kind: string = d.kind ?? "formal";
   const color = COLORS[kind] ?? COLORS.formal;
   const bend: number = d.bend ?? 0;
+  const isDir = kind === "direction";
 
-  const pts = railPoints(sourceX, sourceY, targetX, targetY, bend);
+  const pts = route(
+    { x: sourceX, y: sourceY },
+    { x: targetX, y: targetY },
+    normalOf(sourcePosition),
+    normalOf(targetPosition),
+    bend,
+  );
   const path = toPath(pts);
-  const left = toPath(offsetLine(pts, 2.6));
-  const right = toPath(offsetLine(pts, -2.6));
-  const sleepers = sampleAlong(pts, 13);
+  const left = toPath(offsetLine(pts, 2.8));
+  const right = toPath(offsetLine(pts, -2.8));
+  const ties = sleepers(pts, 14);
 
-  const signX = (sourceX + targetX) / 2 + bend * 20;
-  const signY = (sourceY + targetY) / 2 + 20;
-
-  const isDirection = kind === "direction";
-  const label = isDirection ? d.question || "下一步方向" : d.label || "关系";
+  // 路牌放到最长的一段上
+  let best = { x: 0, y: 0, len: 0, angle: 0 };
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i];
+    const b = pts[i + 1];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    if (len > best.len) {
+      best = {
+        x: (a.x + b.x) / 2,
+        y: (a.y + b.y) / 2,
+        len,
+        angle: (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI,
+      };
+    }
+  }
+  const label = isDir ? d.question || "下一步方向" : d.label || "关系";
 
   return (
     <>
-      {/* 道砟 + 枕木 + 双轨 */}
-      <path d={path} fill="none" stroke="#e2d1b4" strokeWidth={15} strokeLinecap="round" strokeLinejoin="round" />
-      {sleepers.map((s, i) => (
+      <path d={path} fill="none" stroke="#e2d1b4" strokeWidth={16} strokeLinecap="round" strokeLinejoin="round" />
+      {ties.map((s, i) => (
         <line
           key={i}
-          x1={s.x + s.nx * 5.5}
-          y1={s.y + s.ny * 5.5}
-          x2={s.x - s.nx * 5.5}
-          y2={s.y - s.ny * 5.5}
-          stroke="#b9a98a"
-          strokeWidth={1.4}
+          x1={s.x + s.nx * 6}
+          y1={s.y + s.ny * 6}
+          x2={s.x - s.nx * 6}
+          y2={s.y - s.ny * 6}
+          stroke="#9c8a6a"
+          strokeWidth={1.7}
         />
       ))}
       <path d={left} fill="none" stroke={color} strokeWidth={1.9} />
       <path d={right} fill="none" stroke={color} strokeWidth={1.9} />
       {kind === "suggest" && (
-        <path d={path} fill="none" stroke="#fffdf7" strokeWidth={1} strokeDasharray="4 6" opacity={0.8} />
+        <path d={path} fill="none" stroke="#fffdf7" strokeWidth={1.1} strokeDasharray="4 7" opacity={0.85} />
       )}
 
       <EdgeLabelRenderer>
-        <button
-          className={"rail-sign" + (isDirection ? " dir" : "") + (kind === "suggest" ? " suggest" : "")}
+        <div
+          className={"rail-post" + (isDir ? " dir" : "") + (kind === "suggest" ? " suggest" : "")}
           style={{
             position: "absolute",
-            transform: `translate(-50%,-50%) translate(${signX}px,${signY}px)`,
+            transform: `translate(-50%,-100%) translate(${best.x}px,${best.y - 8}px)`,
             pointerEvents: "all",
           }}
-          title={isDirection ? "方向提示：点击查看问题" : label}
-          onClick={(e) => {
-            e.stopPropagation();
-            d.onSign?.(id);
-          }}
         >
-          <span className="rail-sign-icon">{isDirection ? "?" : kind === "suggest" ? "◌" : "▸"}</span>
-          <span className="rail-sign-text">{label}</span>
-        </button>
+          <button
+            className="rail-board"
+            title={isDir ? "方向路牌：点击查看问题" : label}
+            onClick={(e) => {
+              e.stopPropagation();
+              d.onSign?.(id);
+            }}
+          >
+            <span
+              className="rail-board-arrow"
+              style={{ transform: `rotate(${isDir ? best.angle : 0}deg)` }}
+            >
+              {isDir ? "➜" : "▸"}
+            </span>
+            <span className="rail-board-text">{label}</span>
+          </button>
+          <span className="rail-stem" />
+        </div>
       </EdgeLabelRenderer>
     </>
   );
