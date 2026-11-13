@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Background,
   Controls,
@@ -38,10 +38,11 @@ export default function World() {
   }, []);
 
   const rfNodes = useMemo<Node[]>(() => {
+    const SPREAD = 1.28; // 节点造型变大后，坐标也拉开，避免岛叠在一起
     const base: Node[] = nodes.map((n) => ({
       id: n.id,
       type: "island",
-      position: { x: n.x, y: n.y },
+      position: { x: n.x * SPREAD, y: n.y * SPREAD },
       data: { ...n, unknown: false },
       draggable: false,
       selectable: true,
@@ -52,8 +53,8 @@ export default function World() {
         id: "b:" + b.id,
         type: "building",
         position: {
-          x: (anchor?.x ?? 120) + 300,
-          y: (anchor?.y ?? 0) - 90 + i * 110,
+          x: (anchor?.x ?? 120) * SPREAD + 330,
+          y: (anchor?.y ?? 0) * SPREAD - 110 + i * 130,
         },
         data: { ...b },
         draggable: false,
@@ -131,6 +132,15 @@ export default function World() {
           <Background color="#ded3c0" gap={26} size={1} />
           <Controls showInteractive={false} />
         </ReactFlow>
+        <div className="legend">
+          <div><b>线型</b></div>
+          <div className="li"><i className="sw" />正式关系（实线，不可删除）</div>
+          <div className="li"><i className="sw src" />探索来源（正式关系的一种）</div>
+          <div className="li"><i className="sw dash" />AI 建议（虚线，可接受）</div>
+          <div className="li"><i className="sw dot" />方向（点线 + ?，无 MD）</div>
+          <div style={{ marginTop: 6 }}><b>节点三档</b>：核心 → Ⅰ 环 → Ⅱ → Ⅲ 塔</div>
+          <div><b>建筑</b>：领域副本 / 流程副本</div>
+        </div>
         <InputBar />
       </div>
 

@@ -12,6 +12,8 @@
 
 ## 界面
 
+![world](docs/screenshots/05-world.png)
+
 | 世界首页 | 节点抽屉（自由区 + 题目区） |
 | --- | --- |
 | ![home](docs/screenshots/01-home.png) | ![node](docs/screenshots/02-node.png) |
