@@ -1,4 +1,4 @@
-﻿import express from "express";
+import express from "express";
 import { createServer } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
 import { env, providers } from "./env.js";
@@ -39,6 +39,7 @@ import { mockASR, mockLLM } from "./providers/mock.js";
 import { elkLayout, wfcLayout } from "./layout.js";
 import { placeAround } from "./placement.js";
 import { simulateExplore } from "./explore.js";
+import { wfcGraphLayout } from "./wfc.js";
 
 seedDemoIfEmpty();
 
@@ -301,14 +302,15 @@ app.post("/api/worlds/:id/layout", async (req, res) => {
   const world = getWorld(req.params.id);
   if (!world) return res.status(404).json({ error: "world not found" });
   const { nodes, edges } = getGraph(world.id);
+  const preferred = String(req.body?.engine ?? "wfc");
   let placed;
-  let engine = "elk";
+  let engine = preferred;
   try {
-    placed = await elkLayout(nodes, edges);
+    placed = preferred === "elk" ? await elkLayout(nodes, edges) : wfcGraphLayout(nodes, edges);
   } catch (err) {
-    console.warn("[layout] elk 失败，回退 WFC", err);
-    engine = "wfc";
-    placed = wfcLayout(nodes, edges);
+    console.warn(`[layout] ${preferred} 失败，回退另一种`, err);
+    engine = preferred === "elk" ? "wfc" : "elk";
+    placed = engine === "elk" ? await elkLayout(nodes, edges) : wfcGraphLayout(nodes, edges);
   }
   for (const p of placed) setNodePosition(p.id, p.x, p.y);
   const fresh = getGraph(world.id);
