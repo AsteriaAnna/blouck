@@ -51,6 +51,9 @@ export type EdgeRow = {
   label: string;
   md: string;
   question: string | null;
+  frontier_x?: number | null;
+  frontier_y?: number | null;
+  consumed?: number;
 };
 
 export type BuildingRow = {
@@ -63,6 +66,8 @@ export type BuildingRow = {
   md: string;
   steps: string;
   status: "locked" | "playable" | "cleared";
+  x: number;
+  y: number;
 };
 
 export type Quiz = {

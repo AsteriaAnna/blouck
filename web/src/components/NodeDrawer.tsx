@@ -4,6 +4,7 @@ import { useStore } from "../store";
 
 export default function NodeDrawer() {
   const drawer = useStore((s) => s.drawer);
+  const world = useStore((s) => s.world);
   const nodes = useStore((s) => s.nodes);
   const quizzes = useStore((s) => s.quizzes);
   const passed = useStore((s) => s.passed);
@@ -18,14 +19,61 @@ export default function NodeDrawer() {
   const node = nodes.find((n) => n.id === (drawer?.kind === "node" ? drawer.id : ""));
   const [md, setMd] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [hidePreview, setHidePreview] = useState<{ id: string; name: string }[] | null>(null);
+  const [hideBusy, setHideBusy] = useState(false);
 
   useEffect(() => {
     if (node) setMd(node.free_md ?? "");
+    setHidePreview(null);
   }, [node?.id, node?.free_md]);
 
   if (!node) return null;
   const short = quizzes.filter((q) => q.kind === "short");
   const judge = quizzes.filter((q) => q.kind === "judge");
+  const isRoot = world?.root_node_id === node.id;
+
+  async function previewHide() {
+    if (!world || !node) return;
+    setHideBusy(true);
+    try {
+      const r = await fetch(`/api/worlds/${world.id}/hide/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nodeId: node.id }),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        useStore.getState().showToast(data.error ?? "隐藏预览失败");
+        return;
+      }
+      setHidePreview(data.nodes ?? []);
+    } finally {
+      setHideBusy(false);
+    }
+  }
+
+  async function confirmHide() {
+    if (!world || !node) return;
+    setHideBusy(true);
+    try {
+      const r = await fetch(`/api/worlds/${world.id}/hide`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nodeId: node.id }),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        useStore.getState().showToast(data.error ?? "隐藏失败");
+        return;
+      }
+      setHidePreview(null);
+      closeDrawer();
+      await useStore.getState().openWorld(world.id);
+      useStore.getState().showToast(`已隐藏 ${data.count} 个节点（可撤回）`);
+    } finally {
+      setHideBusy(false);
+    }
+  }
 
   return (
     <div className="drawer">
@@ -78,28 +126,28 @@ export default function NodeDrawer() {
               {quizStatus === "idle" ? "题库未生成" : "生成中…"}
               <div style={{ marginTop: 8 }}>
                 <button className="primary" disabled={busy} onClick={() => generateQuiz(node.id)}>
-                  生成 5 简答 + 10 判断
+                  生成题库（5 简答 + 10 判断）
                 </button>
               </div>
             </div>
           ) : (
             <>
-              <div className="hintline" style={{ marginBottom: 8 }}>
-                已生成 {short.length} 简答 / {judge.length} 判断（AI 题才计入三档）
-              </div>
               {short.map((q) => (
-                <div className="quiz" key={q.id}>
-                  <div className="kind">简答</div>
+                <div key={q.id} className="quiz">
                   <div className="q">{q.prompt}</div>
                   <textarea
+                    className="md-edit"
+                    placeholder="写下你的答案"
                     value={answers[q.id] ?? ""}
-                    onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
-                    placeholder="写下你的理解"
+                    onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
                   />
-                  <div className="ans">
+                  <div className="row">
                     <button
-                      className="primary"
-                      onClick={() => answerQuiz(q.id, answers[q.id] ?? "")}
+                      className="secondary"
+                      onClick={async () => {
+                        await answerQuiz(q.id, answers[q.id] ?? "");
+                        await useStore.getState().openNode(node.id);
+                      }}
                     >
                       提交
                     </button>
@@ -107,14 +155,25 @@ export default function NodeDrawer() {
                 </div>
               ))}
               {judge.map((q) => (
-                <div className="quiz" key={q.id}>
-                  <div className="kind">判断</div>
+                <div key={q.id} className="quiz">
                   <div className="q">{q.prompt}</div>
-                  <div className="ans">
-                    <button className="secondary" onClick={() => answerQuiz(q.id, "对")}>
+                  <div className="row">
+                    <button
+                      className="secondary"
+                      onClick={async () => {
+                        await answerQuiz(q.id, "对");
+                        await useStore.getState().openNode(node.id);
+                      }}
+                    >
                       对
                     </button>
-                    <button className="secondary" onClick={() => answerQuiz(q.id, "错")}>
+                    <button
+                      className="secondary"
+                      onClick={async () => {
+                        await answerQuiz(q.id, "错");
+                        await useStore.getState().openNode(node.id);
+                      }}
+                    >
                       错
                     </button>
                   </div>
@@ -122,33 +181,40 @@ export default function NodeDrawer() {
               ))}
             </>
           )}
-          <div className="hintline" style={{ marginTop: 10 }}>
-            答题失败可重答；不同题只计一次通过。
-          </div>
         </div>
 
         <div className="section">
-          <h4>节点操作</h4>
-          <div className="row">
-            <button
-              className="secondary"
-              onClick={async () => {
-                await fetch(`/api/nodes/${node.id}`, {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ hidden: !node.hidden }),
-                });
-                useStore.setState({
-                  nodes: nodes.map((n) =>
-                    n.id === node.id ? { ...n, hidden: n.hidden ? 0 : 1 } : n,
-                  ),
-                });
-              }}
-            >
-              {node.hidden ? "恢复显示" : "隐藏节点"}
+          <h4>隐藏</h4>
+          {isRoot ? (
+            <div className="hintline">初始节点暂不提供隐藏。</div>
+          ) : hidePreview === null ? (
+            <button className="secondary" disabled={hideBusy} onClick={previewHide}>
+              隐藏整片（先预览）
             </button>
-            <span className="hintline">隐藏只改变显示，不删除内容与记录</span>
-          </div>
+          ) : (
+            <div>
+              <div className="hintline">
+                移除「{node.name}」后会断开：
+                {hidePreview.length ? (
+                  <ul>
+                    {hidePreview.slice(0, 12).map((n) => (
+                      <li key={n.id}>{n.name}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div>（没有其它节点会断开）</div>
+                )}
+              </div>
+              <div className="row">
+                <button className="primary" disabled={hideBusy} onClick={confirmHide}>
+                  确认隐藏 {hidePreview.length + 1} 个节点
+                </button>
+                <button className="secondary" onClick={() => setHidePreview(null)}>
+                  取消
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

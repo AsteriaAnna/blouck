@@ -9,11 +9,12 @@ const KIND_LABEL: Record<string, string> = {
   direction: "方向线（无 MD）",
 };
 
-/** 点击路牌打开：关系 MD 编辑 / 接受建议 / 方向问题 */
+/** 点击线/路牌：关系 MD 编辑、接受建议、方向问题探索 */
 export default function RelationDrawer() {
   const drawer = useStore((s) => s.drawer);
   const edges = useStore((s) => s.edges);
   const nodes = useStore((s) => s.nodes);
+  const world = useStore((s) => s.world);
   const acceptEdge = useStore((s) => s.acceptEdge);
   const extract = useStore((s) => s.extract);
   const closeDrawer = useStore((s) => s.closeDrawer);
@@ -22,6 +23,7 @@ export default function RelationDrawer() {
   const edge = edges.find((e) => e.id === (drawer?.kind === "edge" ? drawer.id : ""));
   const [md, setMd] = useState("");
   const [label, setLabel] = useState("");
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!edge) return;
@@ -34,15 +36,32 @@ export default function RelationDrawer() {
   const to = nodes.find((n) => n.id === edge.dst);
 
   async function save() {
-    await fetch(`/api/edges/${edge!.id}`, {
+    if (!edge) return;
+    await fetch(`/api/edges/${edge.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ md, label }),
     });
     useStore.setState({
-      edges: edges.map((e) => (e.id === edge!.id ? { ...e, md, label } : e)),
+      edges: edges.map((e) => (e.id === edge.id ? { ...e, md, label } : e)),
     });
     showToast("关系已保存");
+  }
+
+  async function exploreDirection() {
+    if (!edge || !world) return;
+    setBusy(true);
+    try {
+      const text = edge.question || "继续探索这个方向";
+      // 先把方向标记标记为已消费，再走正常抽取（新节点会落在附近）
+      await fetch(`/api/edges/${edge.id}/consume`, { method: "POST" }).catch(() => null);
+      closeDrawer();
+      await extract(text);
+      await useStore.getState().openWorld(world.id);
+      showToast("已沿这个方向探索");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -50,7 +69,7 @@ export default function RelationDrawer() {
       <header>
         <div className="k">线 · {KIND_LABEL[edge.kind] ?? edge.kind}</div>
         <h2>
-          {from?.name ?? "?"} → {to?.name ?? "?"}
+          {from?.name ?? "?"} → {edge.kind === "direction" ? "未知方向" : to?.name ?? "?"}
         </h2>
         <div className="hintline">
           {edge.kind === "direction"
@@ -68,16 +87,12 @@ export default function RelationDrawer() {
             <div className="md-preview">
               <p>{edge.question || edge.label || "下一步可以往这里探索"}</p>
             </div>
-            <button
-              className="primary"
-              style={{ marginTop: 10 }}
-              onClick={async () => {
-                closeDrawer();
-                await extract(edge.question || "继续探索这个方向");
-              }}
-            >
+            <button className="primary" style={{ marginTop: 10 }} disabled={busy} onClick={exploreDirection}>
               按这个方向探索
             </button>
+            <div className="hintline" style={{ marginTop: 6 }}>
+              探索后这个方向标记会被消费并消失。
+            </div>
           </div>
         ) : (
           <>

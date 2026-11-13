@@ -1,4 +1,4 @@
-﻿import {
+import {
   addEdge,
   addNode,
   createWorld,
@@ -85,12 +85,15 @@ export async function simulateExplore(
   const clusterAnchor = placeAround(placed, { id: "c2", x: 1200, y: 900 }, { minGap: 240 });
   const center = addNode(world.id, "领域中心", clusterAnchor.x, clusterAnchor.y);
   placed.push({ id: center.id, ...clusterAnchor });
+  const clusterIds: string[] = [];
   for (let i = 0; i < 5; i++) {
     const pos = placeAround(placed, { id: center.id, x: clusterAnchor.x, y: clusterAnchor.y }, { minGap: 225 });
     const n = addNode(world.id, `领域节点${i + 1}`, pos.x, pos.y);
     placed.push({ id: n.id, x: pos.x, y: pos.y });
     addEdge(world.id, center.id, n.id, "formal", "属于");
-    if (i > 0) addEdge(world.id, n.id, center.id, "formal", "关联");
+    // 邻居之间互相连接，形成真正的"领域簇"
+    if (clusterIds.length) addEdge(world.id, n.id, clusterIds[clusterIds.length - 1], "formal", "同类");
+    clusterIds.push(n.id);
   }
 
   // 局部松弛：消除放置阶段的少量挤压，不整体重排

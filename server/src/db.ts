@@ -35,6 +35,9 @@ export type EdgeRow = {
   label: string;
   md: string;
   question: string | null;
+  frontier_x: number | null;
+  frontier_y: number | null;
+  consumed: number;
   created_at: number;
 };
 
@@ -48,6 +51,8 @@ export type BuildingRow = {
   md: string;
   steps: string;
   status: "locked" | "playable" | "cleared";
+  x: number;
+  y: number;
   created_at: number;
 };
 
@@ -98,6 +103,37 @@ CREATE TABLE IF NOT EXISTS attempts(
 CREATE INDEX IF NOT EXISTS idx_nodes_world ON nodes(world_id);
 CREATE INDEX IF NOT EXISTS idx_edges_world ON edges(world_id);
 CREATE INDEX IF NOT EXISTS idx_quizzes_node ON quizzes(node_id);
+`);
+
+/* ---------- 轻量迁移：老库补齐新列 / 新表 ---------- */
+function columnNames(table: string): string[] {
+  return (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name);
+}
+if (!columnNames("edges").includes("frontier_x")) {
+  db.exec("ALTER TABLE edges ADD COLUMN frontier_x REAL");
+}
+if (!columnNames("edges").includes("frontier_y")) {
+  db.exec("ALTER TABLE edges ADD COLUMN frontier_y REAL");
+}
+if (!columnNames("edges").includes("consumed")) {
+  db.exec("ALTER TABLE edges ADD COLUMN consumed INTEGER NOT NULL DEFAULT 0");
+}
+if (!columnNames("buildings").includes("x")) {
+  db.exec("ALTER TABLE buildings ADD COLUMN x REAL NOT NULL DEFAULT 0");
+}
+if (!columnNames("buildings").includes("y")) {
+  db.exec("ALTER TABLE buildings ADD COLUMN y REAL NOT NULL DEFAULT 0");
+}
+db.exec(`
+CREATE TABLE IF NOT EXISTS hide_batches(
+  id TEXT PRIMARY KEY, world_id TEXT NOT NULL, node_ids TEXT NOT NULL,
+  created_at INTEGER NOT NULL, undone INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS daily_domain(
+  world_id TEXT NOT NULL, building_id TEXT NOT NULL, date TEXT NOT NULL,
+  used INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY(world_id, building_id, date)
+);
 `);
 
 const now = () => Date.now();

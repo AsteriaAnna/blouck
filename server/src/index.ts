@@ -40,6 +40,17 @@ import { elkLayout, wfcLayout } from "./layout.js";
 import { placeAround } from "./placement.js";
 import { simulateExplore } from "./explore.js";
 import { wfcGraphLayout } from "./wfc.js";
+import {
+  applyHide,
+  bumpDomainDaily,
+  consumeDirection,
+  ensureBuildingPositions,
+  ensureDirectionFrontiers,
+  exportWorld,
+  hidePreview,
+  setBuildingPosition,
+  undoLastHide,
+} from "./assetops.js";
 
 seedDemoIfEmpty();
 
@@ -78,6 +89,8 @@ app.delete("/api/worlds/:id", (req, res) => {
 app.get("/api/worlds/:id", (req, res) => {
   const world = getWorld(req.params.id);
   if (!world) return res.status(404).json({ error: "world not found" });
+  ensureBuildingPositions(world.id);
+  ensureDirectionFrontiers(world.id);
   const graph = getGraph(world.id);
   const buildings = listBuildings(world.id);
   const nodes = graph.nodes.map((n) => ({
@@ -151,7 +164,8 @@ app.post("/api/worlds/:id/extract", async (req, res) => {
     createdEdges.push(e);
   }
 
-  detectBuildings(world.id, focus, graph.nodes);
+  detectBuildingsV2(world.id, focus, graph.nodes);
+  ensureDirectionFrontiers(world.id);
   const fresh = getGraph(world.id);
   const buildings = listBuildings(world.id);
   res.json({
@@ -195,6 +209,118 @@ function detectBuildings(worldId: string, focus: NodeRow, all: NodeRow[]) {
         steps,
       );
     }
+  }
+}
+
+/** 最长 formal 链：DFS 简单路径（深度≤6，容忍图里有环），链长 3—6 才生成流程副本 */
+function longestFormalChain(nodes: NodeRow[], formalEdges: { src: string; dst: string }[]): string[] {
+  const out = new Map<string, string[]>();
+  const ids = new Set(nodes.map((n) => n.id));
+  for (const n of nodes) out.set(n.id, []);
+  for (const e of formalEdges) {
+    if (!ids.has(e.src) || !ids.has(e.dst)) continue;
+    out.get(e.src)!.push(e.dst);
+  }
+  let best: string[] = [];
+  const dfs = (id: string, path: string[], seen: Set<string>) => {
+    if (path.length > best.length) best = [...path];
+    if (path.length >= 6) return;
+    for (const nb of out.get(id) ?? []) {
+      if (seen.has(nb)) continue;
+      seen.add(nb);
+      path.push(nb);
+      dfs(nb, path, seen);
+      path.pop();
+      seen.delete(nb);
+    }
+  };
+  for (const n of nodes) dfs(n.id, [n.id], new Set([n.id]));
+  return best;
+}
+
+/**
+ * 副本生成 v2（按 MVP 文档）：
+ * - 领域：锚点有 ≥3 个正式邻居，且邻居之间至少 2 条正式边（成簇）→ 生成；
+ * - 流程：只认 formal 边，拓扑无环、最长链 3—6 步 → 生成，锚点 = 链首；
+ * - 状态：locked / playable / cleared，由相关节点当前 tier 决定。
+ */
+function detectBuildingsV2(worldId: string, _focus: NodeRow, _all: NodeRow[]) {
+  const bs = listBuildings(worldId);
+  const { nodes, edges } = getGraph(worldId);
+  const knowledge = edges.filter((e) => e.kind === "formal" || e.kind === "source");
+  const nb = new Map<string, Set<string>>();
+  for (const n of nodes) nb.set(n.id, new Set());
+  for (const e of knowledge) {
+    nb.get(e.src)?.add(e.dst);
+    nb.get(e.dst)?.add(e.src);
+  }
+
+  if (!bs.some((b) => b.kind === "domain")) {
+    let bestAnchor: NodeRow | null = null;
+    let bestMembers: string[] = [];
+    for (const n of nodes) {
+      const ns = [...(nb.get(n.id) ?? [])].filter((id) => id !== n.id);
+      if (ns.length < 3) continue;
+      let inter = 0;
+      for (let i = 0; i < ns.length; i++) {
+        for (let j = i + 1; j < ns.length; j++) if (nb.get(ns[i])?.has(ns[j])) inter++;
+      }
+      if (inter >= 2 && ns.length > bestMembers.length - 1) {
+        bestAnchor = n;
+        bestMembers = [n.id, ...ns];
+      }
+    }
+    if (bestAnchor) {
+      const created = createBuilding(
+        worldId,
+        "domain",
+        bestAnchor.id,
+        "领域副本",
+        "领域每日练习 · 10 题",
+        `## 领域副本\n\n围绕「${bestAnchor.name}」及其 ${bestMembers.length - 1} 个关联节点的每日练习。`,
+        [],
+      );
+      ensureBuildingPositions(worldId);
+      void created;
+    }
+  }
+
+  if (!bs.some((b) => b.kind === "flow")) {
+    const chain = longestFormalChain(nodes, edges.filter((e) => e.kind === "formal"));
+    if (chain.length >= 3 && chain.length <= 6) {
+      const head = nodes.find((n) => n.id === chain[0])!;
+      createBuilding(
+        worldId,
+        "flow",
+        head.id,
+        "流程副本",
+        `流程排序 · ${chain.length} 步`,
+        `## 流程副本\n\n从「${head.name}」开始的 ${chain.length} 个步骤，按正确顺序连接。`,
+        chain,
+      );
+      ensureBuildingPositions(worldId);
+    }
+  }
+  refreshAllBuildingStatus(worldId);
+}
+
+/** 副本解锁状态：流程看链上节点，领域看锚点邻域，均需当前 tier≥1 */
+function refreshAllBuildingStatus(worldId: string) {
+  for (const b of listBuildings(worldId)) {
+    if (b.status === "cleared") continue;
+    let ready = false;
+    if (b.kind === "flow") {
+      const steps = JSON.parse(b.steps || "[]") as string[];
+      ready = steps.length >= 3 && steps.every((id) => (getNode(id)?.tier ?? 0) >= 1);
+    } else {
+      const related = getGraph(worldId).edges
+        .filter((e) => e.kind === "formal" || e.kind === "source")
+        .flatMap((e) => [e.src, e.dst]);
+      const ids = new Set<string>([b.anchor, ...related]);
+      const passed = [...ids].filter((id) => (getNode(id)?.tier ?? 0) >= 1).length;
+      ready = passed >= 2;
+    }
+    setBuildingStatus(b.id, ready ? "playable" : "locked");
   }
 }
 
@@ -313,6 +439,9 @@ app.post("/api/worlds/:id/layout", async (req, res) => {
     placed = engine === "elk" ? await elkLayout(nodes, edges) : wfcGraphLayout(nodes, edges);
   }
   for (const p of placed) setNodePosition(p.id, p.x, p.y);
+  ensureBuildingPositions(world.id);
+  ensureDirectionFrontiers(world.id);
+  refreshAllBuildingStatus(world.id);
   const fresh = getGraph(world.id);
   res.json({
     ok: true,
@@ -346,7 +475,9 @@ app.post("/api/dev/world", (req, res) => {
 /** 探索模拟（增量放置版）：新节点围绕焦点现场算位置，不做全局重排 */
 app.post("/api/dev/explore", async (req, res) => {
   const rounds = Math.max(6, Math.min(60, Number(req.body?.rounds ?? 24)));
-  const result = await simulateExplore(rounds, detectBuildings);
+  const result = await simulateExplore(rounds, detectBuildingsV2);
+  ensureBuildingPositions(result.world.id);
+  ensureDirectionFrontiers(result.world.id);
   res.json(result);
 });
 
@@ -442,6 +573,42 @@ app.post("/api/dev/explore", async (req, res) => {
   });
 });
 
+/* ---------------- 隐藏 / 撤回 / 导出 ---------------- */
+app.post("/api/worlds/:id/hide/preview", (req, res) => {
+  const result = hidePreview(req.params.id, String(req.body?.nodeId ?? ""));
+  if ("error" in result) return res.status(400).json(result);
+  res.json(result);
+});
+
+app.post("/api/worlds/:id/hide", (req, res) => {
+  const result = applyHide(req.params.id, String(req.body?.nodeId ?? ""));
+  if ("error" in result) return res.status(400).json(result);
+  res.json(result);
+});
+
+app.post("/api/worlds/:id/hide/undo", (req, res) => {
+  const result = undoLastHide(req.params.id);
+  if ("error" in result) return res.status(400).json(result);
+  res.json(result);
+});
+
+app.get("/api/worlds/:id/export", (req, res) => {
+  const data = exportWorld(req.params.id);
+  if (!data) return res.status(404).json({ error: "world not found" });
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="knowledge-world-${req.params.id.slice(0, 8)}.json"`,
+  );
+  res.json(data);
+});
+
+/** 方向探索被消费：标记 consumed，前端隐藏该方向标记 */
+app.post("/api/edges/:id/consume", (req, res) => {
+  const ok = consumeDirection(req.params.id);
+  if (!ok) return res.status(400).json({ error: "不是可消费的方向线" });
+  res.json({ ok });
+});
+
 /* ---------------- 副本 ---------------- */
 app.get("/api/buildings/:id", (req, res) => {
   const b = getBuilding(req.params.id);
@@ -469,7 +636,16 @@ app.post("/api/buildings/:id/challenge", async (req, res) => {
   }
   const anchor = getNode(b.anchor);
   let quizzes = anchor ? listQuizzes(anchor.id).filter((q) => q.kind === "judge") : [];
-  if (quizzes.length < 10 && anchor) {
+  // 领域副本：每个自然日至多 10 道新题；已有题组重开不新增额度
+  const daily = bumpDomainDaily(b.world_id, b.id, 10, quizzes.length ? 0 : 10);
+  if (!daily.allowed && !quizzes.length) {
+    return res.status(429).json({
+      error: "今日领域题目额度已用完（10 道），明天再来",
+      used: daily.used,
+      limit: daily.limit,
+    });
+  }
+  if (quizzes.length < 10 && anchor && daily.allowed) {
     const items = await llm.generateQuiz({ name: anchor.name, md: anchor.free_md });
     if (!listQuizzes(anchor.id).length) createQuizzes(anchor.id, items);
     quizzes = listQuizzes(anchor.id).filter((q) => q.kind === "judge");
@@ -478,6 +654,7 @@ app.post("/api/buildings/:id/challenge", async (req, res) => {
     kind: "domain",
     title: b.title,
     md: b.md,
+    daily: { used: daily.used, limit: daily.limit },
     questions: quizzes.slice(0, 10).map((q) => ({ id: q.id, prompt: q.prompt })),
     status: b.status,
   });

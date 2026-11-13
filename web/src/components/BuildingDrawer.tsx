@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { useStore } from "../store";
 
-/** 副本抽屉：领域副本（每日 10 题） / 流程副本（排序连线） */
+/** 副本抽屉：领域副本（每日 10 题）/ 流程副本（排序连线），MD 可编辑 */
 export default function BuildingDrawer() {
   const drawer = useStore((s) => s.drawer);
   const buildings = useStore((s) => s.buildings);
@@ -15,22 +15,52 @@ export default function BuildingDrawer() {
   const building = buildings.find((b) => b.id === (drawer?.kind === "building" ? drawer.id : ""));
   const [order, setOrder] = useState<string[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [md, setMd] = useState("");
+  const [saved, setSaved] = useState("");
 
   useEffect(() => {
     setOrder([]);
     setAnswers({});
+    setSaved("");
   }, [drawer?.id]);
+
+  useEffect(() => {
+    if (building) setMd(building.md ?? "");
+  }, [building?.id, building?.md]);
 
   if (!building) return null;
   const steps: string[] = challenge?.steps ?? [];
   const questions: { id: string; prompt: string }[] = challenge?.questions ?? [];
+  const daily = challenge?.daily as { used: number; limit: number } | undefined;
+  const statusText =
+    building.status === "cleared" ? "已通关" : building.status === "locked" ? "未解锁" : "可挑战";
+
+  async function saveMd() {
+    if (!building) return;
+    const r = await fetch(`/api/buildings/${building.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ md }),
+    });
+    if (r.ok) {
+      useStore.setState({
+        buildings: buildings.map((b) => (b.id === building.id ? { ...b, md } : b)),
+      });
+      setSaved("已保存 " + new Date().toLocaleTimeString());
+    } else {
+      setSaved("保存失败");
+    }
+  }
+
+  function toggleStep(id: string) {
+    setOrder((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
 
   return (
     <div className="drawer">
       <header>
         <div className="k">
-          建筑 · {building.kind === "flow" ? "流程副本" : "领域副本"} ·{" "}
-          {building.status === "cleared" ? "已通关" : building.status === "locked" ? "未解锁" : "可挑战"}
+          建筑 · {building.kind === "flow" ? "流程副本" : "领域副本"} · {statusText}
         </div>
         <h2>{building.title}</h2>
         <div className="hintline">{building.sub}</div>
@@ -39,92 +69,107 @@ export default function BuildingDrawer() {
         </button>
       </header>
       <div className="body">
-        {challenge?.error && (
+        {building.status === "locked" && (
+          <div className="section">
+            <div className="hintline">
+              未解锁：{building.kind === "flow" ? "流程链上节点" : "锚点邻域"}至少 2 个当前达到第一档后可挑战。
+            </div>
+          </div>
+        )}
+
+        {building.status !== "locked" && challenge?.error && (
           <div className="section">
             <div className="hintline">{challenge.error}</div>
-            <button className="primary" style={{ marginTop: 10 }} onClick={() => startChallenge(building.id)}>
-              重试
-            </button>
           </div>
         )}
 
-        {!challenge?.error && building.kind === "flow" && (
+        {challenge && !challenge.error && building.kind === "flow" && (
           <div className="section">
-            <h4>连线题：按正确顺序点击步骤</h4>
-            <div className="order">
-              {order.length ? order.join(" → ") : "还没有选择步骤"}
-            </div>
-            <div className="steps" style={{ marginTop: 10 }}>
-              {steps
-                .filter((s) => !order.includes(s))
-                .map((s) => (
-                  <button key={s} className="step" onClick={() => setOrder([...order, s])}>
-                    {s}
+            <h4>按正确顺序点击步骤</h4>
+            <div className="steps">
+              {steps.map((id) => {
+                const node = useStore.getState().nodes.find((n) => n.id === id);
+                const idx = order.indexOf(id);
+                return (
+                  <button
+                    key={id}
+                    className={"step-btn" + (idx >= 0 ? " on" : "")}
+                    onClick={() => toggleStep(id)}
+                  >
+                    {idx >= 0 ? `${idx + 1}. ` : ""}
+                    {node?.name ?? id}
                   </button>
-                ))}
+                );
+              })}
             </div>
-            <div className="row" style={{ marginTop: 12 }}>
-              <button className="primary" onClick={() => submitFlow(building.id, order)}>
+            <div className="row" style={{ marginTop: 8 }}>
+              <button
+                className="primary"
+                disabled={order.length !== steps.length}
+                onClick={() => submitFlow(building.id, order)}
+              >
                 提交顺序
               </button>
-              <button className="secondary" onClick={() => setOrder([])}>
-                清空
-              </button>
+              <span className="hintline">共 {steps.length} 步</span>
             </div>
           </div>
         )}
 
-        {!challenge?.error && building.kind === "domain" && (
+        {challenge && !challenge.error && building.kind === "domain" && (
           <div className="section">
-            <h4>每日练习（最多 10 题，判断）</h4>
-            {questions.length === 0 ? (
-              <div className="hintline">题目准备中或今日额度已用完。</div>
-            ) : (
-              questions.map((q) => (
-                <div className="quiz" key={q.id}>
-                  <div className="kind">判断</div>
-                  <div className="q">{q.prompt}</div>
-                  <div className="ans">
-                    <button
-                      className="secondary"
-                      onClick={() => setAnswers({ ...answers, [q.id]: "对" })}
-                      style={{ outline: answers[q.id] === "对" ? "2px solid #2a2620" : "none" }}
-                    >
-                      对
-                    </button>
-                    <button
-                      className="secondary"
-                      onClick={() => setAnswers({ ...answers, [q.id]: "错" })}
-                      style={{ outline: answers[q.id] === "错" ? "2px solid #2a2620" : "none" }}
-                    >
-                      错
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-            <button
-              className="primary"
-              onClick={() =>
-                submitDomain(
-                  building.id,
-                  Object.entries(answers).map(([id, answer]) => ({ id, answer })),
-                )
-              }
-            >
-              提交
-            </button>
-            <div className="hintline" style={{ marginTop: 8 }}>
-              领域题按 MVP 建议先不计节点三档，避免重复记功。
+            <h4>
+              今日题组 {daily ? `（${daily.used}/${daily.limit}）` : ""}
+            </h4>
+            {questions.map((q) => (
+              <div key={q.id} className="quiz">
+                <div className="q">{q.prompt}</div>
+                <textarea
+                  className="md-edit"
+                  placeholder="填写/判断/解答"
+                  value={answers[q.id] ?? ""}
+                  onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
+                />
+              </div>
+            ))}
+            <div className="row">
+              <button
+                className="primary"
+                onClick={() =>
+                  submitDomain(
+                    building.id,
+                    Object.entries(answers).map(([id, answer]) => ({ id, answer })),
+                  )
+                }
+              >
+                提交
+              </button>
+              <button className="secondary" onClick={() => startChallenge(building.id)}>
+                刷新题目
+              </button>
             </div>
+            <div className="hintline">领域题不改变节点三档，只记录副本通关。</div>
           </div>
         )}
 
         <div className="section">
-          <h4>副本说明（可编辑 MD）</h4>
-          <div className="md-preview">
-            <ReactMarkdown>{building.md || ""}</ReactMarkdown>
+          <h4>副本 MD（可编辑）</h4>
+          <textarea
+            className="md-edit"
+            value={md}
+            onChange={(e) => setMd(e.target.value)}
+            placeholder="副本的背景、规则、来源…"
+          />
+          <div className="row" style={{ marginTop: 8 }}>
+            <button className="primary" onClick={saveMd}>
+              保存
+            </button>
+            <span className="hintline">{saved}</span>
           </div>
+          {md.trim() && (
+            <div className="md-preview" style={{ marginTop: 10 }}>
+              <ReactMarkdown>{md}</ReactMarkdown>
+            </div>
+          )}
         </div>
       </div>
     </div>

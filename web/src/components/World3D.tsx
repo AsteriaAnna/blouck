@@ -1,4 +1,4 @@
-﻿import { Suspense, useMemo, useRef, useState } from "react";
+import { Suspense, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Html, Line, OrbitControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
@@ -340,29 +340,66 @@ export default function World3D() {
           <Island key={n.id} position={posOf(n.x, n.y)} node={n} onOpen={() => openNode(n.id)} />
         ))}
         {edges.map((e) => {
+          if (e.kind === "direction") {
+            if (e.consumed) return null;
+            const a = nodePos.get(e.src);
+            const f =
+              e.frontier_x != null && e.frontier_y != null
+                ? new THREE.Vector3((e.frontier_x - cx) * scale, 0, (e.frontier_y - cy) * scale)
+                : null;
+            if (!a || !f) return null;
+            return (
+              <group key={e.id}>
+                <Line
+                  points={[
+                    [a.x, 2, a.z],
+                    [f.x, 2, f.z],
+                  ]}
+                  color="#b9ab97"
+                  lineWidth={1.4}
+                  dashed
+                  dashSize={6}
+                  gapSize={6}
+                  transparent
+                  opacity={0.5}
+                />
+                <SignPost
+                  position={[f.x, 0, f.z]}
+                  label={e.question || "下一步方向"}
+                  onOpen={() => openEdge(e.id)}
+                />
+              </group>
+            );
+          }
           const a = nodePos.get(e.src);
           const b = nodePos.get(e.dst);
           if (!a || !b) return null;
-          const label = e.kind === "direction" ? e.question || "下一步方向" : e.label || "";
           return (
             <Edge
               key={e.id}
               a={a.clone().setY(0)}
               b={b.clone().setY(0)}
               kind={e.kind}
-              label={label}
+              label={e.label || ""}
               onSign={() => openEdge(e.id)}
             />
           );
         })}
         {buildings.map((b) => {
           const anchor = nodes.find((n) => n.id === b.anchor);
-          if (!anchor) return null;
-          const [x, , z] = posOf(anchor.x, anchor.y);
+          let pos: [number, number, number] | null = null;
+          if (b.x || b.y) {
+            const [x, , z] = posOf(b.x, b.y);
+            pos = [x, 0, z];
+          } else if (anchor) {
+            const [x, , z] = posOf(anchor.x, anchor.y);
+            pos = [x + 190, 0, z + 70];
+          }
+          if (!pos) return null;
           return (
             <Building
               key={b.id}
-              position={[x + 190, 0, z + 70]}
+              position={pos}
               building={b}
               onOpen={() => openBuilding(b.id)}
             />
