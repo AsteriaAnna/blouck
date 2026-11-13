@@ -36,7 +36,7 @@ import {
 import { deepseekLLM } from "./providers/deepseek.js";
 import { doubaoASR } from "./providers/doubao.js";
 import { mockASR, mockLLM } from "./providers/mock.js";
-import { wfcLayout } from "./layout.js";
+import { elkLayout, wfcLayout } from "./layout.js";
 
 seedDemoIfEmpty();
 
@@ -290,21 +290,48 @@ app.patch("/api/edges/:id", (req, res) => {
   res.json({ ok: true });
 });
 
-app.post("/api/worlds/:id/layout", (req, res) => {
+app.post("/api/worlds/:id/layout", async (req, res) => {
   const world = getWorld(req.params.id);
   if (!world) return res.status(404).json({ error: "world not found" });
   const { nodes, edges } = getGraph(world.id);
-  const placed = wfcLayout(nodes, edges);
+  let placed;
+  let engine = "elk";
+  try {
+    placed = await elkLayout(nodes, edges);
+  } catch (err) {
+    console.warn("[layout] elk 失败，回退 WFC", err);
+    engine = "wfc";
+    placed = wfcLayout(nodes, edges);
+  }
   for (const p of placed) setNodePosition(p.id, p.x, p.y);
   const fresh = getGraph(world.id);
   res.json({
     ok: true,
+    engine,
     nodes: fresh.nodes.map((n) => ({
       ...n,
       passed: countPassed(n.id),
       tier: computeTier(n.id),
     })),
   });
+});
+
+/** 压测：生成一个 N 节点世界，用于检查布局是否重叠 */
+app.post("/api/dev/world", (req, res) => {
+  const n = Math.max(5, Math.min(60, Number(req.body?.n ?? 30)));
+  const world = createWorld(String(req.body?.name ?? `${n} 节点压测`), "N0");
+  const ids: string[] = [world.root_node_id];
+  for (let i = 1; i < n; i++) ids.push(addNode(world.id, `N${i}`, 0, 0).id);
+  for (let i = 0; i < n - 1; i++) {
+    addEdge(world.id, ids[i], ids[i + 1], i % 7 === 0 ? "source" : "formal", `step ${i}`);
+  }
+  for (let k = 0; k < Math.floor(n * 0.6); k++) {
+    const a = ids[Math.floor(Math.random() * n)];
+    const b = ids[Math.floor(Math.random() * n)];
+    if (a === b) continue;
+    addEdge(world.id, a, b, "suggest", "可能关联");
+  }
+  res.json({ ok: true, world });
 });
 
 /* ---------------- 副本 ---------------- */

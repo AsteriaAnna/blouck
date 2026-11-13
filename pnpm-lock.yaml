@@ -13,6 +13,9 @@ importers:
       dotenv:
         specifier: ^16.4.7
         version: 16.6.1
+      elkjs:
+        specifier: ^0.12.1
+        version: 0.12.1
       express:
         specifier: ^4.21.2
         version: 4.22.3
@@ -925,6 +928,9 @@ packages:
 
   electron-to-chromium@1.5.485:
     resolution: {integrity: sha512-m3uadzR0Z+sR19HGWgfxoZcKv9hE/edVM9OZ+FJ4wNRyfuFtkwZJIDoehEty5sisYVwmge8lKV1tenWOyClVgw==}
+
+  elkjs@0.12.1:
+    resolution: {integrity: sha512-IhMYKHE4S2vtx0QrhBP3lYOIKDeIiJXBrdq9MGYkuB8ZHqhrBnHNfSUndjXFewrX1CPK8chwq+2NA0K0hliYuw==}
 
   encodeurl@2.0.3:
     resolution: {integrity: sha512-mIteYONiEfc4xWf2F1WXovh1c8npzS00vNeiUPdwFF+QlVJni+gNvpQltLMQhob8rew/bWWc/bGTuUr0EUGt0w==}
@@ -2219,6 +2225,8 @@ snapshots:
   ee-first@1.1.1: {}
 
   electron-to-chromium@1.5.485: {}
+
+  elkjs@0.12.1: {}
 
   encodeurl@2.0.3: {}
 

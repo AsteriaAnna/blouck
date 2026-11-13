@@ -124,26 +124,29 @@ export default function RailEdge(props: EdgeProps) {
     }
   }
   const label = isDir ? d.question || "下一步方向" : d.label || "关系";
+  const end = pts[pts.length - 1];
+  const prev = pts[pts.length - 2] ?? end;
+  const ux = end.x - prev.x;
+  const uy = end.y - prev.y;
+  const ul = Math.hypot(ux, uy) || 1;
+  const ax = ux / ul;
+  const ay = uy / ul;
+  const arrowTip = { x: end.x - ax * 2, y: end.y - ay * 2 };
+  const arrowA = { x: end.x - ax * 11 - ay * 5, y: end.y - ay * 11 + ax * 5 };
+  const arrowB = { x: end.x - ax * 11 + ay * 5, y: end.y - ay * 11 - ax * 5 };
 
   return (
     <>
-      <path d={path} fill="none" stroke="#e2d1b4" strokeWidth={16} strokeLinecap="round" strokeLinejoin="round" />
-      {ties.map((s, i) => (
-        <line
-          key={i}
-          x1={s.x + s.nx * 6}
-          y1={s.y + s.ny * 6}
-          x2={s.x - s.nx * 6}
-          y2={s.y - s.ny * 6}
-          stroke="#9c8a6a"
-          strokeWidth={1.7}
-        />
-      ))}
-      <path d={left} fill="none" stroke={color} strokeWidth={1.9} />
-      <path d={right} fill="none" stroke={color} strokeWidth={1.9} />
+      {/* 双轨：干净的地铁线，不要枕木/道砟 */}
+      <path d={left} fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />
+      <path d={right} fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />
       {kind === "suggest" && (
-        <path d={path} fill="none" stroke="#fffdf7" strokeWidth={1.1} strokeDasharray="4 7" opacity={0.85} />
+        <path d={path} fill="none" stroke="#fffdf7" strokeWidth={1.2} strokeDasharray="5 8" opacity={0.9} />
       )}
+      <polygon
+        points={`${arrowTip.x},${arrowTip.y} ${arrowA.x},${arrowA.y} ${arrowB.x},${arrowB.y}`}
+        fill={color}
+      />
 
       <EdgeLabelRenderer>
         <div
