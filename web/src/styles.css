@@ -202,3 +202,15 @@ input, textarea { font: inherit; color: inherit; }
 .legend .sw.src { border-top-color: #6e8fa8; }
 .legend .sw.dash { border-top: 2px dashed #8a8278; }
 .legend .sw.dot { border-top: 2px dotted #a79e90; }
+/* ---------- 方向线终点（悬空 ?） ---------- */
+.dir-marker { position: relative; cursor: default; text-align: center; }
+.dir-marker .dir-circle {
+  width: 26px; height: 26px; border-radius: 50%; border: 1px dashed #a79e90;
+  display: grid; place-items: center; color: #8a8278; font-size: 13px;
+  background: rgba(255,253,247,.85); margin: 0 auto;
+}
+.dir-marker .dir-q {
+  margin-top: 4px; font-size: 10px; color: #8a8278; max-width: 150px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; background: rgba(255,253,247,.9);
+  border-radius: 999px; padding: 1px 7px;
+}

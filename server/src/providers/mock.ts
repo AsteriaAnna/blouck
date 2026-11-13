@@ -52,17 +52,19 @@ export const mockLLM: LLMProvider = {
       }
     }
     if (found.length) {
+      // 新节点先只有一条"探索来源"的正式关系；建议线只给已有节点之间
       relations.push({ type: "source", label: "本轮探索来源", target: found[0] });
-      for (const f of found.slice(1)) {
-        relations.push({ type: "suggest", label: "可能关联", target: f });
-      }
     }
     if (found.length && existing.length) {
-      relations.push({
-        type: "suggest",
-        label: `「${focus.name}」可能关联？`,
-        target: found[0],
-      });
+      const others = existing.filter((x) => x !== focus.name);
+      const other = others[Math.floor(Math.random() * others.length)];
+      if (other) {
+        relations.push({
+          type: "suggest",
+          label: `「${found[0]}」可能关联？`,
+          target: other,
+        });
+      }
     }
     if (text.includes("?") || text.includes("？")) {
       relations.push({

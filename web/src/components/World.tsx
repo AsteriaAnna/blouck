@@ -10,12 +10,13 @@ import "@xyflow/react/dist/style.css";
 import { useStore } from "../store";
 import IslandNode from "./IslandNode";
 import BuildingNode from "./BuildingNode";
+import DirectionNode from "./DirectionNode";
 import KwEdge from "./KwEdge";
 import InputBar from "./InputBar";
 import NodeDrawer from "./NodeDrawer";
 import BuildingDrawer from "./BuildingDrawer";
 
-const nodeTypes = { island: IslandNode, building: BuildingNode };
+const nodeTypes = { island: IslandNode, building: BuildingNode, direction: DirectionNode };
 const edgeTypes = { kw: KwEdge };
 
 export default function World() {
@@ -61,23 +62,53 @@ export default function World() {
         selectable: false,
       };
     });
-    return [...base, ...bs];
-  }, [nodes, buildings]);
+    const dirs: Node[] = edges
+      .filter((e) => e.kind === "direction")
+      .map((e) => {
+        const src = nodes.find((n) => n.id === e.src);
+        let seed = 0;
+        for (let i = 0; i < e.id.length; i++) seed = (seed * 31 + e.id.charCodeAt(i)) | 0;
+        const ang = ((Math.abs(seed) % 360) * Math.PI) / 180;
+        return {
+          id: "d:" + e.id,
+          type: "direction",
+          position: {
+            x: (src?.x ?? 0) * SPREAD + Math.cos(ang) * 190,
+            y: (src?.y ?? 0) * SPREAD + Math.sin(ang) * 150,
+          },
+          data: { question: e.question },
+          draggable: false,
+          selectable: false,
+        };
+      });
+    return [...base, ...bs, ...dirs];
+  }, [nodes, buildings, edges]);
 
   const rfEdges = useMemo<Edge[]>(
     () =>
-      edges.map((e) => ({
-        id: e.id,
-        source: e.src,
-        target: e.dst,
-        type: "kw",
-        data: { kind: e.kind, label: e.label, question: e.question },
-      })),
+      edges.map((e) =>
+        e.kind === "direction"
+          ? {
+              id: e.id,
+              source: e.src,
+              target: "d:" + e.id,
+              type: "kw",
+              data: { kind: e.kind, label: e.label, question: e.question },
+            }
+          : {
+              id: e.id,
+              source: e.src,
+              target: e.dst,
+              type: "kw",
+              data: { kind: e.kind, label: e.label, question: e.question },
+            },
+      ),
     [edges],
   );
 
   const onNodeClick = useCallback(
     (evt: any, node: Node) => {
+      if (node.id.startsWith("d:")) return;
       if (node.id.startsWith("b:")) {
         openBuilding(node.id.slice(2));
       } else {
