@@ -1,4 +1,4 @@
-import { Handle, Position } from "@xyflow/react";
+﻿import { Handle, Position } from "@xyflow/react";
 
 const INK = "#2a2620";
 const TOP = "#fffdf7";
@@ -16,7 +16,10 @@ export default function BuildingNode({ data }: any) {
 
   return (
     <div className={"building-wrap" + (locked ? " locked" : "")}>
-      <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
+      '<Handle id="t" type="target" position={Position.Top} style={{ opacity: 0 }} />
+      <Handle id="r" type="target" position={Position.Right} style={{ opacity: 0 }} />
+      <Handle id="b" type="target" position={Position.Bottom} style={{ opacity: 0 }} />
+      <Handle id="l" type="target" position={Position.Left} style={{ opacity: 0 }} />'
       <svg width={190} height={140} viewBox="0 0 190 140">
         <ellipse cx={cx} cy={124} rx={54} ry={7} fill="rgba(0,0,0,.10)" />
         {/* 底座 */}
@@ -63,7 +66,10 @@ export default function BuildingNode({ data }: any) {
           {cleared ? "已通关" : locked ? "未解锁" : "可挑战"}
         </span>
       </div>
-      <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
+      '<Handle id="t" type="source" position={Position.Top} style={{ opacity: 0 }} />
+      <Handle id="r" type="source" position={Position.Right} style={{ opacity: 0 }} />
+      <Handle id="b" type="source" position={Position.Bottom} style={{ opacity: 0 }} />
+      <Handle id="l" type="source" position={Position.Left} style={{ opacity: 0 }} />'
     </div>
   );
 }

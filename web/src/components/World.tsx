@@ -16,6 +16,8 @@ import InputBar from "./InputBar";
 import NodeDrawer from "./NodeDrawer";
 import BuildingDrawer from "./BuildingDrawer";
 
+const SPREAD = 1.28;
+const EDGE_COLORS: Record<string, string> = { formal: "#2a2620", source: "#6e8fa8", suggest: "#8a8278", direction: "#a79e90" };
 const nodeTypes = { island: IslandNode, building: BuildingNode, direction: DirectionNode };
 const edgeTypes = { kw: KwEdge };
 
@@ -39,7 +41,7 @@ export default function World() {
   }, []);
 
   const rfNodes = useMemo<Node[]>(() => {
-    const SPREAD = 1.28; // 节点造型变大后，坐标也拉开，避免岛叠在一起
+    // 坐标随造型放大拉开，避免岛体重叠
     const base: Node[] = nodes.map((n) => ({
       id: n.id,
       type: "island",
@@ -84,27 +86,54 @@ export default function World() {
     return [...base, ...bs, ...dirs];
   }, [nodes, buildings, edges]);
 
-  const rfEdges = useMemo<Edge[]>(
-    () =>
-      edges.map((e) =>
-        e.kind === "direction"
-          ? {
-              id: e.id,
-              source: e.src,
-              target: "d:" + e.id,
-              type: "kw",
-              data: { kind: e.kind, label: e.label, question: e.question },
-            }
-          : {
-              id: e.id,
-              source: e.src,
-              target: e.dst,
-              type: "kw",
-              data: { kind: e.kind, label: e.label, question: e.question },
-            },
-      ),
-    [edges],
-  );
+  const rfEdges = useMemo<Edge[]>(() => {
+    const center = (id: string) => {
+      const n = nodes.find((x) => x.id === id);
+      return n ? { x: n.x * SPREAD + 95, y: n.y * SPREAD + 75 } : null;
+    };
+    const dirPos = (e: any) => {
+      const src = nodes.find((n) => n.id === e.src);
+      let seed = 0;
+      for (let i = 0; i < e.id.length; i++) seed = (seed * 31 + e.id.charCodeAt(i)) | 0;
+      const ang = ((Math.abs(seed) % 360) * Math.PI) / 180;
+      return {
+        x: (src?.x ?? 0) * SPREAD + Math.cos(ang) * 190,
+        y: (src?.y ?? 0) * SPREAD + Math.sin(ang) * 150,
+      };
+    };
+    const counts: Record<string, number> = {};
+    const bends = [0, 1, -1, 2, -2];
+    return edges
+      .map((e) => {
+        const isDir = e.kind === "direction";
+        const a = center(e.src);
+        const b = isDir ? dirPos(e) : center(e.dst);
+        if (!a || !b) return null;
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const horiz = Math.abs(dx) >= Math.abs(dy);
+        const sourceHandle = horiz ? (dx >= 0 ? "r" : "l") : (dy >= 0 ? "b" : "t");
+        const targetHandle = horiz ? (dx >= 0 ? "l" : "r") : (dy >= 0 ? "t" : "b");
+        const key = isDir ? "d:" + e.id : [e.src, e.dst].sort().join("|");
+        const idx = counts[key] ?? 0;
+        counts[key] = idx + 1;
+        return {
+          id: e.id,
+          source: e.src,
+          target: isDir ? "d:" + e.id : e.dst,
+          sourceHandle,
+          targetHandle,
+          type: "kw",
+          data: {
+            kind: e.kind,
+            label: e.label,
+            question: e.question,
+            bend: bends[idx % bends.length],
+          },
+        } as Edge;
+      })
+      .filter(Boolean) as Edge[];
+  }, [nodes, edges]);
 
   const onNodeClick = useCallback(
     (evt: any, node: Node) => {
@@ -131,6 +160,25 @@ export default function World() {
   if (!world) return null;
 
   return (
+    <>
+      <svg aria-hidden style={{ position: "fixed", width: 0, height: 0, overflow: "hidden" }}>
+        <defs>
+          {Object.entries(EDGE_COLORS).map(([kind, color]) => (
+            <marker
+              key={kind}
+              id={`kw-arrow-${kind}`}
+              viewBox="0 0 10 10"
+              refX="9"
+              refY="5"
+              markerWidth="7"
+              markerHeight="7"
+              orient="auto"
+            >
+              <path d="M0,0 L10,5 L0,10 z" fill={color} />
+            </marker>
+          ))}
+        </defs>
+      </svg>
     <div className="world">
       <div className="topbar">
         <button className="ghost-btn" onClick={backHome}>
@@ -178,5 +226,6 @@ export default function World() {
       {drawer?.kind === "node" && <NodeDrawer />}
       {drawer?.kind === "building" && <BuildingDrawer />}
     </div>
+    </>
   );
 }
