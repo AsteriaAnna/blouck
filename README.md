@@ -1,4 +1,4 @@
-﻿# 知识世界（blouck）· 桌面 Web MVP
+# 知识世界（blouck）· 桌面 Web MVP
 
 把口头理解变成可继续探索、可编辑、可挑战的知识地图。
 本仓库是依据两份基线文档实现的 **MVP 版本**：
@@ -6,15 +6,23 @@
 - `docs/reference/knowledge-world-new-baseline-2026-11-13.md`（用户业务基线）
 - `docs/reference/knowledge-world-desktop-mvp-v1.0.md`（电脑版 MVP 提案）
 
-> 说明：文档中明确「前端不使用 3D 引擎」，因此本 MVP 使用
-> React Flow + SVG 自定义节点实现二维图谱；仓库里没有 3D 依赖。
-> 3D 浮岛样片只作为视觉参考，不进入本 MVP。
+> 范围说明：自 2026-11-14 起，**3D 视图正式纳入 MVP 范围并作为默认主视图**
+> （three.js + react-three-fiber + drei + GLB 浮岛），2D React Flow 保留为可选视图。
+> 依据：[docs/reviews/scope-decision-3d-2026-11-14.md](docs/reviews/scope-decision-3d-2026-11-14.md)。
+> 已知验收缺口（formal 关系在 3D 的可读性、LOD、搜索/回到起点等）见该文档与红队报告。
 
 ## 3D 资产与原型
 
 - 3D 视图使用 web/public/assets3d/ 里的 GLB（21 浮岛 + 2 副本门），资产已入库；
 - 原型 HTML 与生成脚本在 prototype/；
 - 细节见 [docs/ASSETS.md](docs/ASSETS.md)。
+
+## 审查与决策记录
+
+- 红队审查报告：[docs/reviews/mvp-red-team-2026-11-14.md](docs/reviews/mvp-red-team-2026-11-14.md)
+- 3D 范围决策：[docs/reviews/scope-decision-3d-2026-11-14.md](docs/reviews/scope-decision-3d-2026-11-14.md)
+- 实体/关系规则参考：[docs/reviews/entity-relation-rules-reference.md](docs/reviews/entity-relation-rules-reference.md)
+
 
 ## 界面
 
@@ -60,14 +68,16 @@ DEEPSEEK_MODEL=deepseek-chat
 
 DOUBAO_ASR_APP_ID=...
 DOUBAO_ASR_TOKEN=...
-DOUBAO_ASR_CLUSTER=volcengine_input_common
+DOUBAO_ASR_WS_URL=wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async
+DOUBAO_ASR_RESOURCE_ID=volc.seedasr.sauc.duration
 ```
 
 - 未配置 key：自动使用 **mock** provider，整条链路（语音流 → 稳定文本 → 抽取 → 落图）
   都能离线跑通，方便本地验收 UI 与状态机。
 - 配置后：`server/src/providers/deepseek.ts` 走真实 Chat Completions；
-  `server/src/providers/doubao.ts` 是**豆包流式 ASR 的接入位**（协议说明写在文件注释里，
-  当前未实现二进制帧解析，会明确降级到 mock，不伪造成已接入）。
+  `server/src/providers/doubao.ts` 实现**豆包 Seed ASR Streaming 2.0 真实流式协议**
+  （首帧/音频帧/负序号终帧/响应解析，失败自动降级 mock）。协议与实测见
+  [docs/ASR.md](docs/ASR.md)。真人麦克风仍需本机实测。
 
 ## 已实现的 MVP 范围
 
@@ -75,16 +85,21 @@ DOUBAO_ASR_CLUSTER=volcengine_input_common
 | --- | --- |
 | 世界首页：世界列表 + 新建（世界名 + 初始节点名） | ✅ |
 | 地图主页面：底部输入台（左麦克风 / 右提交） | ✅ |
-| 实时语音（稳定片段后抽取、临时文字只更新 UI） | ✅ WS + mock 流式；豆包接入位已留 |
-| 节点：自动落图、别名复用、来源片段、无删除 | ✅ 自动落图 / 同名去重；来源存于关系 |
-| 节点 MD：自由区可编辑、AI 不覆盖 | ✅ |
-| 题目区：5 简答 + 10 判断、三档 1/1 · 3/5 · 5/10 | ✅ 生成、作答、判题、档位回写 |
-| 关系线：正式 / 探索来源 / 虚线建议 / 方向线（无 MD） | ✅ 铁路样式折线（岛底尖端出发）+ 路牌；点路牌可看/编辑关系 MD、接受建议 |
-| 建筑：流程副本（排序连线）、领域副本（每日 10 题） | ✅ 自动检测 + 挑战入口 + 通关保存 |\n| 布局 | ✅ WFC-lite 自动布局（格子坍缩，减少交叉/重叠），顶栏「WFC 重排」 |
+| 实时语音（稳定片段后抽取、临时文字只更新 UI） | ✅ 豆包流式真实接入（partial/final）+ mock 降级；麦克风失败可切模拟语音 |
+| 节点：自动落图、别名复用、来源片段、无删除 | ⚠️ 自动落图 + 同名去重已做；**别名表、来源片段未实现** |
+| 节点 MD：自由区可编辑、AI 不覆盖 | ✅（手动保存；自动保存/保存状态待补） |
+| 题目区：5 简答 + 10 判断、三档 1/1 · 3/5 · 5/10 | ✅ 生成、作答、判题、档位回写；⚠️ 真实模型题量未做校验 |
+| 关系线：正式 / 探索来源 / 虚线建议 / 方向线（无 MD） | ✅ 2D 单线条（曲线/直线/轨道可切）+ 路牌；3D 贴地曲线 + 立体路牌；⚠️ 3D 下 formal/source 暂无路牌 |
+| 建筑：流程副本（排序连线）、领域副本（每日 10 题） | ✅ 规则检测 + 坐标落库 + 挑战 + 通关；⚠️ 领域混合题型/按用户日额待补 |
+| 3D 视图（2026-11-14 起纳入范围） | ✅ 默认 3D；⚠️ LOD、搜索/回起点、formal 关系可读待补 |
+| 布局 | ✅ WFC 自动布局（熵排序 + 约束传播）+ 增量放置；顶栏「重排」 |
 | 实操项目副本 | ⛔ 文档明确本版先不做 |
-| 隐藏：整片隐藏 + 撤回 | ⚠️ 仅实现单节点隐藏开关；整片连通性隐藏/撤回待补 |
+| 隐藏：整片隐藏 + 撤回 | ✅ 连通性预览 + 执行 + 最近一次撤回 + 根节点保护；⚠️ 渲染层仍显示 hidden（红队 P0-4） |
 | 关系 MD / 关系判断题三档 | ⛔ 文档标记延后 |
 | 演示脚本 / VC 演示流程 | ⚠️ 示例世界可用于演示；未写脚本化演示 |
+
+> 红队已审计出的问题与证据见 [docs/reviews/mvp-red-team-2026-11-14.md](docs/reviews/mvp-red-team-2026-11-14.md)；
+> 表中 ✅/⚠️ 以该报告为准，README 不是验收依据。
 
 ## 目录结构
 
