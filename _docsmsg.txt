@@ -1,8 +1,0 @@
-docs: 落盘红队审查报告，正式将 3D 纳入 MVP 范围
-
-- 新增 docs/reviews/mvp-red-team-2026-11-14.md（红队完整报告，P0/P1/P2 + 证据）
-- 新增 docs/reviews/scope-decision-3d-2026-11-14.md（3D 纳入 MVP 的决策与验收要求）
-- 新增 docs/reviews/entity-relation-rules-reference.md（GraphRAG / Neo4j / LlamaIndex 等参考与建议）
-- MVP 文档追加 2026-11-14 修订记录，覆盖原「不做/暂不做 3D」表述
-- README 修正与实现漂移的描述（3D 范围、豆包真实接入、整片隐藏、WFC）
-- .env.example 豆包端点更新为 v3 bigmodel_async
