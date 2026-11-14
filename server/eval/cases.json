@@ -1,0 +1,223 @@
+{
+  "meta": {
+    "version": "2026-11-14",
+    "description": "知识世界生成算法评测集：中文 AI 产品学习材料，人工标注概念、关系、关系类型与证据句。focus 统一为 RAG（模拟用户从根节点开始说）。",
+    "focus": "RAG",
+    "relationTypes": ["prerequisite", "partOf", "contrast", "alternative", "related"],
+    "note": "关系类型是知识语义；mapType 是地图线型（formal/source/suggest/direction），用于检验线型映射。"
+  },
+  "cases": [
+    {
+      "id": "rag-basic",
+      "topic": "RAG 基本链路",
+      "text": "RAG 先把文档切成分块，做向量化后存进向量数据库；用户提问时先检索相关分块，再交给大模型生成回答。所以分块质量会直接影响召回效果。",
+      "goldEntities": ["RAG", "文档分块", "向量数据库", "检索", "大模型", "召回"],
+      "aliases": {
+        "文档分块": ["分块", "chunking"],
+        "大模型": ["LLM", "生成模型"],
+        "召回": ["召回效果"]
+      },
+      "goldRelations": [
+        { "from": "RAG", "to": "文档分块", "type": "partOf", "mapType": "formal", "evidence": "RAG 先把文档切成分块" },
+        { "from": "文档分块", "to": "向量数据库", "type": "related", "mapType": "formal", "evidence": "做向量化后存进向量数据库" },
+        { "from": "检索", "to": "召回", "type": "related", "mapType": "formal", "evidence": "先检索相关分块" },
+        { "from": "文档分块", "to": "召回", "type": "prerequisite", "mapType": "formal", "evidence": "分块质量会直接影响召回效果" }
+      ],
+      "expectDirection": true
+    },
+    {
+      "id": "hybrid-retrieval",
+      "topic": "混合检索",
+      "text": "混合检索把 BM25 的关键词召回和向量数据库的语义召回合并。BM25 擅长精确词匹配，向量召回擅长语义相似，两者互补，然后用 Rerank 精排。",
+      "goldEntities": ["混合检索", "BM25", "关键词召回", "向量数据库", "语义召回", "Rerank", "精排"],
+      "aliases": {
+        "关键词召回": ["关键词检索"],
+        "语义召回": ["向量召回"],
+        "Rerank": ["重排"]
+      },
+      "goldRelations": [
+        { "from": "混合检索", "to": "BM25", "type": "partOf", "mapType": "formal", "evidence": "混合检索把 BM25 的关键词召回…合并" },
+        { "from": "混合检索", "to": "向量数据库", "type": "partOf", "mapType": "formal", "evidence": "和向量数据库的语义召回合并" },
+        { "from": "BM25", "to": "关键词召回", "type": "related", "mapType": "formal", "evidence": "BM25 擅长精确词匹配" },
+        { "from": "向量数据库", "to": "语义召回", "type": "related", "mapType": "formal", "evidence": "向量召回擅长语义相似" },
+        { "from": "BM25", "to": "向量数据库", "type": "contrast", "mapType": "formal", "evidence": "BM25 擅长精确词匹配，向量召回擅长语义相似" },
+        { "from": "混合检索", "to": "Rerank", "type": "related", "mapType": "formal", "evidence": "混合检索…然后用 Rerank 精排" }
+      ],
+      "expectDirection": true
+    },
+    {
+      "id": "rerank",
+      "topic": "精排",
+      "text": "Rerank 是精排阶段，输入是粗排召回的候选集，用交叉编码器重新打分。它比向量相似度更准但更慢，所以只对少量候选做精排。",
+      "goldEntities": ["Rerank", "精排", "粗排", "候选集", "交叉编码器", "向量相似度"],
+      "aliases": {
+        "Rerank": ["重排", "精排"],
+        "粗排": ["召回阶段"],
+        "交叉编码器": ["cross-encoder"]
+      },
+      "goldRelations": [
+        { "from": "Rerank", "to": "精排", "type": "related", "mapType": "formal", "evidence": "Rerank 是精排阶段" },
+        { "from": "Rerank", "to": "粗排", "type": "prerequisite", "mapType": "formal", "evidence": "输入是粗排召回的候选集" },
+        { "from": "Rerank", "to": "交叉编码器", "type": "partOf", "mapType": "formal", "evidence": "用交叉编码器重新打分" },
+        { "from": "Rerank", "to": "向量相似度", "type": "contrast", "mapType": "formal", "evidence": "比向量相似度更准但更慢" }
+      ],
+      "expectDirection": false
+    },
+    {
+      "id": "evaluation",
+      "topic": "评测",
+      "text": "评测集要覆盖真实问题分布，指标包括召回率、准确率和延迟。离线评测通过后还要做线上 A/B，不能只看离线分数。",
+      "goldEntities": ["评测集", "召回率", "准确率", "延迟", "离线评测", "线上 A/B"],
+      "aliases": {
+        "线上 A/B": ["AB 测试", "A/B 测试"],
+        "离线评测": ["离线评估"]
+      },
+      "goldRelations": [
+        { "from": "评测集", "to": "召回率", "type": "related", "mapType": "formal", "evidence": "指标包括召回率" },
+        { "from": "评测集", "to": "准确率", "type": "related", "mapType": "formal", "evidence": "指标包括…准确率" },
+        { "from": "离线评测", "to": "线上 A/B", "type": "prerequisite", "mapType": "formal", "evidence": "离线评测通过后还要做线上 A/B" }
+      ],
+      "expectDirection": true
+    },
+    {
+      "id": "chunking",
+      "topic": "分块策略",
+      "text": "分块太大容易混入无关信息，太小会丢失上下文。常见做法是按语义边界切分，再加重叠窗口，最后对每个分块做 embedding。",
+      "goldEntities": ["分块", "语义边界", "重叠窗口", "embedding", "上下文"],
+      "aliases": {
+        "分块": ["chunking", "文本分块"],
+        "embedding": ["向量化"]
+      },
+      "goldRelations": [
+        { "from": "分块", "to": "语义边界", "type": "related", "mapType": "formal", "evidence": "按语义边界切分" },
+        { "from": "分块", "to": "重叠窗口", "type": "related", "mapType": "formal", "evidence": "再加重叠窗口" },
+        { "from": "分块", "to": "embedding", "type": "prerequisite", "mapType": "formal", "evidence": "最后对每个分块做 embedding" },
+        { "from": "分块", "to": "上下文", "type": "contrast", "mapType": "formal", "evidence": "太小会丢失上下文" }
+      ],
+      "expectDirection": false
+    },
+    {
+      "id": "hallucination",
+      "topic": "幻觉",
+      "text": "幻觉通常来自模型在没有依据时补全内容。RAG 通过检索证据降低幻觉，但如果召回错了，反而会把错误证据交给模型。评测要做事实一致性检查。",
+      "goldEntities": ["幻觉", "RAG", "检索证据", "召回错误", "事实一致性", "评测"],
+      "aliases": {
+        "检索证据": ["检索到的证据"],
+        "召回错误": ["召回错了"]
+      },
+      "goldRelations": [
+        { "from": "RAG", "to": "幻觉", "type": "related", "mapType": "formal", "evidence": "RAG 通过检索证据降低幻觉" },
+        { "from": "RAG", "to": "检索证据", "type": "partOf", "mapType": "formal", "evidence": "通过检索证据" },
+        { "from": "召回错误", "to": "幻觉", "type": "related", "mapType": "formal", "evidence": "召回错了…把错误证据交给模型" },
+        { "from": "事实一致性", "to": "幻觉", "type": "contrast", "mapType": "formal", "evidence": "评测要做事实一致性检查" }
+      ],
+      "expectDirection": true
+    },
+    {
+      "id": "agent-tools",
+      "topic": "Agent 工具调用",
+      "text": "Agent 会先规划任务，再决定调用哪个工具；工具返回结果后还要判断是否继续调用。规划能力是工具调用的前置条件。",
+      "goldEntities": ["Agent", "任务规划", "工具调用", "工具", "规划能力"],
+      "aliases": {
+        "任务规划": ["规划"],
+        "规划能力": ["规划能力"]
+      },
+      "goldRelations": [
+        { "from": "Agent", "to": "任务规划", "type": "partOf", "mapType": "formal", "evidence": "Agent 会先规划任务" },
+        { "from": "Agent", "to": "工具调用", "type": "partOf", "mapType": "formal", "evidence": "再决定调用哪个工具" },
+        { "from": "规划能力", "to": "工具调用", "type": "prerequisite", "mapType": "formal", "evidence": "规划能力是工具调用的前置条件" },
+        { "from": "工具调用", "to": "工具", "type": "related", "mapType": "formal", "evidence": "工具返回结果" }
+      ],
+      "expectDirection": false
+    },
+    {
+      "id": "workflow",
+      "topic": "工作流",
+      "text": "工作流把多个步骤串起来：先解析输入，再检索资料，然后生成草稿，最后审核发布。每一步都有明确的输入输出。",
+      "goldEntities": ["工作流", "输入解析", "资料检索", "草稿生成", "审核发布"],
+      "aliases": {
+        "输入解析": ["解析输入"],
+        "资料检索": ["检索资料"],
+        "草稿生成": ["生成草稿"],
+        "审核发布": ["审核", "发布"]
+      },
+      "goldRelations": [
+        { "from": "工作流", "to": "输入解析", "type": "partOf", "mapType": "formal", "evidence": "工作流把多个步骤串起来：先解析输入" },
+        { "from": "输入解析", "to": "资料检索", "type": "prerequisite", "mapType": "formal", "evidence": "先解析输入，再检索资料" },
+        { "from": "资料检索", "to": "草稿生成", "type": "prerequisite", "mapType": "formal", "evidence": "再检索资料，然后生成草稿" },
+        { "from": "草稿生成", "to": "审核发布", "type": "prerequisite", "mapType": "formal", "evidence": "最后审核发布" }
+      ],
+      "expectFlow": true,
+      "expectDirection": false
+    },
+    {
+      "id": "embedding",
+      "topic": "Embedding",
+      "text": "Embedding 把文本映射成向量，语义相近的文本在向量空间里距离更近。向量数据库用近似最近邻检索来加速，但这会牺牲一点召回率。",
+      "goldEntities": ["Embedding", "向量", "向量空间", "向量数据库", "近似最近邻", "召回率"],
+      "aliases": {
+        "Embedding": ["嵌入", "向量化"],
+        "近似最近邻": ["ANN"]
+      },
+      "goldRelations": [
+        { "from": "Embedding", "to": "向量", "type": "related", "mapType": "formal", "evidence": "把文本映射成向量" },
+        { "from": "Embedding", "to": "向量空间", "type": "related", "mapType": "formal", "evidence": "在向量空间里距离更近" },
+        { "from": "向量数据库", "to": "近似最近邻", "type": "partOf", "mapType": "formal", "evidence": "用近似最近邻检索来加速" },
+        { "from": "近似最近邻", "to": "召回率", "type": "related", "mapType": "formal", "evidence": "会牺牲一点召回率" }
+      ],
+      "expectDirection": false
+    },
+    {
+      "id": "memory",
+      "topic": "记忆",
+      "text": "短期记忆保存当前对话上下文，长期记忆把重要事实写进外部存储。没有记忆的 Agent 每次都要重新了解用户。",
+      "goldEntities": ["短期记忆", "长期记忆", "上下文", "外部存储", "Agent"],
+      "aliases": {
+        "短期记忆": ["工作记忆"],
+        "长期记忆": ["持久记忆"]
+      },
+      "goldRelations": [
+        { "from": "短期记忆", "to": "上下文", "type": "partOf", "mapType": "formal", "evidence": "保存当前对话上下文" },
+        { "from": "长期记忆", "to": "外部存储", "type": "partOf", "mapType": "formal", "evidence": "把重要事实写进外部存储" },
+        { "from": "短期记忆", "to": "长期记忆", "type": "contrast", "mapType": "formal", "evidence": "短期记忆…长期记忆…" },
+        { "from": "Agent", "to": "短期记忆", "type": "related", "mapType": "formal", "evidence": "没有记忆的 Agent 每次都要重新了解用户" }
+      ],
+      "expectDirection": false
+    },
+    {
+      "id": "multimodal",
+      "topic": "多模态",
+      "text": "多模态模型同时处理文本、图片和语音。不同模态要先对齐到同一个表示空间，再做融合；对齐不好会导致跨模态检索失效。",
+      "goldEntities": ["多模态", "文本", "图片", "语音", "表示空间", "融合", "跨模态检索"],
+      "aliases": {
+        "表示空间": ["表征空间"],
+        "跨模态检索": ["跨模态搜索"]
+      },
+      "goldRelations": [
+        { "from": "多模态", "to": "文本", "type": "partOf", "mapType": "formal", "evidence": "同时处理文本" },
+        { "from": "多模态", "to": "图片", "type": "partOf", "mapType": "formal", "evidence": "图片" },
+        { "from": "多模态", "to": "语音", "type": "partOf", "mapType": "formal", "evidence": "语音" },
+        { "from": "表示空间", "to": "融合", "type": "prerequisite", "mapType": "formal", "evidence": "先对齐到同一个表示空间，再做融合" },
+        { "from": "表示空间", "to": "跨模态检索", "type": "prerequisite", "mapType": "formal", "evidence": "对齐不好会导致跨模态检索失效" }
+      ],
+      "expectDirection": false
+    },
+    {
+      "id": "finetune-vs-rag",
+      "topic": "微调与 RAG 的取舍",
+      "text": "微调改变模型参数，适合固定风格和格式；RAG 不改参数，适合经常变化的知识。知识更新频繁时优先 RAG，行为格式要求稳定时优先微调。",
+      "goldEntities": ["微调", "RAG", "模型参数", "知识更新", "风格", "格式"],
+      "aliases": {
+        "知识更新": ["知识变化"],
+        "微调": ["fine-tune", "Fine-tune"]
+      },
+      "goldRelations": [
+        { "from": "微调", "to": "模型参数", "type": "related", "mapType": "formal", "evidence": "微调改变模型参数" },
+        { "from": "微调", "to": "RAG", "type": "contrast", "mapType": "formal", "evidence": "微调…RAG 不改参数" },
+        { "from": "RAG", "to": "知识更新", "type": "related", "mapType": "formal", "evidence": "RAG…适合经常变化的知识" },
+        { "from": "微调", "to": "风格", "type": "related", "mapType": "formal", "evidence": "适合固定风格和格式" }
+      ],
+      "expectDirection": true
+    }
+  ]
+}

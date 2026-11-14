@@ -14,8 +14,8 @@
 
 自 2026-11-14 起：
 
-1. **3D 视图正式纳入 MVP 范围**，作为默认主视图实现（`web/src/components/World3D.tsx`，three.js + react-three-fiber + drei）；
-2. **2D 视图保留**为可选视图（顶栏「2D 视图 / 3D 视图」），二维 React Flow 仍然可用；
+1. **3D 视图正式纳入 MVP 范围**，作为唯一主视图实现（`web/src/components/World3D.tsx`，three.js + react-three-fiber + drei）；
+2. **2D React Flow 视图已移除**（2026-11-14 同日决定）：`IslandNode/BuildingNode/DirectionNode/RailEdge/KwEdge/routing` 与 `@xyflow/react`、`libavoid-js` 依赖已删除；
 3. 3D 资产（21 浮岛 + 2 副本门 GLB）继续由 `web/public/assets3d/` 管理，原型与 Blender 脚本在 `prototype/`；
 4. 原文档其余规则（节点三档、四类关系、副本、隐藏、题库、领域每日额度等）继续适用，不因 3D 改变。
 
@@ -29,11 +29,11 @@
 | 搜索定位 + 回到起点 | ❌ 无 | 补 UI 与相机动画 |
 | 相机不自动旋转、尊重「减少动画」 | ⚠️ 固定在初始位 | 校验 prefers-reduced-motion |
 | 性能目标（150 节点/300 边范围内可交互） | 未实测 | 补性能记录 |
-| 3D 与 2D 状态一致（隐藏、副本、方向、选中） | ❌ 3D 忽略 hidden；方向标记已补 | 修隐藏与选中同步 |
+| 3D 状态一致（隐藏、副本、方向、选中） | ❌ 3D 忽略 hidden；方向标记已补 | 修隐藏与选中同步 |
 | 资产可靠性：GLB 缺失/加载失败可降级 | ⚠️ 未兜底 | 加 fallback 与提示 |
 
 ## 影响
 
 - README 的「没有 3D 依赖 / 3D 不进入 MVP」表述需要改写；
 - 红队报告 P0-5「3D 越界」因本决策关闭，但上述验收项转为 **P1 待办**；
-- 演示脚本可以包含 3D，但必须同时说明 2D 视图可用，且 3D 不改变知识规则。
+- 演示脚本可以包含 3D；2D 视图已移除，3D 不改变知识规则。

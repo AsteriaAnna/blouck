@@ -6,10 +6,11 @@
 - `docs/reference/knowledge-world-new-baseline-2026-11-13.md`（用户业务基线）
 - `docs/reference/knowledge-world-desktop-mvp-v1.0.md`（电脑版 MVP 提案）
 
-> 范围说明：自 2026-11-14 起，**3D 视图正式纳入 MVP 范围并作为默认主视图**
-> （three.js + react-three-fiber + drei + GLB 浮岛），2D React Flow 保留为可选视图。
+> 范围说明：自 2026-11-14 起，**3D 视图正式纳入 MVP 范围并作为唯一主视图**
+> （three.js + react-three-fiber + drei + GLB 浮岛）；原 2D React Flow 视图已移除。
 > 依据：[docs/reviews/scope-decision-3d-2026-11-14.md](docs/reviews/scope-decision-3d-2026-11-14.md)。
 > 已知验收缺口（formal 关系在 3D 的可读性、LOD、搜索/回到起点等）见该文档与红队报告。
+> 生成算法评测见 [docs/EVAL.md](docs/EVAL.md)（当前基线：实体 R 60%、关系 P/R 4.3%/6.0%）。
 
 ## 3D 资产与原型
 
@@ -36,10 +37,10 @@
 | --- | --- |
 | ![flow](docs/screenshots/03-flow-dungeon.png) | ![domain](docs/screenshots/04-domain-dungeon.png) |
 
-## 技术栈（按 MVP 文档）
+## 技术栈
 
-- 前端：React + TypeScript + Vite、React Flow（自定义节点/边）、Zustand、
-  react-markdown、CSS/SVG 动效
+- 前端：React + TypeScript + Vite、three.js + react-three-fiber + drei（3D 视图）、
+  Zustand、react-markdown、CanvasTexture/CSS 动效
 - 服务端：Node.js + Express + WebSocket（`ws`）
 - 存储：Node 内置 SQLite（`node:sqlite`，无需编译原生模块），WAL 模式
 - 预留：**DeepSeek**（语言：抽取 / 出题 / 判题）与 **豆包 / 火山引擎**（流式 ASR）
@@ -89,9 +90,9 @@ DOUBAO_ASR_RESOURCE_ID=volc.seedasr.sauc.duration
 | 节点：自动落图、别名复用、来源片段、无删除 | ⚠️ 自动落图 + 同名去重已做；**别名表、来源片段未实现** |
 | 节点 MD：自由区可编辑、AI 不覆盖 | ✅（手动保存；自动保存/保存状态待补） |
 | 题目区：5 简答 + 10 判断、三档 1/1 · 3/5 · 5/10 | ✅ 生成、作答、判题、档位回写；⚠️ 真实模型题量未做校验 |
-| 关系线：正式 / 探索来源 / 虚线建议 / 方向线（无 MD） | ✅ 2D 单线条（曲线/直线/轨道可切）+ 路牌；3D 贴地曲线 + 立体路牌；⚠️ 3D 下 formal/source 暂无路牌 |
+| 关系线：正式 / 探索来源 / 虚线建议 / 方向线（无 MD） | ✅ 3D 贴地曲线 + 立体路牌；⚠️ formal/source 暂无路牌 |
 | 建筑：流程副本（排序连线）、领域副本（每日 10 题） | ✅ 规则检测 + 坐标落库 + 挑战 + 通关；⚠️ 领域混合题型/按用户日额待补 |
-| 3D 视图（2026-11-14 起纳入范围） | ✅ 默认 3D；⚠️ LOD、搜索/回起点、formal 关系可读待补 |
+| 3D 视图（2026-11-14 起纳入范围，唯一视图） | ✅ three.js + GLB 浮岛；⚠️ LOD、搜索/回起点、formal 关系可读待补 |
 | 布局 | ✅ WFC 自动布局（熵排序 + 约束传播）+ 增量放置；顶栏「重排」 |
 | 实操项目副本 | ⛔ 文档明确本版先不做 |
 | 隐藏：整片隐藏 + 撤回 | ✅ 连通性预览 + 执行 + 最近一次撤回 + 根节点保护；⚠️ 渲染层仍显示 hidden（红队 P0-4） |

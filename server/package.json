@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "eval": "tsx eval/run.ts",
+    "eval:api": "tsx eval/run.ts --api"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

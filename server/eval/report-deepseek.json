@@ -1,0 +1,897 @@
+{
+  "summary": {
+    "entityTP": 42,
+    "entityFP": 0,
+    "entityFN": 28,
+    "relationTP": 3,
+    "relationFP": 67,
+    "relationFN": 47,
+    "mapTypeOK": 0,
+    "mapTypeTotal": 3,
+    "directionExpected": 5,
+    "directionFound": 5
+  },
+  "results": [
+    {
+      "id": "rag-basic",
+      "topic": "RAG 基本链路",
+      "provider": "deepseek",
+      "entityTP": 5,
+      "entityFP": 0,
+      "entityFN": 1,
+      "relationTP": 1,
+      "relationFP": 6,
+      "relationFN": 3,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 1,
+      "evidenceOK": 0,
+      "evidenceTotal": 4,
+      "directionExpected": true,
+      "directionFound": true,
+      "predictedEntities": [
+        "RAG",
+        "文档分块",
+        "向量化",
+        "向量数据库",
+        "检索",
+        "大模型生成",
+        "召回效果"
+      ],
+      "predictedRelations": [
+        {
+          "src": "RAG",
+          "dst": "文档分块",
+          "kind": "source",
+          "label": "RAG 包含文档分块、向量化、向量数据库存储、检索、大模型生成等环节"
+        },
+        {
+          "src": "RAG",
+          "dst": "向量化",
+          "kind": "source",
+          "label": "文档分块后做向量化"
+        },
+        {
+          "src": "RAG",
+          "dst": "向量数据库",
+          "kind": "source",
+          "label": "向量化后存进向量数据库"
+        },
+        {
+          "src": "RAG",
+          "dst": "检索",
+          "kind": "source",
+          "label": "用户提问时先检索相关分块"
+        },
+        {
+          "src": "RAG",
+          "dst": "大模型生成",
+          "kind": "source",
+          "label": "检索到的分块交给大模型生成回答"
+        },
+        {
+          "src": "RAG",
+          "dst": "召回",
+          "kind": "suggest",
+          "label": "分块质量会直接影响召回效果"
+        },
+        {
+          "src": "RAG",
+          "dst": "文档分块",
+          "kind": "direction",
+          "label": "探索如何优化分块策略以提升召回效果"
+        }
+      ],
+      "missingEntities": [
+        "大模型"
+      ],
+      "missingRelations": [
+        "文档分块 --related--> 向量数据库",
+        "检索 --related--> 召回",
+        "文档分块 --prerequisite--> 召回"
+      ],
+      "gotFlow": false,
+      "gotDomain": false
+    },
+    {
+      "id": "hybrid-retrieval",
+      "topic": "混合检索",
+      "provider": "deepseek",
+      "entityTP": 5,
+      "entityFP": 0,
+      "entityFN": 2,
+      "relationTP": 0,
+      "relationFP": 11,
+      "relationFN": 6,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 0,
+      "evidenceOK": 0,
+      "evidenceTotal": 6,
+      "directionExpected": true,
+      "directionFound": true,
+      "predictedEntities": [
+        "RAG",
+        "混合检索",
+        "BM25",
+        "向量数据库",
+        "向量召回",
+        "Rerank"
+      ],
+      "predictedRelations": [
+        {
+          "src": "rag",
+          "dst": "混合检索",
+          "kind": "source",
+          "label": "包含"
+        },
+        {
+          "src": "rag",
+          "dst": "Rerank",
+          "kind": "source",
+          "label": "包含"
+        },
+        {
+          "src": "rag",
+          "dst": "BM25",
+          "kind": "source",
+          "label": "包含"
+        },
+        {
+          "src": "rag",
+          "dst": "语义召回",
+          "kind": "source",
+          "label": "包含"
+        },
+        {
+          "src": "rag",
+          "dst": "BM25",
+          "kind": "formal",
+          "label": "混合检索合并"
+        },
+        {
+          "src": "rag",
+          "dst": "语义召回",
+          "kind": "formal",
+          "label": "混合检索合并"
+        },
+        {
+          "src": "rag",
+          "dst": "向量数据库",
+          "kind": "formal",
+          "label": "向量召回依赖"
+        },
+        {
+          "src": "rag",
+          "dst": "Rerank",
+          "kind": "formal",
+          "label": "混合检索后精排"
+        },
+        {
+          "src": "rag",
+          "dst": "语义召回",
+          "kind": "suggest",
+          "label": "BM25与向量召回互补"
+        },
+        {
+          "src": "rag",
+          "dst": "Rerank",
+          "kind": "direction",
+          "label": "探索 Rerank 模型选型与效果评估"
+        },
+        {
+          "src": "rag",
+          "dst": "混合检索",
+          "kind": "direction",
+          "label": "探索混合检索的融合权重与策略"
+        }
+      ],
+      "missingEntities": [
+        "关键词召回",
+        "精排"
+      ],
+      "missingRelations": [
+        "混合检索 --partOf--> BM25",
+        "混合检索 --partOf--> 向量数据库",
+        "BM25 --related--> 关键词召回",
+        "向量数据库 --related--> 语义召回",
+        "BM25 --contrast--> 向量数据库",
+        "混合检索 --related--> Rerank"
+      ],
+      "gotFlow": false,
+      "gotDomain": false
+    },
+    {
+      "id": "rerank",
+      "topic": "精排",
+      "provider": "deepseek",
+      "entityTP": 3,
+      "entityFP": 0,
+      "entityFN": 3,
+      "relationTP": 0,
+      "relationFP": 6,
+      "relationFN": 4,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 0,
+      "evidenceOK": 0,
+      "evidenceTotal": 4,
+      "directionExpected": false,
+      "directionFound": false,
+      "predictedEntities": [
+        "RAG",
+        "Rerank",
+        "交叉编码器",
+        "向量相似度",
+        "粗排召回"
+      ],
+      "predictedRelations": [
+        {
+          "src": "rag",
+          "dst": "rag",
+          "kind": "source",
+          "label": "Rerank 是 RAG 流程中的精排阶段"
+        },
+        {
+          "src": "rag",
+          "dst": "粗排召回",
+          "kind": "source",
+          "label": "Rerank 的输入是粗排召回的候选集"
+        },
+        {
+          "src": "rag",
+          "dst": "交叉编码器",
+          "kind": "source",
+          "label": "Rerank 使用交叉编码器重新打分"
+        },
+        {
+          "src": "rag",
+          "dst": "向量相似度",
+          "kind": "suggest",
+          "label": "交叉编码器比向量相似度更准但更慢，因此只对少量候选做精排"
+        },
+        {
+          "src": "rag",
+          "dst": "粗排召回",
+          "kind": "direction",
+          "label": "探索 Rerank 与粗排召回的协同设计：候选集规模如何影响精度与延迟的权衡"
+        },
+        {
+          "src": "rag",
+          "dst": "交叉编码器",
+          "kind": "direction",
+          "label": "探索交叉编码器的轻量化或蒸馏方案以降低精排延迟"
+        }
+      ],
+      "missingEntities": [
+        "精排",
+        "粗排",
+        "候选集"
+      ],
+      "missingRelations": [
+        "Rerank --related--> 精排",
+        "Rerank --prerequisite--> 粗排",
+        "Rerank --partOf--> 交叉编码器",
+        "Rerank --contrast--> 向量相似度"
+      ],
+      "gotFlow": false,
+      "gotDomain": false
+    },
+    {
+      "id": "evaluation",
+      "topic": "评测",
+      "provider": "deepseek",
+      "entityTP": 6,
+      "entityFP": 0,
+      "entityFN": 0,
+      "relationTP": 0,
+      "relationFP": 9,
+      "relationFN": 3,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 0,
+      "evidenceOK": 0,
+      "evidenceTotal": 3,
+      "directionExpected": true,
+      "directionFound": true,
+      "predictedEntities": [
+        "RAG",
+        "评测集",
+        "召回率",
+        "准确率",
+        "延迟",
+        "离线评测",
+        "线上 A/B"
+      ],
+      "predictedRelations": [
+        {
+          "src": "rag",
+          "dst": "评测集",
+          "kind": "source",
+          "label": "评测集覆盖真实问题分布"
+        },
+        {
+          "src": "rag",
+          "dst": "召回率",
+          "kind": "source",
+          "label": "评测指标包括召回率、准确率和延迟"
+        },
+        {
+          "src": "rag",
+          "dst": "准确率",
+          "kind": "source",
+          "label": "评测指标包括召回率、准确率和延迟"
+        },
+        {
+          "src": "rag",
+          "dst": "延迟",
+          "kind": "source",
+          "label": "评测指标包括召回率、准确率和延迟"
+        },
+        {
+          "src": "rag",
+          "dst": "离线评测",
+          "kind": "source",
+          "label": "离线评测通过后还要做线上 A/B"
+        },
+        {
+          "src": "rag",
+          "dst": "线上 A/B",
+          "kind": "source",
+          "label": "离线评测通过后还要做线上 A/B"
+        },
+        {
+          "src": "rag",
+          "dst": "线上 A/B",
+          "kind": "suggest",
+          "label": "离线分数与线上效果可能不一致"
+        },
+        {
+          "src": "rag",
+          "dst": "评测集",
+          "kind": "direction",
+          "label": "如何构建覆盖真实问题分布的评测集"
+        },
+        {
+          "src": "rag",
+          "dst": "线上 A/B",
+          "kind": "direction",
+          "label": "离线与线上指标如何对齐"
+        }
+      ],
+      "missingEntities": [],
+      "missingRelations": [
+        "评测集 --related--> 召回率",
+        "评测集 --related--> 准确率",
+        "离线评测 --prerequisite--> 线上 A/B"
+      ],
+      "gotFlow": false,
+      "gotDomain": false
+    },
+    {
+      "id": "chunking",
+      "topic": "分块策略",
+      "provider": "deepseek",
+      "entityTP": 2,
+      "entityFP": 0,
+      "entityFN": 3,
+      "relationTP": 0,
+      "relationFP": 6,
+      "relationFN": 4,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 0,
+      "evidenceOK": 0,
+      "evidenceTotal": 4,
+      "directionExpected": false,
+      "directionFound": false,
+      "predictedEntities": [
+        "RAG",
+        "文本分块",
+        "语义边界切分",
+        "重叠窗口",
+        "分块 embedding",
+        "分块大小权衡"
+      ],
+      "predictedRelations": [
+        {
+          "src": "rag",
+          "dst": "分块",
+          "kind": "source",
+          "label": "RAG 依赖文本分块"
+        },
+        {
+          "src": "rag",
+          "dst": "语义边界切分",
+          "kind": "source",
+          "label": "文本分块采用语义边界切分"
+        },
+        {
+          "src": "rag",
+          "dst": "重叠窗口",
+          "kind": "source",
+          "label": "文本分块采用重叠窗口"
+        },
+        {
+          "src": "rag",
+          "dst": "分块embedding",
+          "kind": "source",
+          "label": "文本分块后对每个分块做 embedding"
+        },
+        {
+          "src": "rag",
+          "dst": "分块大小权衡",
+          "kind": "suggest",
+          "label": "分块大小权衡影响检索质量"
+        },
+        {
+          "src": "rag",
+          "dst": "分块参数调优",
+          "kind": "direction",
+          "label": "探索分块大小与重叠比例的调参策略"
+        }
+      ],
+      "missingEntities": [
+        "语义边界",
+        "embedding",
+        "上下文"
+      ],
+      "missingRelations": [
+        "分块 --related--> 语义边界",
+        "分块 --related--> 重叠窗口",
+        "分块 --prerequisite--> embedding",
+        "分块 --contrast--> 上下文"
+      ],
+      "gotFlow": false,
+      "gotDomain": false
+    },
+    {
+      "id": "hallucination",
+      "topic": "幻觉",
+      "provider": "deepseek",
+      "entityTP": 4,
+      "entityFP": 0,
+      "entityFN": 2,
+      "relationTP": 1,
+      "relationFP": 2,
+      "relationFN": 3,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 1,
+      "evidenceOK": 0,
+      "evidenceTotal": 4,
+      "directionExpected": true,
+      "directionFound": true,
+      "predictedEntities": [
+        "RAG",
+        "幻觉",
+        "检索证据",
+        "召回错误",
+        "事实一致性检查"
+      ],
+      "predictedRelations": [
+        {
+          "src": "RAG",
+          "dst": "幻觉",
+          "kind": "source",
+          "label": "RAG 通过检索证据降低幻觉"
+        },
+        {
+          "src": "RAG",
+          "dst": "幻觉",
+          "kind": "suggest",
+          "label": "召回错误会把错误证据交给模型，可能放大幻觉"
+        },
+        {
+          "src": "RAG",
+          "dst": "事实一致性检查",
+          "kind": "direction",
+          "label": "评测要做事实一致性检查"
+        }
+      ],
+      "missingEntities": [
+        "事实一致性",
+        "评测"
+      ],
+      "missingRelations": [
+        "RAG --partOf--> 检索证据",
+        "召回错误 --related--> 幻觉",
+        "事实一致性 --contrast--> 幻觉"
+      ],
+      "gotFlow": false,
+      "gotDomain": false
+    },
+    {
+      "id": "agent-tools",
+      "topic": "Agent 工具调用",
+      "provider": "deepseek",
+      "entityTP": 3,
+      "entityFP": 0,
+      "entityFN": 2,
+      "relationTP": 0,
+      "relationFP": 5,
+      "relationFN": 4,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 0,
+      "evidenceOK": 0,
+      "evidenceTotal": 4,
+      "directionExpected": false,
+      "directionFound": false,
+      "predictedEntities": [
+        "RAG",
+        "Agent",
+        "工具调用",
+        "规划能力"
+      ],
+      "predictedRelations": [
+        {
+          "src": "rag",
+          "dst": "工具调用",
+          "kind": "source",
+          "label": "Agent 先规划任务再决定调用哪个工具"
+        },
+        {
+          "src": "rag",
+          "dst": "工具调用",
+          "kind": "source",
+          "label": "工具返回结果后判断是否继续调用"
+        },
+        {
+          "src": "rag",
+          "dst": "规划能力",
+          "kind": "source",
+          "label": "规划能力是工具调用的前置条件"
+        },
+        {
+          "src": "rag",
+          "dst": "Agent",
+          "kind": "suggest",
+          "label": "RAG 可能为 Agent 的规划或工具调用提供外部知识支撑"
+        },
+        {
+          "src": "rag",
+          "dst": "rag",
+          "kind": "direction",
+          "label": "探索 RAG 与 Agent 规划/工具调用链路的结合方式"
+        }
+      ],
+      "missingEntities": [
+        "任务规划",
+        "工具"
+      ],
+      "missingRelations": [
+        "Agent --partOf--> 任务规划",
+        "Agent --partOf--> 工具调用",
+        "规划能力 --prerequisite--> 工具调用",
+        "工具调用 --related--> 工具"
+      ],
+      "gotFlow": false,
+      "gotDomain": false
+    },
+    {
+      "id": "workflow",
+      "topic": "工作流",
+      "provider": "deepseek",
+      "entityTP": 5,
+      "entityFP": 0,
+      "entityFN": 0,
+      "relationTP": 0,
+      "relationFP": 6,
+      "relationFN": 4,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 0,
+      "evidenceOK": 0,
+      "evidenceTotal": 4,
+      "directionExpected": false,
+      "directionFound": false,
+      "predictedEntities": [
+        "RAG",
+        "工作流",
+        "输入解析",
+        "资料检索",
+        "草稿生成",
+        "审核发布"
+      ],
+      "predictedRelations": [
+        {
+          "src": "rag",
+          "dst": "输入解析",
+          "kind": "source",
+          "label": "工作流包含步骤"
+        },
+        {
+          "src": "rag",
+          "dst": "资料检索",
+          "kind": "source",
+          "label": "工作流包含步骤"
+        },
+        {
+          "src": "rag",
+          "dst": "草稿生成",
+          "kind": "source",
+          "label": "工作流包含步骤"
+        },
+        {
+          "src": "rag",
+          "dst": "审核发布",
+          "kind": "source",
+          "label": "工作流包含步骤"
+        },
+        {
+          "src": "rag",
+          "dst": "资料检索",
+          "kind": "suggest",
+          "label": "RAG 可能对应资料检索与草稿生成环节"
+        },
+        {
+          "src": "rag",
+          "dst": "rag",
+          "kind": "direction",
+          "label": "探索 RAG 在检索与生成之间的衔接方式"
+        }
+      ],
+      "missingEntities": [],
+      "missingRelations": [
+        "工作流 --partOf--> 输入解析",
+        "输入解析 --prerequisite--> 资料检索",
+        "资料检索 --prerequisite--> 草稿生成",
+        "草稿生成 --prerequisite--> 审核发布"
+      ],
+      "expectFlow": true,
+      "gotFlow": false,
+      "gotDomain": false
+    },
+    {
+      "id": "embedding",
+      "topic": "Embedding",
+      "provider": "deepseek",
+      "entityTP": 3,
+      "entityFP": 0,
+      "entityFN": 3,
+      "relationTP": 0,
+      "relationFP": 5,
+      "relationFN": 4,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 0,
+      "evidenceOK": 0,
+      "evidenceTotal": 4,
+      "directionExpected": false,
+      "directionFound": false,
+      "predictedEntities": [
+        "RAG",
+        "Embedding",
+        "向量数据库",
+        "近似最近邻检索",
+        "召回率"
+      ],
+      "predictedRelations": [
+        {
+          "src": "rag",
+          "dst": "Embedding",
+          "kind": "source",
+          "label": "RAG 依赖 Embedding 做语义表示"
+        },
+        {
+          "src": "rag",
+          "dst": "向量数据库",
+          "kind": "source",
+          "label": "RAG 常用向量数据库做检索"
+        },
+        {
+          "src": "rag",
+          "dst": "近似最近邻检索",
+          "kind": "source",
+          "label": "向量数据库采用近似最近邻检索加速"
+        },
+        {
+          "src": "rag",
+          "dst": "召回率",
+          "kind": "suggest",
+          "label": "近似最近邻检索可能降低召回率"
+        },
+        {
+          "src": "rag",
+          "dst": "召回率",
+          "kind": "direction",
+          "label": "探索如何在 RAG 中平衡检索速度与召回率"
+        }
+      ],
+      "missingEntities": [
+        "向量",
+        "向量空间",
+        "近似最近邻"
+      ],
+      "missingRelations": [
+        "Embedding --related--> 向量",
+        "Embedding --related--> 向量空间",
+        "向量数据库 --partOf--> 近似最近邻",
+        "近似最近邻 --related--> 召回率"
+      ],
+      "gotFlow": false,
+      "gotDomain": false
+    },
+    {
+      "id": "memory",
+      "topic": "记忆",
+      "provider": "deepseek",
+      "entityTP": 3,
+      "entityFP": 0,
+      "entityFN": 2,
+      "relationTP": 0,
+      "relationFP": 3,
+      "relationFN": 4,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 0,
+      "evidenceOK": 0,
+      "evidenceTotal": 4,
+      "directionExpected": false,
+      "directionFound": false,
+      "predictedEntities": [
+        "RAG",
+        "短期记忆",
+        "长期记忆",
+        "Agent"
+      ],
+      "predictedRelations": [
+        {
+          "src": "rag",
+          "dst": "Agent",
+          "kind": "source",
+          "label": "RAG 与记忆机制同属为 Agent 提供外部信息的方案"
+        },
+        {
+          "src": "rag",
+          "dst": "rag",
+          "kind": "suggest",
+          "label": "长期记忆的外部存储可能借鉴检索机制（如向量检索）"
+        },
+        {
+          "src": "rag",
+          "dst": "长期记忆",
+          "kind": "direction",
+          "label": "探索 RAG 与长期记忆在检索方式上的异同"
+        }
+      ],
+      "missingEntities": [
+        "上下文",
+        "外部存储"
+      ],
+      "missingRelations": [
+        "短期记忆 --partOf--> 上下文",
+        "长期记忆 --partOf--> 外部存储",
+        "短期记忆 --contrast--> 长期记忆",
+        "Agent --related--> 短期记忆"
+      ],
+      "gotFlow": false,
+      "gotDomain": false
+    },
+    {
+      "id": "multimodal",
+      "topic": "多模态",
+      "provider": "deepseek",
+      "entityTP": 1,
+      "entityFP": 0,
+      "entityFN": 6,
+      "relationTP": 0,
+      "relationFP": 4,
+      "relationFN": 5,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 0,
+      "evidenceOK": 0,
+      "evidenceTotal": 5,
+      "directionExpected": false,
+      "directionFound": false,
+      "predictedEntities": [
+        "RAG",
+        "多模态模型",
+        "模态对齐",
+        "跨模态检索"
+      ],
+      "predictedRelations": [
+        {
+          "src": "rag",
+          "dst": "多模态模型",
+          "kind": "source",
+          "label": "RAG与多模态模型结合"
+        },
+        {
+          "src": "rag",
+          "dst": "模态对齐",
+          "kind": "suggest",
+          "label": "多模态RAG依赖模态对齐质量"
+        },
+        {
+          "src": "rag",
+          "dst": "跨模态检索",
+          "kind": "suggest",
+          "label": "模态对齐影响跨模态检索"
+        },
+        {
+          "src": "rag",
+          "dst": "跨模态检索",
+          "kind": "direction",
+          "label": "探索多模态RAG中的跨模态检索与对齐方法"
+        }
+      ],
+      "missingEntities": [
+        "多模态",
+        "文本",
+        "图片",
+        "语音",
+        "表示空间",
+        "融合"
+      ],
+      "missingRelations": [
+        "多模态 --partOf--> 文本",
+        "多模态 --partOf--> 图片",
+        "多模态 --partOf--> 语音",
+        "表示空间 --prerequisite--> 融合",
+        "表示空间 --prerequisite--> 跨模态检索"
+      ],
+      "gotFlow": false,
+      "gotDomain": false
+    },
+    {
+      "id": "finetune-vs-rag",
+      "topic": "微调与 RAG 的取舍",
+      "provider": "deepseek",
+      "entityTP": 2,
+      "entityFP": 0,
+      "entityFN": 4,
+      "relationTP": 1,
+      "relationFP": 4,
+      "relationFN": 3,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 1,
+      "evidenceOK": 0,
+      "evidenceTotal": 4,
+      "directionExpected": true,
+      "directionFound": true,
+      "predictedEntities": [
+        "RAG",
+        "微调",
+        "知识更新频率",
+        "行为格式稳定性"
+      ],
+      "predictedRelations": [
+        {
+          "src": "RAG",
+          "dst": "RAG",
+          "kind": "source",
+          "label": "RAG 不改参数，适合经常变化的知识"
+        },
+        {
+          "src": "RAG",
+          "dst": "微调",
+          "kind": "source",
+          "label": "微调改变模型参数，适合固定风格和格式"
+        },
+        {
+          "src": "RAG",
+          "dst": "知识更新频率",
+          "kind": "suggest",
+          "label": "知识更新频繁时优先 RAG"
+        },
+        {
+          "src": "RAG",
+          "dst": "行为格式稳定性",
+          "kind": "suggest",
+          "label": "行为格式要求稳定时优先微调"
+        },
+        {
+          "src": "RAG",
+          "dst": "混合方案",
+          "kind": "direction",
+          "label": "探索 RAG 与微调的混合方案（如 RAG+微调结合）"
+        }
+      ],
+      "missingEntities": [
+        "模型参数",
+        "知识更新",
+        "风格",
+        "格式"
+      ],
+      "missingRelations": [
+        "微调 --related--> 模型参数",
+        "RAG --related--> 知识更新",
+        "微调 --related--> 风格"
+      ],
+      "gotFlow": false,
+      "gotDomain": false
+    }
+  ]
+}

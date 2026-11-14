@@ -1,0 +1,542 @@
+{
+  "summary": {
+    "entityTP": 12,
+    "entityFP": 0,
+    "entityFN": 58,
+    "relationTP": 0,
+    "relationFP": 12,
+    "relationFN": 50,
+    "mapTypeOK": 0,
+    "mapTypeTotal": 0,
+    "directionExpected": 5,
+    "directionFound": 0
+  },
+  "results": [
+    {
+      "id": "rag-basic",
+      "topic": "RAG 基本链路",
+      "provider": "mock",
+      "entityTP": 1,
+      "entityFP": 0,
+      "entityFN": 5,
+      "relationTP": 0,
+      "relationFP": 1,
+      "relationFN": 4,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 0,
+      "evidenceOK": 0,
+      "evidenceTotal": 4,
+      "directionExpected": true,
+      "directionFound": false,
+      "predictedEntities": [
+        "召回"
+      ],
+      "predictedRelations": [
+        {
+          "src": "RAG",
+          "dst": "召回",
+          "kind": "source",
+          "label": "本轮探索来源"
+        }
+      ],
+      "missingEntities": [
+        "RAG",
+        "文档分块",
+        "向量数据库",
+        "检索",
+        "大模型"
+      ],
+      "missingRelations": [
+        "RAG --partOf--> 文档分块",
+        "文档分块 --related--> 向量数据库",
+        "检索 --related--> 召回",
+        "文档分块 --prerequisite--> 召回"
+      ],
+      "gotFlow": false,
+      "gotDomain": false
+    },
+    {
+      "id": "hybrid-retrieval",
+      "topic": "混合检索",
+      "provider": "mock",
+      "entityTP": 4,
+      "entityFP": 0,
+      "entityFN": 3,
+      "relationTP": 0,
+      "relationFP": 1,
+      "relationFN": 6,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 0,
+      "evidenceOK": 0,
+      "evidenceTotal": 6,
+      "directionExpected": true,
+      "directionFound": false,
+      "predictedEntities": [
+        "Rerank",
+        "精排",
+        "混合检索",
+        "BM25",
+        "召回"
+      ],
+      "predictedRelations": [
+        {
+          "src": "rag",
+          "dst": "Rerank",
+          "kind": "source",
+          "label": "本轮探索来源"
+        }
+      ],
+      "missingEntities": [
+        "关键词召回",
+        "向量数据库",
+        "语义召回"
+      ],
+      "missingRelations": [
+        "混合检索 --partOf--> BM25",
+        "混合检索 --partOf--> 向量数据库",
+        "BM25 --related--> 关键词召回",
+        "向量数据库 --related--> 语义召回",
+        "BM25 --contrast--> 向量数据库",
+        "混合检索 --related--> Rerank"
+      ],
+      "gotFlow": false,
+      "gotDomain": false
+    },
+    {
+      "id": "rerank",
+      "topic": "精排",
+      "provider": "mock",
+      "entityTP": 2,
+      "entityFP": 0,
+      "entityFN": 4,
+      "relationTP": 0,
+      "relationFP": 1,
+      "relationFN": 4,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 0,
+      "evidenceOK": 0,
+      "evidenceTotal": 4,
+      "directionExpected": false,
+      "directionFound": false,
+      "predictedEntities": [
+        "Rerank",
+        "精排",
+        "召回"
+      ],
+      "predictedRelations": [
+        {
+          "src": "rag",
+          "dst": "Rerank",
+          "kind": "source",
+          "label": "本轮探索来源"
+        }
+      ],
+      "missingEntities": [
+        "粗排",
+        "候选集",
+        "交叉编码器",
+        "向量相似度"
+      ],
+      "missingRelations": [
+        "Rerank --related--> 精排",
+        "Rerank --prerequisite--> 粗排",
+        "Rerank --partOf--> 交叉编码器",
+        "Rerank --contrast--> 向量相似度"
+      ],
+      "gotFlow": false,
+      "gotDomain": false
+    },
+    {
+      "id": "evaluation",
+      "topic": "评测",
+      "provider": "mock",
+      "entityTP": 1,
+      "entityFP": 0,
+      "entityFN": 5,
+      "relationTP": 0,
+      "relationFP": 1,
+      "relationFN": 3,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 0,
+      "evidenceOK": 0,
+      "evidenceTotal": 3,
+      "directionExpected": true,
+      "directionFound": false,
+      "predictedEntities": [
+        "召回",
+        "评测集"
+      ],
+      "predictedRelations": [
+        {
+          "src": "rag",
+          "dst": "召回",
+          "kind": "source",
+          "label": "本轮探索来源"
+        }
+      ],
+      "missingEntities": [
+        "召回率",
+        "准确率",
+        "延迟",
+        "离线评测",
+        "线上 A/B"
+      ],
+      "missingRelations": [
+        "评测集 --related--> 召回率",
+        "评测集 --related--> 准确率",
+        "离线评测 --prerequisite--> 线上 A/B"
+      ],
+      "gotFlow": false,
+      "gotDomain": false
+    },
+    {
+      "id": "chunking",
+      "topic": "分块策略",
+      "provider": "mock",
+      "entityTP": 0,
+      "entityFP": 0,
+      "entityFN": 5,
+      "relationTP": 0,
+      "relationFP": 1,
+      "relationFN": 4,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 0,
+      "evidenceOK": 0,
+      "evidenceTotal": 4,
+      "directionExpected": false,
+      "directionFound": false,
+      "predictedEntities": [
+        "分块太大容易",
+        "混入无关信息"
+      ],
+      "predictedRelations": [
+        {
+          "src": "rag",
+          "dst": "分块太大容易",
+          "kind": "source",
+          "label": "本轮探索来源"
+        }
+      ],
+      "missingEntities": [
+        "分块",
+        "语义边界",
+        "重叠窗口",
+        "embedding",
+        "上下文"
+      ],
+      "missingRelations": [
+        "分块 --related--> 语义边界",
+        "分块 --related--> 重叠窗口",
+        "分块 --prerequisite--> embedding",
+        "分块 --contrast--> 上下文"
+      ],
+      "gotFlow": false,
+      "gotDomain": false
+    },
+    {
+      "id": "hallucination",
+      "topic": "幻觉",
+      "provider": "mock",
+      "entityTP": 0,
+      "entityFP": 0,
+      "entityFN": 6,
+      "relationTP": 0,
+      "relationFP": 1,
+      "relationFN": 4,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 0,
+      "evidenceOK": 0,
+      "evidenceTotal": 4,
+      "directionExpected": true,
+      "directionFound": false,
+      "predictedEntities": [
+        "召回"
+      ],
+      "predictedRelations": [
+        {
+          "src": "RAG",
+          "dst": "召回",
+          "kind": "source",
+          "label": "本轮探索来源"
+        }
+      ],
+      "missingEntities": [
+        "幻觉",
+        "RAG",
+        "检索证据",
+        "召回错误",
+        "事实一致性",
+        "评测"
+      ],
+      "missingRelations": [
+        "RAG --related--> 幻觉",
+        "RAG --partOf--> 检索证据",
+        "召回错误 --related--> 幻觉",
+        "事实一致性 --contrast--> 幻觉"
+      ],
+      "gotFlow": false,
+      "gotDomain": false
+    },
+    {
+      "id": "agent-tools",
+      "topic": "Agent 工具调用",
+      "provider": "mock",
+      "entityTP": 1,
+      "entityFP": 0,
+      "entityFN": 4,
+      "relationTP": 0,
+      "relationFP": 1,
+      "relationFN": 4,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 0,
+      "evidenceOK": 0,
+      "evidenceTotal": 4,
+      "directionExpected": false,
+      "directionFound": false,
+      "predictedEntities": [
+        "Agent"
+      ],
+      "predictedRelations": [
+        {
+          "src": "rag",
+          "dst": "Agent",
+          "kind": "source",
+          "label": "本轮探索来源"
+        }
+      ],
+      "missingEntities": [
+        "任务规划",
+        "工具调用",
+        "工具",
+        "规划能力"
+      ],
+      "missingRelations": [
+        "Agent --partOf--> 任务规划",
+        "Agent --partOf--> 工具调用",
+        "规划能力 --prerequisite--> 工具调用",
+        "工具调用 --related--> 工具"
+      ],
+      "gotFlow": false,
+      "gotDomain": false
+    },
+    {
+      "id": "workflow",
+      "topic": "工作流",
+      "provider": "mock",
+      "entityTP": 1,
+      "entityFP": 0,
+      "entityFN": 4,
+      "relationTP": 0,
+      "relationFP": 1,
+      "relationFN": 4,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 0,
+      "evidenceOK": 0,
+      "evidenceTotal": 4,
+      "directionExpected": false,
+      "directionFound": false,
+      "predictedEntities": [
+        "工作流"
+      ],
+      "predictedRelations": [
+        {
+          "src": "rag",
+          "dst": "工作流",
+          "kind": "source",
+          "label": "本轮探索来源"
+        }
+      ],
+      "missingEntities": [
+        "输入解析",
+        "资料检索",
+        "草稿生成",
+        "审核发布"
+      ],
+      "missingRelations": [
+        "工作流 --partOf--> 输入解析",
+        "输入解析 --prerequisite--> 资料检索",
+        "资料检索 --prerequisite--> 草稿生成",
+        "草稿生成 --prerequisite--> 审核发布"
+      ],
+      "expectFlow": true,
+      "gotFlow": false,
+      "gotDomain": false
+    },
+    {
+      "id": "embedding",
+      "topic": "Embedding",
+      "provider": "mock",
+      "entityTP": 0,
+      "entityFP": 0,
+      "entityFN": 6,
+      "relationTP": 0,
+      "relationFP": 1,
+      "relationFN": 4,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 0,
+      "evidenceOK": 0,
+      "evidenceTotal": 4,
+      "directionExpected": false,
+      "directionFound": false,
+      "predictedEntities": [
+        "召回"
+      ],
+      "predictedRelations": [
+        {
+          "src": "rag",
+          "dst": "召回",
+          "kind": "source",
+          "label": "本轮探索来源"
+        }
+      ],
+      "missingEntities": [
+        "Embedding",
+        "向量",
+        "向量空间",
+        "向量数据库",
+        "近似最近邻",
+        "召回率"
+      ],
+      "missingRelations": [
+        "Embedding --related--> 向量",
+        "Embedding --related--> 向量空间",
+        "向量数据库 --partOf--> 近似最近邻",
+        "近似最近邻 --related--> 召回率"
+      ],
+      "gotFlow": false,
+      "gotDomain": false
+    },
+    {
+      "id": "memory",
+      "topic": "记忆",
+      "provider": "mock",
+      "entityTP": 1,
+      "entityFP": 0,
+      "entityFN": 4,
+      "relationTP": 0,
+      "relationFP": 1,
+      "relationFN": 4,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 0,
+      "evidenceOK": 0,
+      "evidenceTotal": 4,
+      "directionExpected": false,
+      "directionFound": false,
+      "predictedEntities": [
+        "Agent"
+      ],
+      "predictedRelations": [
+        {
+          "src": "rag",
+          "dst": "Agent",
+          "kind": "source",
+          "label": "本轮探索来源"
+        }
+      ],
+      "missingEntities": [
+        "短期记忆",
+        "长期记忆",
+        "上下文",
+        "外部存储"
+      ],
+      "missingRelations": [
+        "短期记忆 --partOf--> 上下文",
+        "长期记忆 --partOf--> 外部存储",
+        "短期记忆 --contrast--> 长期记忆",
+        "Agent --related--> 短期记忆"
+      ],
+      "gotFlow": false,
+      "gotDomain": false
+    },
+    {
+      "id": "multimodal",
+      "topic": "多模态",
+      "provider": "mock",
+      "entityTP": 1,
+      "entityFP": 0,
+      "entityFN": 6,
+      "relationTP": 0,
+      "relationFP": 1,
+      "relationFN": 5,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 0,
+      "evidenceOK": 0,
+      "evidenceTotal": 5,
+      "directionExpected": false,
+      "directionFound": false,
+      "predictedEntities": [
+        "多模态"
+      ],
+      "predictedRelations": [
+        {
+          "src": "rag",
+          "dst": "多模态",
+          "kind": "source",
+          "label": "本轮探索来源"
+        }
+      ],
+      "missingEntities": [
+        "文本",
+        "图片",
+        "语音",
+        "表示空间",
+        "融合",
+        "跨模态检索"
+      ],
+      "missingRelations": [
+        "多模态 --partOf--> 文本",
+        "多模态 --partOf--> 图片",
+        "多模态 --partOf--> 语音",
+        "表示空间 --prerequisite--> 融合",
+        "表示空间 --prerequisite--> 跨模态检索"
+      ],
+      "gotFlow": false,
+      "gotDomain": false
+    },
+    {
+      "id": "finetune-vs-rag",
+      "topic": "微调与 RAG 的取舍",
+      "provider": "mock",
+      "entityTP": 0,
+      "entityFP": 0,
+      "entityFN": 6,
+      "relationTP": 0,
+      "relationFP": 1,
+      "relationFN": 4,
+      "mapTypeOK": 0,
+      "mapTypeTotal": 0,
+      "evidenceOK": 0,
+      "evidenceTotal": 4,
+      "directionExpected": true,
+      "directionFound": false,
+      "predictedEntities": [
+        "微调改变模型",
+        "参数"
+      ],
+      "predictedRelations": [
+        {
+          "src": "RAG",
+          "dst": "微调改变模型",
+          "kind": "source",
+          "label": "本轮探索来源"
+        }
+      ],
+      "missingEntities": [
+        "微调",
+        "RAG",
+        "模型参数",
+        "知识更新",
+        "风格",
+        "格式"
+      ],
+      "missingRelations": [
+        "微调 --related--> 模型参数",
+        "微调 --contrast--> RAG",
+        "RAG --related--> 知识更新",
+        "微调 --related--> 风格"
+      ],
+      "gotFlow": false,
+      "gotDomain": false
+    }
+  ]
+}

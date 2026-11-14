@@ -1,0 +1,13 @@
+feat: 生成算法评测基线 + 移除 2D 视图，只保留 3D
+
+评测：
+- 新增 server/eval/cases.json（12 个中文 AI 产品用例，人工标注实体/关系/关系类型/证据）
+- 新增 server/eval/run.ts：实体 P/R、关系 P/R、线型一致率、证据覆盖、方向命中、副本命中
+- 基线：mock 实体 R 17.1% / 关系 0%；DeepSeek 实体 P 100% R 60%、关系 P 4.3% R 6.0%
+- 报告写入 server/eval/report-*.md；docs/EVAL.md 记录指标、根因与下一步
+
+2D 移除：
+- 删除 IslandNode/BuildingNode/DirectionNode/RailEdge/KwEdge/routing 与 @xyflow/react、libavoid-js 依赖
+- World.tsx 改为纯 3D 页面；移除 2D 切换、LOD、连线模式、libavoid 路由
+- 更新 README / MVP 修订记录 / 3D 范围决策：2D 已移除，3D 为唯一主视图
+- 截图更新为 3D-only
