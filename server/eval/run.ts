@@ -76,6 +76,8 @@ type CaseResult = {
   relationFN: number;
   mapTypeOK: number;
   mapTypeTotal: number;
+  predicateOK: number;
+  predicateTotal: number;
   evidenceOK: number;
   evidenceTotal: number;
   directionExpected: boolean;
@@ -93,7 +95,14 @@ type CaseResult = {
 function scoreCase(
   c: Case,
   result: ExtractResult,
-  edges: { src: string; dst: string; kind: string; label: string }[],
+  edges: {
+    src: string;
+    dst: string;
+    kind: string;
+    label: string;
+    predicate?: string | null;
+    evidence?: string;
+  }[],
   buildingKinds: string[],
 ): CaseResult {
   const match = matcher(c);
@@ -112,6 +121,8 @@ function scoreCase(
       dst: match(e.dst) ?? norm(e.dst),
       kind: e.kind,
       label: e.label,
+      predicate: e.predicate ?? null,
+      evidence: e.evidence ?? "",
     }))
     .filter((e) => e.src && e.dst);
   const goldPairs = c.goldRelations.map((r) => ({
@@ -120,6 +131,8 @@ function scoreCase(
   }));
   let relationTP = 0;
   let mapTypeOK = 0;
+  let predicateOK = 0;
+  let evidenceOK = 0;
   const matchedGold = new Set<string>();
   for (const gold of goldPairs) {
     const found = mappedEdges.find((e) => [norm(e.src), norm(e.dst)].sort().join("|") === gold.key);
@@ -127,6 +140,8 @@ function scoreCase(
       relationTP++;
       matchedGold.add(gold.key);
       if (found.kind === gold.relation.mapType) mapTypeOK++;
+      if (found.predicate && found.predicate === gold.relation.type) predicateOK++;
+      if (found.evidence && found.evidence.trim().length >= 4) evidenceOK++;
     }
   }
   const relationFN = goldPairs.length - relationTP;
@@ -147,7 +162,9 @@ function scoreCase(
     relationFN,
     mapTypeOK,
     mapTypeTotal: relationTP,
-    evidenceOK: 0,
+    predicateOK,
+    predicateTotal: relationTP,
+    evidenceOK,
     evidenceTotal: c.goldRelations.length,
     directionExpected: c.expectDirection === true,
     directionFound,
@@ -177,6 +194,8 @@ async function evaluateDirect(c: Case) {
     dst: r.target,
     kind: r.type,
     label: r.label,
+    predicate: r.predicate ?? null,
+    evidence: r.evidence,
   }));
   return scoreCase(c, result, edges, []);
 }
@@ -202,6 +221,8 @@ async function evaluateApi(c: Case): Promise<CaseResult> {
       dst: byId.get(e.dst) ?? e.dst,
       kind: e.kind,
       label: e.label,
+      predicate: e.predicate ?? null,
+      evidence: e.evidence,
     }));
     const buildingKinds = (res.buildings ?? []).map((b: any) => b.kind);
     const result: ExtractResult = {
@@ -236,6 +257,10 @@ const relationFP = results.reduce((a, r) => a + r.relationFP, 0);
 const relationFN = results.reduce((a, r) => a + r.relationFN, 0);
 const mapTypeOK = results.reduce((a, r) => a + r.mapTypeOK, 0);
 const mapTypeTotal = results.reduce((a, r) => a + r.mapTypeTotal, 0);
+const predicateOK = results.reduce((a, r) => a + r.predicateOK, 0);
+const predicateTotal = results.reduce((a, r) => a + r.predicateTotal, 0);
+const evidenceOK = results.reduce((a, r) => a + r.evidenceOK, 0);
+const evidenceTotal = results.reduce((a, r) => a + r.evidenceTotal, 0);
 const directionExpected = results.filter((r) => r.directionExpected).length;
 const directionFound = results.filter((r) => r.directionFound).length;
 const flowExpected = results.filter((r) => r.expectFlow).length;
@@ -267,7 +292,8 @@ lines.push(`| 实体 F1 | ${pct(2 * eP * eR, eP + eR)} |`);
 lines.push(`| 关系对 Precision | ${pct(relationTP, relationTP + relationFP)} |`);
 lines.push(`| 关系对 Recall | ${pct(relationTP, relationTP + relationFN)} |`);
 lines.push(`| 线型（mapType）一致率 | ${pct(mapTypeOK, mapTypeTotal)} |`);
-lines.push(`| 证据覆盖率 | 0.0%（当前抽取没有 evidence 字段） |`);
+lines.push(`| 谓词（predicate）准确率 | ${pct(predicateOK, predicateTotal)} |`);
+lines.push(`| 证据覆盖率 | ${pct(evidenceOK, evidenceTotal)} |`);
 lines.push(`| 方向问题命中 | ${directionFound}/${directionExpected} |`);
 if (useApi) {
   lines.push(`| 流程副本命中 | ${flowFound}/${flowExpected} |`);
@@ -295,7 +321,7 @@ lines.push(`4. **副本检测**：只有 --api 模式能评，而且依赖抽取
 lines.push(``);
 
 const baseName = `report-${provider.name}${useApi ? "-api" : ""}`;
-fs.writeFileSync(path.join(__dirname, `${baseName}.json`), JSON.stringify({ summary: { entityTP, entityFP, entityFN, relationTP, relationFP, relationFN, mapTypeOK, mapTypeTotal, directionExpected, directionFound }, results }, null, 2));
+fs.writeFileSync(path.join(__dirname, `${baseName}.json`), JSON.stringify({ summary: { entityTP, entityFP, entityFN, relationTP, relationFP, relationFN, mapTypeOK, mapTypeTotal, predicateOK, predicateTotal, evidenceOK, evidenceTotal, directionExpected, directionFound }, results }, null, 2));
 fs.writeFileSync(path.join(__dirname, `${baseName}.md`), lines.join("\n"));
 
 console.log(`\n实体 P/R: ${pct(entityTP, entityTP + entityFP)} / ${pct(entityTP, entityTP + entityFN)}`);

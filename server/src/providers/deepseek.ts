@@ -97,4 +97,70 @@ export const deepseekLLM: LLMProvider = {
       return mockLLM.judge({ prompt, answer, reference });
     }
   },
+
+  async suggestRelation({ a, b, evidence }) {
+    const system = `你是知识关系命名器。只输出 JSON：{"predicate":"kindOf|partOf|prerequisite|contrast|alternative|related","label":"关系名称（2-12字）","md":"为什么这样定位（1-2句，引用依据）"}。
+方向约定：kindOf 具体→上位；partOf 部分→整体；prerequisite 前置→后续；contrast/related 无方向；alternative 旧→新。不要编造证据。`;
+    const user = `概念 A：${a.name}\n定义：${a.definition ?? ""}\n笔记：${(a.md ?? "").slice(0, 500)}\n概念 B：${b.name}\n定义：${b.definition ?? ""}\n笔记：${(b.md ?? "").slice(0, 500)}\n可用证据：${evidence ?? "（无，置信度要低）"}`;
+    try {
+      const raw = await chat(system, user);
+      const parsed = JSON.parse(raw) as { predicate?: string; label?: string; md?: string };
+      const allowed = ["kindOf", "partOf", "prerequisite", "contrast", "alternative", "related"];
+      return {
+        predicate: (allowed.includes(parsed.predicate ?? "") ? parsed.predicate : "related") as any,
+        label: parsed.label?.slice(0, 16) || `${a.name} 与 ${b.name}`,
+        md: parsed.md ?? evidence ?? "",
+      };
+    } catch (err) {
+      console.warn("[llm] deepseek 关系命名失败，降级默认：", err);
+      return mockLLM.suggestRelation({ a, b, evidence });
+    }
+  },
+
+  async suggestDirections({ nodes }) {
+    const system = `你是学习探索引导器。只输出 JSON：{"items":[{"node":"节点名","question":"下一步问题（8-60字，必须提到该节点）","reason":"为什么问这个"}]}。
+每个节点给 1 条，问题要具体、可探索，不要泛泛而问。`;
+    const user = nodes
+      .map((n) => `节点：${n.name}\n定义：${n.definition ?? ""}\n邻居：${n.neighbors.join("、")}`)
+      .join("\n---\n");
+    try {
+      const raw = await chat(system, user);
+      const parsed = JSON.parse(raw) as { items?: { node?: string; question?: string; reason?: string }[] };
+      return (parsed.items ?? [])
+        .filter((x) => x.node && x.question && x.question.length >= 8)
+        .map((x) => ({ node: x.node!, question: x.question!, reason: x.reason ?? "" }));
+    } catch (err) {
+      console.warn("[llm] deepseek 方向生成失败：", err);
+      return [];
+    }
+  },
+
+  async detectDungeons({ nodes, edges }) {
+    const system = `你是副本候选识别器。只输出 JSON：
+{"flows":[{"processName":"过程名","steps":["步骤概念名"],"precedence":[{"before":"概念名","after":"概念名","evidence":"原文或关系证据"}],"confidence":0.0}],
+ "domains":[{"domainName":"领域名","members":["概念名"],"confidence":0.0}]}
+规则：
+- 流程：同一过程、3-6 步、有先后证据；多解/证据不足不要提。
+- 领域：同一上位概念下的 4-8 个概念；只是互相连边不算。
+- 不得编造不存在的概念。`;
+    const user = `概念：\n${nodes
+      .map((n) => `- ${n.name}（${n.type ?? "概念"}）：${n.definition ?? ""}`)
+      .join("\n")}\n关系：\n${edges
+      .map((e) => `- ${e.src} --${e.predicate ?? e.label ?? "相关"}--> ${e.dst}（${e.evidence ?? ""}）`)
+      .join("\n")}`;
+    try {
+      const raw = await chat(system, user);
+      const parsed = JSON.parse(raw) as {
+        flows?: any[];
+        domains?: any[];
+      };
+      return {
+        flows: Array.isArray(parsed.flows) ? parsed.flows : [],
+        domains: Array.isArray(parsed.domains) ? parsed.domains : [],
+      };
+    } catch (err) {
+      console.warn("[llm] deepseek 副本候选失败：", err);
+      return { flows: [], domains: [] };
+    }
+  },
 };

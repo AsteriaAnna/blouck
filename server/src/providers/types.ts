@@ -37,6 +37,38 @@ export type ExtractResult = {
   relations: ExtractRelation[];
 };
 
+export type RelationSuggestion = {
+  predicate: RelationPredicate;
+  label: string;
+  md: string;
+};
+
+export type DirectionSuggestion = {
+  node: string;
+  question: string;
+  reason: string;
+};
+
+export type DungeonFlowSuggestion = {
+  processName: string;
+  steps: string[];
+  precedence: { before: string; after: string; evidence: string }[];
+  confidence: number;
+};
+
+export type DungeonDomainSuggestion = {
+  domainName: string;
+  members: string[];
+  commonParent?: string;
+  sharedSpanIds?: string[];
+  confidence: number;
+};
+
+export type DungeonSuggestions = {
+  flows: DungeonFlowSuggestion[];
+  domains: DungeonDomainSuggestion[];
+};
+
 export type QuizItem = {
   kind: "short" | "judge";
   prompt: string;
@@ -59,6 +91,21 @@ export type LLMProvider = {
     answer: string;
     reference: string;
   }): Promise<{ correct: boolean; feedback: string }>;
+  /** 用户手动连线时，给出关系谓词/名称/说明 */
+  suggestRelation(input: {
+    a: { name: string; definition?: string; md?: string };
+    b: { name: string; definition?: string; md?: string };
+    evidence?: string;
+  }): Promise<RelationSuggestion>;
+  /** 为一批节点生成下一步方向问题 */
+  suggestDirections(input: {
+    nodes: { name: string; definition?: string; evidence?: string; neighbors: string[] }[];
+  }): Promise<DirectionSuggestion[]>;
+  /** 基于当前图提出流程/领域副本候选（程序再做硬校验） */
+  detectDungeons(input: {
+    nodes: { name: string; type?: string; definition?: string }[];
+    edges: { src: string; dst: string; predicate?: string | null; label?: string; evidence?: string }[];
+  }): Promise<DungeonSuggestions>;
 };
 
 export type ASREvents = {

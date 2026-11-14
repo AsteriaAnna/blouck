@@ -152,6 +152,26 @@ export const mockLLM: LLMProvider = {
       ? { correct: true, feedback: "关键点基本覆盖（mock 判题）" }
       : { correct: false, feedback: "关键点不足，建议补充细节" };
   },
+
+  async suggestRelation({ a, b, evidence }) {
+    return {
+      predicate: "related",
+      label: `${a.name} 与 ${b.name}`,
+      md: evidence ? `依据：${evidence}` : "用户手动关联；证据待补充。",
+    };
+  },
+
+  async suggestDirections({ nodes }) {
+    return nodes.slice(0, 3).map((n) => ({
+      node: n.name,
+      question: `「${n.name}」和${n.neighbors[0] ?? "相邻概念"}的区别是什么？`,
+      reason: "mock：围绕定义与邻居生成",
+    }));
+  },
+
+  async detectDungeons() {
+    return { flows: [], domains: [] };
+  },
 };
 
 /** mock 流式 ASR：按句式逐段吐 partial，用于前端联调 */

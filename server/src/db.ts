@@ -620,7 +620,7 @@ export function refreshBuildingStatus(nodeId: string) {
         ready = related.filter((n) => n.tier >= 1).length >= 2;
       }
     }
-    setBuildingStatus(b.id, ready ? "playable" : b.status === "stale" ? "stale" : "detected");
+    setBuildingStatus(b.id, ready ? "playable" : "detected");
   }
 }
 

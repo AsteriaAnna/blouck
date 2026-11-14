@@ -4,12 +4,16 @@
     "entityFP": 0,
     "entityFN": 21,
     "relationTP": 23,
-    "relationFP": 50,
+    "relationFP": 48,
     "relationFN": 27,
     "mapTypeOK": 21,
     "mapTypeTotal": 23,
+    "predicateOK": 20,
+    "predicateTotal": 23,
+    "evidenceOK": 23,
+    "evidenceTotal": 50,
     "directionExpected": 5,
-    "directionFound": 3
+    "directionFound": 1
   },
   "results": [
     {
@@ -20,14 +24,16 @@
       "entityFP": 0,
       "entityFN": 0,
       "relationTP": 1,
-      "relationFP": 7,
+      "relationFP": 8,
       "relationFN": 3,
-      "mapTypeOK": 0,
+      "mapTypeOK": 1,
       "mapTypeTotal": 1,
-      "evidenceOK": 0,
+      "predicateOK": 1,
+      "predicateTotal": 1,
+      "evidenceOK": 1,
       "evidenceTotal": 4,
       "directionExpected": true,
-      "directionFound": true,
+      "directionFound": false,
       "predictedEntities": [
         "RAG",
         "分块",
@@ -42,50 +48,74 @@
         {
           "src": "文档分块",
           "dst": "RAG",
-          "kind": "suggest",
-          "label": "RAG流程组成"
+          "kind": "formal",
+          "label": "RAG流程步骤",
+          "predicate": "partOf",
+          "evidence": "RAG 先把文档切成分块"
         },
         {
           "src": "向量化",
           "dst": "RAG",
-          "kind": "suggest",
-          "label": "RAG流程组成"
+          "kind": "formal",
+          "label": "RAG流程步骤",
+          "predicate": "partOf",
+          "evidence": "做向量化后存进向量数据库"
         },
         {
           "src": "向量数据库",
           "dst": "RAG",
-          "kind": "suggest",
-          "label": "RAG流程组成"
+          "kind": "formal",
+          "label": "RAG流程组件",
+          "predicate": "partOf",
+          "evidence": "做向量化后存进向量数据库"
         },
         {
           "src": "检索",
           "dst": "RAG",
-          "kind": "suggest",
-          "label": "RAG流程组成"
+          "kind": "formal",
+          "label": "RAG流程步骤",
+          "predicate": "partOf",
+          "evidence": "用户提问时先检索相关分块"
         },
         {
           "src": "大模型",
           "dst": "RAG",
-          "kind": "suggest",
-          "label": "RAG流程组成"
+          "kind": "formal",
+          "label": "RAG流程组件",
+          "predicate": "partOf",
+          "evidence": "再交给大模型生成回答"
+        },
+        {
+          "src": "文档分块",
+          "dst": "向量化",
+          "kind": "formal",
+          "label": "分块先于向量化",
+          "predicate": "prerequisite",
+          "evidence": "RAG 先把文档切成分块，做向量化后存进向量数据库"
         },
         {
           "src": "向量化",
           "dst": "向量数据库",
-          "kind": "suggest",
-          "label": "向量化后入库"
+          "kind": "formal",
+          "label": "向量化后入库",
+          "predicate": "prerequisite",
+          "evidence": "做向量化后存进向量数据库"
+        },
+        {
+          "src": "检索",
+          "dst": "大模型",
+          "kind": "formal",
+          "label": "先检索后生成",
+          "predicate": "prerequisite",
+          "evidence": "用户提问时先检索相关分块，再交给大模型生成回答"
         },
         {
           "src": "分块质量",
           "dst": "召回",
-          "kind": "suggest",
-          "label": "影响"
-        },
-        {
-          "src": "RAG",
-          "dst": "分块质量如何评估与优化",
-          "kind": "direction",
-          "label": "下一步探索"
+          "kind": "formal",
+          "label": "影响",
+          "predicate": "related",
+          "evidence": "所以分块质量会直接影响召回效果"
         }
       ],
       "missingEntities": [],
@@ -109,7 +139,9 @@
       "relationFN": 1,
       "mapTypeOK": 5,
       "mapTypeTotal": 5,
-      "evidenceOK": 0,
+      "predicateOK": 4,
+      "predicateTotal": 5,
+      "evidenceOK": 5,
       "evidenceTotal": 6,
       "directionExpected": true,
       "directionFound": false,
@@ -126,43 +158,57 @@
           "src": "混合检索",
           "dst": "rag",
           "kind": "suggest",
-          "label": "属于RAG检索环节"
+          "label": "属于RAG检索环节",
+          "predicate": "partOf",
+          "evidence": "混合检索把 BM25 的关键词召回和向量数据库的语义召回合并。"
+        },
+        {
+          "src": "混合检索",
+          "dst": "BM25",
+          "kind": "formal",
+          "label": "包含关键词召回",
+          "predicate": "partOf",
+          "evidence": "混合检索把 BM25 的关键词召回和向量数据库的语义召回合并。"
+        },
+        {
+          "src": "混合检索",
+          "dst": "向量数据库",
+          "kind": "formal",
+          "label": "包含语义召回",
+          "predicate": "partOf",
+          "evidence": "混合检索把 BM25 的关键词召回和向量数据库的语义召回合并。"
         },
         {
           "src": "BM25",
-          "dst": "混合检索",
+          "dst": "关键词召回",
           "kind": "formal",
-          "label": "关键词召回组件"
+          "label": "实现关键词召回",
+          "predicate": "related",
+          "evidence": "BM25 的关键词召回"
         },
         {
           "src": "向量数据库",
-          "dst": "混合检索",
+          "dst": "语义召回",
           "kind": "formal",
-          "label": "语义召回组件"
-        },
-        {
-          "src": "关键词召回",
-          "dst": "BM25",
-          "kind": "formal",
-          "label": "BM25提供关键词召回"
-        },
-        {
-          "src": "语义召回",
-          "dst": "向量数据库",
-          "kind": "formal",
-          "label": "向量数据库提供语义召回"
+          "label": "提供语义召回",
+          "predicate": "related",
+          "evidence": "向量数据库的语义召回"
         },
         {
           "src": "关键词召回",
           "dst": "语义召回",
           "kind": "formal",
-          "label": "互补关系"
+          "label": "互补关系",
+          "predicate": "contrast",
+          "evidence": "BM25 擅长精确词匹配，向量召回擅长语义相似，两者互补"
         },
         {
-          "src": "Rerank",
-          "dst": "混合检索",
+          "src": "混合检索",
+          "dst": "Rerank",
           "kind": "formal",
-          "label": "召回后精排"
+          "label": "召回后精排",
+          "predicate": "prerequisite",
+          "evidence": "两者互补，然后用 Rerank 精排"
         }
       ],
       "missingEntities": [
@@ -186,7 +232,9 @@
       "relationFN": 2,
       "mapTypeOK": 2,
       "mapTypeTotal": 2,
-      "evidenceOK": 0,
+      "predicateOK": 2,
+      "predicateTotal": 2,
+      "evidenceOK": 2,
       "evidenceTotal": 4,
       "directionExpected": false,
       "directionFound": false,
@@ -201,19 +249,25 @@
           "src": "Rerank",
           "dst": "粗排召回",
           "kind": "formal",
-          "label": "输入依赖"
+          "label": "输入依赖",
+          "predicate": "prerequisite",
+          "evidence": "输入是粗排召回的候选集"
         },
         {
           "src": "Rerank",
           "dst": "交叉编码器",
           "kind": "formal",
-          "label": "使用组件"
+          "label": "使用组件",
+          "predicate": "partOf",
+          "evidence": "用交叉编码器重新打分"
         },
         {
           "src": "Rerank",
           "dst": "向量相似度",
           "kind": "formal",
-          "label": "准确率与速度对比"
+          "label": "精度与速度权衡",
+          "predicate": "contrast",
+          "evidence": "它比向量相似度更准但更慢"
         }
       ],
       "missingEntities": [
@@ -236,14 +290,16 @@
       "entityFP": 0,
       "entityFN": 0,
       "relationTP": 1,
-      "relationFP": 7,
+      "relationFP": 6,
       "relationFN": 2,
       "mapTypeOK": 1,
       "mapTypeTotal": 1,
-      "evidenceOK": 0,
+      "predicateOK": 1,
+      "predicateTotal": 1,
+      "evidenceOK": 1,
       "evidenceTotal": 3,
       "directionExpected": true,
-      "directionFound": true,
+      "directionFound": false,
       "predictedEntities": [
         "评测集",
         "召回率",
@@ -257,49 +313,57 @@
           "src": "评测集",
           "dst": "rag",
           "kind": "suggest",
-          "label": "评测组成"
+          "label": "评测组成部分",
+          "predicate": "partOf",
+          "evidence": "评测集要覆盖真实问题分布"
         },
         {
           "src": "召回率",
           "dst": "rag",
           "kind": "suggest",
-          "label": "评测指标"
+          "label": "评测指标",
+          "predicate": "related",
+          "evidence": "指标包括召回率、准确率和延迟"
         },
         {
           "src": "准确率",
           "dst": "rag",
           "kind": "suggest",
-          "label": "评测指标"
+          "label": "评测指标",
+          "predicate": "related",
+          "evidence": "指标包括召回率、准确率和延迟"
         },
         {
           "src": "延迟",
           "dst": "rag",
           "kind": "suggest",
-          "label": "评测指标"
+          "label": "评测指标",
+          "predicate": "related",
+          "evidence": "指标包括召回率、准确率和延迟"
         },
         {
           "src": "离线评测",
           "dst": "线上 A/B",
           "kind": "formal",
-          "label": "前置评测"
-        },
-        {
-          "src": "离线评测",
-          "dst": "rag",
-          "kind": "suggest",
-          "label": "评测流程"
-        },
-        {
-          "src": "线上 A/B",
-          "dst": "rag",
-          "kind": "suggest",
-          "label": "评测流程"
+          "label": "先离线后线上",
+          "predicate": "prerequisite",
+          "evidence": "离线评测通过后还要做线上 A/B"
         },
         {
           "src": "rag",
-          "dst": "离线评测分数能否代表线上效果",
-          "kind": "direction",
-          "label": "待探索问题"
+          "dst": "离线评测",
+          "kind": "suggest",
+          "label": "评测方式",
+          "predicate": "related",
+          "evidence": "离线评测通过后还要做线上 A/B"
+        },
+        {
+          "src": "rag",
+          "dst": "线上 A/B",
+          "kind": "suggest",
+          "label": "评测方式",
+          "predicate": "related",
+          "evidence": "离线评测通过后还要做线上 A/B"
         }
       ],
       "missingEntities": [],
@@ -318,11 +382,13 @@
       "entityFP": 0,
       "entityFN": 2,
       "relationTP": 2,
-      "relationFP": 3,
+      "relationFP": 2,
       "relationFN": 2,
       "mapTypeOK": 2,
       "mapTypeTotal": 2,
-      "evidenceOK": 0,
+      "predicateOK": 1,
+      "predicateTotal": 2,
+      "evidenceOK": 2,
       "evidenceTotal": 4,
       "directionExpected": false,
       "directionFound": false,
@@ -337,31 +403,33 @@
           "src": "分块",
           "dst": "rag",
           "kind": "suggest",
-          "label": "分块是RAG的组成部分"
+          "label": "属于检索增强生成流程",
+          "predicate": "partOf",
+          "evidence": "分块太大容易混入无关信息，太小会丢失上下文。"
         },
         {
           "src": "语义边界切分",
           "dst": "分块",
           "kind": "formal",
-          "label": "语义边界切分是分块的常见做法"
+          "label": "分块策略",
+          "predicate": "partOf",
+          "evidence": "常见做法是按语义边界切分，再加重叠窗口"
         },
         {
           "src": "重叠窗口",
           "dst": "分块",
           "kind": "formal",
-          "label": "重叠窗口是分块的常见做法"
+          "label": "分块策略",
+          "predicate": "partOf",
+          "evidence": "常见做法是按语义边界切分，再加重叠窗口"
         },
         {
           "src": "embedding",
           "dst": "分块",
           "kind": "formal",
-          "label": "分块是embedding的前置步骤"
-        },
-        {
-          "src": "语义边界切分",
-          "dst": "重叠窗口",
-          "kind": "formal",
-          "label": "语义边界切分与重叠窗口配合使用"
+          "label": "分块后嵌入",
+          "predicate": "prerequisite",
+          "evidence": "最后对每个分块做 embedding"
         }
       ],
       "missingEntities": [
@@ -387,7 +455,9 @@
       "relationFN": 2,
       "mapTypeOK": 1,
       "mapTypeTotal": 2,
-      "evidenceOK": 0,
+      "predicateOK": 2,
+      "predicateTotal": 2,
+      "evidenceOK": 2,
       "evidenceTotal": 4,
       "directionExpected": true,
       "directionFound": true,
@@ -397,51 +467,65 @@
         "检索证据",
         "召回错误",
         "错误证据",
-        "事实一致性检查",
-        "评测"
+        "评测",
+        "事实一致性检查"
       ],
       "predictedRelations": [
         {
           "src": "RAG",
           "dst": "幻觉",
           "kind": "suggest",
-          "label": "降低幻觉"
+          "label": "降低幻觉",
+          "predicate": "related",
+          "evidence": "RAG 通过检索证据降低幻觉"
         },
         {
           "src": "RAG",
           "dst": "检索证据",
           "kind": "formal",
-          "label": "依赖检索证据"
+          "label": "使用检索证据",
+          "predicate": "partOf",
+          "evidence": "RAG 通过检索证据降低幻觉"
         },
         {
           "src": "召回错误",
           "dst": "错误证据",
           "kind": "formal",
-          "label": "导致错误证据"
+          "label": "导致错误证据",
+          "predicate": "related",
+          "evidence": "但如果召回错了，反而会把错误证据交给模型"
         },
         {
           "src": "错误证据",
           "dst": "幻觉",
           "kind": "suggest",
-          "label": "可能加剧幻觉"
+          "label": "可能加剧幻觉",
+          "predicate": "related",
+          "evidence": "但如果召回错了，反而会把错误证据交给模型"
         },
         {
-          "src": "事实一致性检查",
-          "dst": "评测",
+          "src": "评测",
+          "dst": "事实一致性检查",
           "kind": "formal",
-          "label": "评测手段"
+          "label": "包含事实一致性检查",
+          "predicate": "partOf",
+          "evidence": "评测要做事实一致性检查。"
         },
         {
           "src": "RAG",
           "dst": "事实一致性检查",
           "kind": "suggest",
-          "label": "需事实一致性评测"
+          "label": "需评测事实一致性",
+          "predicate": "related",
+          "evidence": "评测要做事实一致性检查。"
         },
         {
           "src": "RAG",
           "dst": "召回错误",
           "kind": "direction",
-          "label": "召回质量风险"
+          "label": "检索失败风险",
+          "predicate": "related",
+          "evidence": "但如果召回错了，反而会把错误证据交给模型"
         }
       ],
       "missingEntities": [
@@ -464,9 +548,11 @@
       "relationTP": 2,
       "relationFP": 3,
       "relationFN": 2,
-      "mapTypeOK": 2,
+      "mapTypeOK": 1,
       "mapTypeTotal": 2,
-      "evidenceOK": 0,
+      "predicateOK": 2,
+      "predicateTotal": 2,
+      "evidenceOK": 2,
       "evidenceTotal": 4,
       "directionExpected": false,
       "directionFound": false,
@@ -479,34 +565,44 @@
       ],
       "predictedRelations": [
         {
-          "src": "Agent",
-          "dst": "规划任务",
-          "kind": "formal",
-          "label": "执行规划"
-        },
-        {
-          "src": "Agent",
-          "dst": "工具调用",
-          "kind": "formal",
-          "label": "决定调用"
-        },
-        {
           "src": "规划任务",
           "dst": "工具调用",
-          "kind": "formal",
-          "label": "先规划后调用"
-        },
-        {
-          "src": "工具调用",
-          "dst": "工具返回结果",
-          "kind": "formal",
-          "label": "产生返回结果"
+          "kind": "suggest",
+          "label": "规划先于工具调用",
+          "predicate": "prerequisite",
+          "evidence": "Agent 会先规划任务，再决定调用哪个工具"
         },
         {
           "src": "规划能力",
           "dst": "工具调用",
           "kind": "formal",
-          "label": "前置条件"
+          "label": "规划能力是工具调用的前置条件",
+          "predicate": "prerequisite",
+          "evidence": "规划能力是工具调用的前置条件"
+        },
+        {
+          "src": "工具返回结果",
+          "dst": "工具调用",
+          "kind": "suggest",
+          "label": "依据返回结果判断是否继续调用",
+          "predicate": "related",
+          "evidence": "工具返回结果后还要判断是否继续调用"
+        },
+        {
+          "src": "Agent",
+          "dst": "规划任务",
+          "kind": "suggest",
+          "label": "Agent 执行规划任务",
+          "predicate": "partOf",
+          "evidence": "Agent 会先规划任务，再决定调用哪个工具"
+        },
+        {
+          "src": "Agent",
+          "dst": "工具调用",
+          "kind": "suggest",
+          "label": "Agent 决定工具调用",
+          "predicate": "partOf",
+          "evidence": "Agent 会先规划任务，再决定调用哪个工具"
         }
       ],
       "missingEntities": [
@@ -532,7 +628,9 @@
       "relationFN": 0,
       "mapTypeOK": 4,
       "mapTypeTotal": 4,
-      "evidenceOK": 0,
+      "predicateOK": 4,
+      "predicateTotal": 4,
+      "evidenceOK": 4,
       "evidenceTotal": 4,
       "directionExpected": false,
       "directionFound": false,
@@ -548,61 +646,81 @@
           "src": "输入解析",
           "dst": "工作流",
           "kind": "formal",
-          "label": "工作流步骤"
+          "label": "属于工作流步骤",
+          "predicate": "partOf",
+          "evidence": "工作流把多个步骤串起来：先解析输入，再检索资料，然后生成草稿，最后审核发布。"
         },
         {
           "src": "资料检索",
           "dst": "工作流",
           "kind": "formal",
-          "label": "工作流步骤"
+          "label": "属于工作流步骤",
+          "predicate": "partOf",
+          "evidence": "工作流把多个步骤串起来：先解析输入，再检索资料，然后生成草稿，最后审核发布。"
         },
         {
           "src": "草稿生成",
           "dst": "工作流",
           "kind": "formal",
-          "label": "工作流步骤"
+          "label": "属于工作流步骤",
+          "predicate": "partOf",
+          "evidence": "工作流把多个步骤串起来：先解析输入，再检索资料，然后生成草稿，最后审核发布。"
         },
         {
           "src": "审核发布",
           "dst": "工作流",
           "kind": "formal",
-          "label": "工作流步骤"
+          "label": "属于工作流步骤",
+          "predicate": "partOf",
+          "evidence": "工作流把多个步骤串起来：先解析输入，再检索资料，然后生成草稿，最后审核发布。"
         },
         {
           "src": "输入解析",
           "dst": "资料检索",
           "kind": "formal",
-          "label": "先后顺序"
+          "label": "先后顺序",
+          "predicate": "prerequisite",
+          "evidence": "先解析输入，再检索资料，然后生成草稿，最后审核发布。"
         },
         {
           "src": "资料检索",
           "dst": "草稿生成",
           "kind": "formal",
-          "label": "先后顺序"
+          "label": "先后顺序",
+          "predicate": "prerequisite",
+          "evidence": "先解析输入，再检索资料，然后生成草稿，最后审核发布。"
         },
         {
           "src": "草稿生成",
           "dst": "审核发布",
           "kind": "formal",
-          "label": "先后顺序"
+          "label": "先后顺序",
+          "predicate": "prerequisite",
+          "evidence": "先解析输入，再检索资料，然后生成草稿，最后审核发布。"
         },
         {
           "src": "rag",
           "dst": "资料检索",
           "kind": "suggest",
-          "label": "RAG 的检索环节"
+          "label": "检索环节对应",
+          "predicate": "related",
+          "evidence": "先解析输入，再检索资料，然后生成草稿，最后审核发布。"
         },
         {
           "src": "rag",
           "dst": "工作流",
           "kind": "suggest",
-          "label": "RAG 可组织为工作流"
+          "label": "可编排为工作流",
+          "predicate": "related",
+          "evidence": "工作流把多个步骤串起来：先解析输入，再检索资料，然后生成草稿，最后审核发布。"
         },
         {
           "src": "rag",
-          "dst": "工作流",
+          "dst": "工作流中的审核发布环节如何与rag的生成结果衔接",
           "kind": "direction",
-          "label": "待探索"
+          "label": "下一步探索",
+          "predicate": "related",
+          "evidence": "先解析输入，再检索资料，然后生成草稿，最后审核发布。"
         }
       ],
       "missingEntities": [],
@@ -619,10 +737,12 @@
       "entityFP": 0,
       "entityFN": 3,
       "relationTP": 0,
-      "relationFP": 4,
+      "relationFP": 5,
       "relationFN": 4,
       "mapTypeOK": 0,
       "mapTypeTotal": 0,
+      "predicateOK": 0,
+      "predicateTotal": 0,
       "evidenceOK": 0,
       "evidenceTotal": 4,
       "directionExpected": false,
@@ -638,25 +758,41 @@
           "src": "Embedding",
           "dst": "rag",
           "kind": "suggest",
-          "label": "检索组件"
+          "label": "检索组件",
+          "predicate": "partOf",
+          "evidence": "Embedding 把文本映射成向量，语义相近的文本在向量空间里距离更近。"
         },
         {
           "src": "向量数据库",
-          "dst": "rag",
-          "kind": "suggest",
-          "label": "检索组件"
-        },
-        {
-          "src": "近似最近邻检索",
-          "dst": "向量数据库",
+          "dst": "近似最近邻检索",
           "kind": "formal",
-          "label": "加速方法"
+          "label": "使用",
+          "predicate": "related",
+          "evidence": "向量数据库用近似最近邻检索来加速，但这会牺牲一点召回率。"
         },
         {
           "src": "近似最近邻检索",
           "dst": "召回率",
           "kind": "formal",
-          "label": "牺牲召回率"
+          "label": "牺牲召回率",
+          "predicate": "related",
+          "evidence": "向量数据库用近似最近邻检索来加速，但这会牺牲一点召回率。"
+        },
+        {
+          "src": "向量数据库",
+          "dst": "rag",
+          "kind": "suggest",
+          "label": "检索组件",
+          "predicate": "partOf",
+          "evidence": "向量数据库用近似最近邻检索来加速，但这会牺牲一点召回率。"
+        },
+        {
+          "src": "rag",
+          "dst": "embedding与向量数据库如何影响rag的检索质量？",
+          "kind": "direction",
+          "label": "待探索问题",
+          "predicate": "related",
+          "evidence": "Embedding 把文本映射成向量，语义相近的文本在向量空间里距离更近。"
         }
       ],
       "missingEntities": [
@@ -685,7 +821,9 @@
       "relationFN": 2,
       "mapTypeOK": 2,
       "mapTypeTotal": 2,
-      "evidenceOK": 0,
+      "predicateOK": 1,
+      "predicateTotal": 2,
+      "evidenceOK": 2,
       "evidenceTotal": 4,
       "directionExpected": false,
       "directionFound": false,
@@ -693,33 +831,41 @@
         "短期记忆",
         "长期记忆",
         "外部存储",
-        "Agent",
-        "对话上下文"
+        "对话上下文",
+        "Agent"
       ],
       "predictedRelations": [
         {
           "src": "短期记忆",
           "dst": "对话上下文",
           "kind": "formal",
-          "label": "保存"
+          "label": "保存",
+          "predicate": "related",
+          "evidence": "短期记忆保存当前对话上下文"
         },
         {
           "src": "长期记忆",
           "dst": "外部存储",
           "kind": "formal",
-          "label": "写入"
+          "label": "写入",
+          "predicate": "related",
+          "evidence": "长期记忆把重要事实写进外部存储"
         },
         {
           "src": "短期记忆",
           "dst": "长期记忆",
           "kind": "formal",
-          "label": "对比"
+          "label": "对比",
+          "predicate": "contrast",
+          "evidence": "短期记忆保存当前对话上下文，长期记忆把重要事实写进外部存储"
         },
         {
           "src": "Agent",
           "dst": "长期记忆",
           "kind": "suggest",
-          "label": "依赖"
+          "label": "依赖",
+          "predicate": "prerequisite",
+          "evidence": "没有记忆的 Agent 每次都要重新了解用户"
         }
       ],
       "missingEntities": [
@@ -740,10 +886,12 @@
       "entityFP": 0,
       "entityFN": 5,
       "relationTP": 0,
-      "relationFP": 7,
+      "relationFP": 5,
       "relationFN": 5,
       "mapTypeOK": 0,
       "mapTypeTotal": 0,
+      "predicateOK": 0,
+      "predicateTotal": 0,
       "evidenceOK": 0,
       "evidenceTotal": 5,
       "directionExpected": false,
@@ -760,43 +908,41 @@
           "src": "模态对齐",
           "dst": "模态融合",
           "kind": "formal",
-          "label": "对齐先于融合"
+          "label": "对齐先于融合",
+          "predicate": "prerequisite",
+          "evidence": "不同模态要先对齐到同一个表示空间，再做融合"
         },
         {
           "src": "模态对齐",
           "dst": "表示空间",
           "kind": "formal",
-          "label": "对齐到统一表示空间"
+          "label": "对齐到统一表示空间",
+          "predicate": "related",
+          "evidence": "不同模态要先对齐到同一个表示空间，再做融合"
         },
         {
           "src": "模态对齐",
           "dst": "跨模态检索",
           "kind": "formal",
-          "label": "对齐质量影响检索"
+          "label": "对齐质量影响检索",
+          "predicate": "related",
+          "evidence": "对齐不好会导致跨模态检索失效"
         },
         {
           "src": "多模态模型",
           "dst": "模态对齐",
-          "kind": "formal",
-          "label": "多模态处理流程环节"
+          "kind": "suggest",
+          "label": "多模态处理流程环节",
+          "predicate": "partOf",
+          "evidence": "多模态模型同时处理文本、图片和语音。不同模态要先对齐到同一个表示空间，再做融合"
         },
         {
           "src": "rag",
           "dst": "多模态模型",
-          "kind": "suggest",
-          "label": "RAG与多模态结合"
-        },
-        {
-          "src": "rag",
-          "dst": "跨模态检索",
-          "kind": "suggest",
-          "label": "RAG的跨模态检索扩展"
-        },
-        {
-          "src": "rag",
-          "dst": "多模态rag中如何对齐不同模态的表示",
           "kind": "direction",
-          "label": "下一步探索"
+          "label": "RAG与多模态结合",
+          "predicate": "related",
+          "evidence": "多模态模型同时处理文本、图片和语音。"
         }
       ],
       "missingEntities": [
@@ -828,7 +974,9 @@
       "relationFN": 2,
       "mapTypeOK": 2,
       "mapTypeTotal": 2,
-      "evidenceOK": 0,
+      "predicateOK": 2,
+      "predicateTotal": 2,
+      "evidenceOK": 2,
       "evidenceTotal": 4,
       "directionExpected": true,
       "directionFound": false,
@@ -844,31 +992,41 @@
           "src": "微调",
           "dst": "模型参数",
           "kind": "formal",
-          "label": "改变参数"
+          "label": "改变参数",
+          "predicate": "related",
+          "evidence": "微调改变模型参数"
         },
         {
           "src": "RAG",
           "dst": "模型参数",
           "kind": "formal",
-          "label": "不改参数"
+          "label": "不改参数",
+          "predicate": "contrast",
+          "evidence": "RAG 不改参数"
         },
         {
           "src": "RAG",
           "dst": "知识更新频繁",
           "kind": "formal",
-          "label": "适用场景"
+          "label": "适用场景",
+          "predicate": "related",
+          "evidence": "知识更新频繁时优先 RAG"
         },
         {
           "src": "微调",
           "dst": "行为格式要求稳定",
           "kind": "formal",
-          "label": "适用场景"
+          "label": "适用场景",
+          "predicate": "related",
+          "evidence": "行为格式要求稳定时优先微调"
         },
         {
           "src": "RAG",
           "dst": "微调",
           "kind": "formal",
-          "label": "参数是否改变与适用场景对比"
+          "label": "参数是否改变",
+          "predicate": "contrast",
+          "evidence": "微调改变模型参数，适合固定风格和格式；RAG 不改参数，适合经常变化的知识"
         }
       ],
       "missingEntities": [

@@ -10,7 +10,7 @@
 > （three.js + react-three-fiber + drei + GLB 浮岛）；原 2D React Flow 视图已移除。
 > 依据：[docs/reviews/scope-decision-3d-2026-11-14.md](docs/reviews/scope-decision-3d-2026-11-14.md)。
 > 已知验收缺口（formal 关系在 3D 的可读性、LOD、搜索/回到起点等）见该文档与红队报告。
-> 生成算法评测见 [docs/EVAL.md](docs/EVAL.md)（关系 v2 基线：实体 R 70%、关系 P/R 31.5%/46.0%）。
+> 生成算法评测见 [docs/EVAL.md](docs/EVAL.md)（关系 v2 基线：实体 R 70%、关系 P/R 32.4%/46.0%、谓词准确率 87%）。
 
 ## 3D 资产与原型
 

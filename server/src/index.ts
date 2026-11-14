@@ -314,15 +314,42 @@ app.post("/api/worlds/:id/extract", async (req, res) => {
     }
   }
 
-  // 每个节点至少一条方向（数据层）；地图只渲染 frontier 节点
+  // 每个节点至少一条方向（数据层）；优先用 LLM，失败再模板兜底
+  const dirTargets = [focus, ...createdNodes];
   const haveDirection = new Set(listDirections(world.id).map((d) => d.node_id));
-  for (const n of [focus, ...createdNodes]) {
+  const pending = dirTargets.filter((n) => !haveDirection.has(n.id));
+  if (pending.length) {
+    try {
+      const suggestions = await llm.suggestDirections({
+        nodes: pending.map((n) => ({
+          name: n.name,
+          definition: n.definition,
+          evidence: sentenceFor(n.name),
+          neighbors: graph.edges
+            .filter((e) => e.src === n.id || e.dst === n.id)
+            .map((e) => graph.nodes.find((x) => x.id === (e.src === n.id ? e.dst : e.src))?.name ?? "")
+            .filter(Boolean)
+            .slice(0, 6),
+        })),
+      });
+      for (const sug of suggestions) {
+        const n = pending.find((x) => x.name === sug.node);
+        if (!n || haveDirection.has(n.id)) continue;
+        addDirection(world.id, n.id, sug.question, sug.reason, null);
+        haveDirection.add(n.id);
+      }
+    } catch (err) {
+      console.warn("[extract] 方向生成失败，使用模板：", err);
+    }
+  }
+  for (const n of pending) {
     if (haveDirection.has(n.id)) continue;
-    const question = `「${n.name}」还可以往哪一步深入？`;
-    addDirection(world.id, n.id, question, `围绕「${n.name}」的下一步`, null);
+    addDirection(world.id, n.id, `「${n.name}」还可以往哪一步深入？`, `围绕「${n.name}」的下一步`, null);
   }
 
   computeFrontier(world.id);
+  refreshStaleBuildings(world.id);
+  await detectBuildingsLLM(world.id, focus);
   materializeDirectionEdges(world.id);
   detectBuildingsV2(world.id, focus, graph.nodes);
   ensureDirectionFrontiers(world.id);
@@ -484,6 +511,135 @@ function detectBuildingsV2(worldId: string, _focus: NodeRow, _all: NodeRow[]) {
   refreshAllBuildingStatus(worldId);
 }
 
+
+/** LLM 提出副本候选，程序硬校验；规则检测作为兜底 */
+async function detectBuildingsLLM(worldId: string, focus: NodeRow) {
+  const bs = listBuildings(worldId);
+  if (bs.some((b) => b.kind === "flow") && bs.some((b) => b.kind === "domain")) return;
+  const graph = getGraph(worldId);
+  const dNodes = toDungeonNodes(graph.nodes);
+  const dEdges = toDungeonEdges(graph.edges);
+  const byName = new Map(graph.nodes.map((n) => [n.name, n]));
+  const suggestions = await llm.detectDungeons({
+    nodes: graph.nodes.map((n) => ({ name: n.name, type: n.type, definition: n.definition })),
+    edges: graph.edges
+      .filter((e) => e.kind === "formal")
+      .map((e) => ({ src: e.src, dst: e.dst, predicate: e.predicate, label: e.label, evidence: e.evidence })),
+  });
+
+  if (!bs.some((b) => b.kind === "flow")) {
+    for (const f of suggestions.flows ?? []) {
+      const steps = (f.steps ?? [])
+        .map((name) => byName.get(name))
+        .filter(Boolean) as NodeRow[];
+      const precedence = (f.precedence ?? [])
+        .map((x) => {
+          const before = byName.get(x.before);
+          const after = byName.get(x.after);
+          return before && after ? { before: before.id, after: after.id, evidence: x.evidence } : null;
+        })
+        .filter(Boolean) as { before: string; after: string; evidence: string }[];
+      if (steps.length < 3) continue;
+      const candidate = {
+        processName: f.processName || `${steps[0].name}流程`,
+        steps: steps.map((n) => ({ id: n.id, name: n.name })),
+        precedence,
+        confidence: typeof f.confidence === "number" ? f.confidence : 0.8,
+        origin: "ai" as const,
+      };
+      const check = validateFlowCandidate(dNodes, candidate);
+      if (!check.ok || !check.order) continue;
+      const head = graph.nodes.find((n) => n.id === check.order![0]);
+      if (!head) continue;
+      createBuilding(
+        worldId,
+        "flow",
+        head.id,
+        candidate.processName,
+        `流程排序 · ${check.order.length} 步`,
+        `## 流程副本\n\n过程：**${candidate.processName}**\n\n顺序：${check.order
+          .map((id) => graph.nodes.find((n) => n.id === id)?.name ?? id)
+          .join(" → ")}\n\n依据：${precedence.map((p) => `「${p.evidence}」`).join("；")}`,
+        check.order,
+      );
+      ensureBuildingPositions(worldId);
+      break;
+    }
+  }
+
+  if (!bs.some((b) => b.kind === "domain")) {
+    for (const d of suggestions.domains ?? []) {
+      const members = (d.members ?? [])
+        .map((name) => byName.get(name))
+        .filter(Boolean) as NodeRow[];
+      if (members.length < 4) continue;
+      const parent = d.commonParent ? byName.get(d.commonParent) : undefined;
+      const candidate = {
+        domainName: d.domainName || `${members[0].name}领域`,
+        members: members.map((n) => ({ id: n.id, name: n.name })),
+        commonParent: parent?.id,
+        sharedSpanIds: d.sharedSpanIds,
+        confidence: typeof d.confidence === "number" ? d.confidence : 0.8,
+        origin: "ai" as const,
+      };
+      const check = validateDomainCandidate(dNodes, dEdges, candidate, []);
+      if (!check.ok) continue;
+      const anchorNode = parent ?? members[0];
+      createBuilding(
+        worldId,
+        "domain",
+        anchorNode.id,
+        `${candidate.domainName} · 领域副本`,
+        `领域每日练习 · 10 题 · ${members.length} 个概念`,
+        `## 领域副本\n\n领域：**${candidate.domainName}**\n\n成员：${members
+          .map((n) => n.name)
+          .join("、")}\n\n依据：LLM 识别 + 程序校验。`,
+        members.map((n) => n.id),
+      );
+      ensureBuildingPositions(worldId);
+      break;
+    }
+  }
+  refreshAllBuildingStatus(worldId);
+  void focus;
+}
+
+/** 依据隐藏/争议变化，把副本标记为 stale；恢复后重新计算状态 */
+function refreshStaleBuildings(worldId: string) {
+  const graph = getGraph(worldId);
+  for (const b of listBuildings(worldId)) {
+    const steps = (() => {
+      try {
+        return JSON.parse(b.steps || "[]") as string[];
+      } catch {
+        return [];
+      }
+    })();
+    const basis = steps.length
+      ? steps
+      : [
+          b.anchor,
+          ...graph.edges
+            .filter((e) => e.kind === "formal" && (e.src === b.anchor || e.dst === b.anchor))
+            .map((e) => (e.src === b.anchor ? e.dst : e.src)),
+        ];
+    const hidden = basis.some((id) => (getNode(id)?.hidden ?? 0) === 1);
+    const disputed =
+      steps.length > 0 &&
+      graph.edges.some(
+        (e) =>
+          e.claim_status === "disputed" &&
+          basis.includes(e.src) &&
+          basis.includes(e.dst),
+      );
+    if (hidden || disputed) {
+      if (b.status !== "stale") setBuildingStatus(b.id, "stale");
+    } else if (b.status === "stale") {
+      refreshBuildingStatus(b.anchor);
+    }
+  }
+}
+
 /** 副本解锁状态：流程看链上节点，领域看锚点邻域，均需当前 tier≥1 */
 function refreshAllBuildingStatus(worldId: string) {
   for (const b of listBuildings(worldId)) {
@@ -592,14 +748,72 @@ app.post("/api/quiz/:id/answer", async (req, res) => {
   });
 });
 
-app.post("/api/edges/:id/accept", (req, res) => {
+app.post("/api/edges/:id/accept", async (req, res) => {
   const edge = db.prepare("SELECT * FROM edges WHERE id=?").get(req.params.id) as
-    | { id: string; kind: string }
+    | { id: string; kind: string; src: string; dst: string; label: string; evidence: string; predicate: string | null }
     | undefined;
   if (!edge) return res.status(404).json({ error: "edge not found" });
   if (edge.kind !== "suggest") return res.status(400).json({ error: "只能接受虚线建议" });
-  updateEdgeKind(edge.id, "formal");
-  res.json({ ok: true });
+  const a = getNode(edge.src);
+  const b = getNode(edge.dst);
+  if (a && b) {
+    const suggestion = await llm.suggestRelation({
+      a: { name: a.name, definition: a.definition, md: a.free_md },
+      b: { name: b.name, definition: b.definition, md: b.free_md },
+      evidence: edge.evidence,
+    });
+    updateEdgeKind(edge.id, "formal");
+    db.prepare("UPDATE edges SET label=?, md=?, predicate=?, evidence=? WHERE id=?").run(
+      suggestion.label,
+      suggestion.md,
+      suggestion.predicate,
+      edge.evidence || suggestion.md,
+      edge.id,
+    );
+  } else {
+    updateEdgeKind(edge.id, "formal");
+  }
+  res.json({ ok: true, edge: db.prepare("SELECT * FROM edges WHERE id=?").get(edge.id) });
+});
+
+/** 用户手动连线：两个已有概念之间建立正式关系（AI 给谓词/名称/说明） */
+app.post("/api/worlds/:id/relations", async (req, res) => {
+  const world = getWorld(req.params.id);
+  if (!world) return res.status(404).json({ error: "world not found" });
+  const from = getNode(String(req.body?.fromNodeId ?? ""));
+  const to = getNode(String(req.body?.toNodeId ?? ""));
+  if (!from || !to) return res.status(400).json({ error: "两个节点都必须存在" });
+  if (from.id === to.id) return res.status(400).json({ error: "不能连接同一个节点" });
+  if (from.world_id !== world.id || to.world_id !== world.id)
+    return res.status(400).json({ error: "节点不属于当前世界" });
+  const evidence = String(req.body?.evidence ?? "").slice(0, 500);
+  let predicate = String(req.body?.predicate ?? "");
+  let label = String(req.body?.label ?? "").trim();
+  let md = String(req.body?.md ?? "").trim();
+  const allowed = ["kindOf", "partOf", "prerequisite", "contrast", "alternative", "related"];
+  if (!allowed.includes(predicate) || !label) {
+    const suggestion = await llm.suggestRelation({
+      a: { name: from.name, definition: from.definition, md: from.free_md },
+      b: { name: to.name, definition: to.definition, md: to.free_md },
+      evidence,
+    });
+    predicate = allowed.includes(predicate) ? predicate : suggestion.predicate;
+    label = label || suggestion.label;
+    md = md || suggestion.md;
+  }
+  const dup = db
+    .prepare("SELECT id FROM edges WHERE world_id=? AND src=? AND dst=? AND predicate=? AND kind='formal'")
+    .get(world.id, from.id, to.id, predicate) as { id: string } | undefined;
+  if (dup) return res.status(409).json({ error: "这两个概念之间已有同类正式关系" });
+  const edge = addEdge(world.id, from.id, to.id, "formal", label, null, md, {
+    predicate,
+    evidence,
+    confidence: 0.9,
+    origin: "manual",
+  });
+  computeFrontier(world.id);
+  materializeDirectionEdges(world.id);
+  res.json({ ok: true, edge });
 });
 
 /* ---------------- 关系编辑 / WFC 布局 ---------------- */
@@ -804,12 +1018,14 @@ app.post("/api/worlds/:id/hide/preview", (req, res) => {
 app.post("/api/worlds/:id/hide", (req, res) => {
   const result = applyHide(req.params.id, String(req.body?.nodeId ?? ""));
   if ("error" in result) return res.status(400).json(result);
+  refreshStaleBuildings(req.params.id);
   res.json(result);
 });
 
 app.post("/api/worlds/:id/hide/undo", (req, res) => {
   const result = undoLastHide(req.params.id);
   if ("error" in result) return res.status(400).json(result);
+  refreshStaleBuildings(req.params.id);
   res.json(result);
 });
 
@@ -848,7 +1064,7 @@ app.get("/api/buildings/:id", (req, res) => {
 app.post("/api/buildings/:id/challenge", async (req, res) => {
   const b = getBuilding(req.params.id);
   if (!b) return res.status(404).json({ error: "building not found" });
-  if (b.status === "locked" || b.status === "detected") {
+  if (b.status === "locked" || b.status === "detected" || b.status === "stale") {
     res.status(409).json({ error: "尚未解锁：相关节点达到第一档后可挑战" });
     return;
   }

@@ -212,9 +212,7 @@ export const useStore = create<State>((set, getState) => ({
 
   async acceptEdge(id) {
     await send(`/api/edges/${id}/accept`, "POST");
-    set({
-      edges: getState().edges.map((e) => (e.id === id ? { ...e, kind: "formal" } : e)),
-    });
+    if (getState().world) await getState().openWorld(getState().world!.id);
     getState().showToast("已接受关联，虚线 → 正式关系");
   },
 

@@ -23,6 +23,10 @@ export default function NodeDrawer() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [hidePreview, setHidePreview] = useState<{ id: string; name: string }[] | null>(null);
   const [hideBusy, setHideBusy] = useState(false);
+  const [linkTo, setLinkTo] = useState("");
+  const [linkPredicate, setLinkPredicate] = useState("related");
+  const [linkLabel, setLinkLabel] = useState("");
+  const [linkBusy, setLinkBusy] = useState(false);
 
   useEffect(() => {
     if (node) setMd(node.free_md ?? "");
@@ -150,6 +154,81 @@ export default function NodeDrawer() {
                 );
               })
           )}
+        </div>
+
+        <div className="section">
+          <h4>手动关联</h4>
+          <div className="hintline">把当前概念和另一个概念连成正式关系；关系名留空时由 AI 给出。</div>
+          <select
+            className="md-edit"
+            style={{ minHeight: 38, marginTop: 6 }}
+            value={linkTo}
+            onChange={(e) => setLinkTo(e.target.value)}
+          >
+            <option value="">选择另一个概念…</option>
+            {nodes
+              .filter((n) => n.id !== node.id && !n.hidden)
+              .map((n) => (
+                <option key={n.id} value={n.id}>
+                  {n.name}
+                </option>
+              ))}
+          </select>
+          <select
+            className="md-edit"
+            style={{ minHeight: 38, marginTop: 6 }}
+            value={linkPredicate}
+            onChange={(e) => setLinkPredicate(e.target.value)}
+          >
+            <option value="related">相关</option>
+            <option value="kindOf">归类（具体→上位）</option>
+            <option value="partOf">组成（部分→整体）</option>
+            <option value="prerequisite">前置（前置→后续）</option>
+            <option value="contrast">对比</option>
+            <option value="alternative">替代（旧→新）</option>
+          </select>
+          <input
+            className="md-edit"
+            style={{ minHeight: 38, marginTop: 6 }}
+            value={linkLabel}
+            onChange={(e) => setLinkLabel(e.target.value)}
+            placeholder="关系名（留空由 AI 生成）"
+          />
+          <div className="row" style={{ marginTop: 8 }}>
+            <button
+              className="primary"
+              disabled={!linkTo || linkBusy}
+              onClick={async () => {
+                if (!world || !node || !linkTo) return;
+                setLinkBusy(true);
+                try {
+                  const r = await fetch(`/api/worlds/${world.id}/relations`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      fromNodeId: node.id,
+                      toNodeId: linkTo,
+                      predicate: linkPredicate,
+                      label: linkLabel || undefined,
+                    }),
+                  });
+                  const data = await r.json();
+                  if (!r.ok) {
+                    useStore.getState().showToast(data.error ?? "建立关系失败");
+                    return;
+                  }
+                  setLinkTo("");
+                  setLinkLabel("");
+                  await useStore.getState().openWorld(world.id);
+                  useStore.getState().showToast("已建立正式关系");
+                } finally {
+                  setLinkBusy(false);
+                }
+              }}
+            >
+              建立关系
+            </button>
+          </div>
         </div>
 
         <div className="section">
