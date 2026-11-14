@@ -715,8 +715,9 @@ wss.on("connection", (ws: WebSocket) => {
     } catch {
       return;
     }
-    if (msg.type === "start") {
-      session = asr.open({
+    if (msg.type === "start" || msg.type === "mock") {
+      const provider = msg.type === "mock" ? mockASR : asr;
+      session = provider.open({
         onPartial: (text) => ws.send(JSON.stringify({ type: "partial", text })),
         onFinal: (text) => {
           ws.send(JSON.stringify({ type: "final", text }));
@@ -724,7 +725,7 @@ wss.on("connection", (ws: WebSocket) => {
         },
         onError: (message) => ws.send(JSON.stringify({ type: "error", message })),
       });
-      ws.send(JSON.stringify({ type: "ready", provider: asr.name }));
+      ws.send(JSON.stringify({ type: "ready", provider: provider.name }));
     } else if (msg.type === "stop") {
       session?.end();
     } else if (msg.type === "audio" && msg.chunk) {

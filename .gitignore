@@ -8,3 +8,7 @@ server/data/
 
 # 本地 Blender 安装（几百 MB，不进仓库）
 prototype/tools/blender-*/
+
+# 本地语音测试产物
+server/*.pcm
+server/_tts*.wav
