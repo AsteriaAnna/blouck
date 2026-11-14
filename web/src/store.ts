@@ -220,7 +220,12 @@ export const useStore = create<State>((set, getState) => ({
     set({ challenge: null });
     try {
       const c = await send<any>(`/api/buildings/${id}/challenge`, "POST");
-      set({ challenge: c });
+      set({
+        challenge: c,
+        buildings: getState().buildings.map((b) =>
+          b.id === id && c.status ? { ...b, status: c.status } : b,
+        ),
+      });
     } catch (e: any) {
       set({ challenge: { error: e.message ?? "副本尚未解锁" } });
     }

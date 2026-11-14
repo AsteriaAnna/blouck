@@ -151,6 +151,18 @@ app.get("/api/worlds/:id", (req, res) => {
   res.json({ world, nodes, edges: graph.edges, buildings, directions: listDirections(world.id) });
 });
 
+/** 名词化：动作短语补“环节”，避免把“审核发布”直接当概念节点 */
+const ACTION_PREFIX =
+  /^(输入|输出|检索|生成|审核|发布|解析|处理|清洗|召回|排序|评估|评测|训练|部署|监控|编排|构建|拆分|合并|抽取|切分)/;
+const NOUN_SUFFIX = /(环节|阶段|方法|工具|组件|系统|指标|模型|技术|流程|策略|框架|步骤)$/;
+function normalizeConceptName(raw: string): { name: string; aliases: string[] } {
+  const name = raw.trim();
+  if (!/^[\u4e00-\u9fa5]{4,8}$/.test(name)) return { name, aliases: [] };
+  if (NOUN_SUFFIX.test(name)) return { name, aliases: [] };
+  if (ACTION_PREFIX.test(name)) return { name: `${name}环节`, aliases: [name] };
+  return { name, aliases: [] };
+}
+
 /** 语音/文字 → 概念/关系/方向 → 落图（关系与节点 v2） */
 app.post("/api/worlds/:id/extract", async (req, res) => {
   const world = getWorld(req.params.id);
@@ -200,9 +212,11 @@ app.post("/api/worlds/:id/extract", async (req, res) => {
   const placed = graph.nodes.map((n) => ({ id: n.id, x: n.x, y: n.y }));
 
   for (const ent of result.entities) {
-    const name = ent.name?.trim() ?? "";
-    if (!name || name.length < 2 || name.length > 20) continue;
-    if (BAD_NAME.test(name)) continue;
+    const rawName = ent.name?.trim() ?? "";
+    if (!rawName || rawName.length < 2 || rawName.length > 20) continue;
+    if (BAD_NAME.test(rawName)) continue;
+    const normalized = normalizeConceptName(rawName);
+    const name = normalized.name;
     let evidence = ent.evidence?.trim() ?? "";
     if (evidence && !text.includes(evidence)) evidence = "";
     if (!evidence) evidence = sentenceFor(name);
@@ -216,7 +230,9 @@ app.post("/api/worlds/:id/extract", async (req, res) => {
       updateNodeMeta(existingNode.id, {
         type: NODE_TYPES.has(existingNode.type) ? existingNode.type : type,
         definition: existingNode.definition || ent.definition || "",
-        aliases: [...new Set([...aliasesOf(existingNode), ...(ent.aliases ?? []), name])],
+        aliases: [
+          ...new Set([...aliasesOf(existingNode), ...(ent.aliases ?? []), ...normalized.aliases, rawName]),
+        ],
         sourceSpanId: existingNode.source_span_id ?? sourceSpanId,
       });
       continue;
@@ -230,7 +246,7 @@ app.post("/api/worlds/:id/extract", async (req, res) => {
     const node = addNode(world.id, name, pos.x, pos.y, "", {
       type,
       definition: ent.definition ?? "",
-      aliases: ent.aliases ?? [],
+      aliases: [...new Set([...(ent.aliases ?? []), ...normalized.aliases])],
       sourceSpanId,
     });
     createdNodes.push(node);
@@ -367,6 +383,18 @@ app.post("/api/worlds/:id/extract", async (req, res) => {
   for (const n of pending) {
     if (haveDirection.has(n.id)) continue;
     addDirection(world.id, n.id, `「${n.name}」还可以往哪一步深入？`, `围绕「${n.name}」的下一步`, null);
+  }
+
+  // 新节点自动生成题库（后台，最多 3 个，避免一次刷太多模型调用）
+  for (const n of createdNodes.slice(0, 3)) {
+    if (listQuizzes(n.id).length) continue;
+    const material = `定义：${n.definition || "（暂无）"}\n来源：${sentenceFor(n.name)}\n笔记：${n.free_md}`;
+    void llm
+      .generateQuiz({ name: n.name, md: material })
+      .then((items) => {
+        if (!listQuizzes(n.id).length) createQuizzes(n.id, items.slice(0, 15));
+      })
+      .catch((err) => console.warn("[quiz] 自动生成失败：", err));
   }
 
   computeFrontier(world.id);
@@ -744,10 +772,22 @@ app.patch("/api/nodes/:id", (req, res) => {
   res.json({ ok: true });
 });
 
-app.get("/api/nodes/:id/quiz", (req, res) => {
+app.get("/api/nodes/:id/quiz", async (req, res) => {
   const node = getNode(req.params.id);
   if (!node) return res.status(404).json({ error: "node not found" });
-  const quizzes = listQuizzes(node.id);
+  let quizzes = listQuizzes(node.id);
+  if (!quizzes.length) {
+    try {
+      const items = await llm.generateQuiz({
+        name: node.name,
+        md: `定义：${node.definition}\n笔记：${node.free_md}`,
+      });
+      createQuizzes(node.id, items.slice(0, 15));
+      quizzes = listQuizzes(node.id);
+    } catch (err) {
+      console.warn("[quiz] 打开节点时生成失败：", err);
+    }
+  }
   res.json({
     quizzes: quizzes.map(({ answer, ...q }) => q),
     passed: countPassed(node.id),
@@ -760,7 +800,10 @@ app.post("/api/nodes/:id/quiz/generate", async (req, res) => {
   const node = getNode(req.params.id);
   if (!node) return res.status(404).json({ error: "node not found" });
   if (!listQuizzes(node.id).length) {
-    const items = await llm.generateQuiz({ name: node.name, md: node.free_md });
+    const items = await llm.generateQuiz({
+      name: node.name,
+      md: `定义：${node.definition || "（暂无）"}\n笔记：${node.free_md}`,
+    });
     createQuizzes(node.id, items);
   }
   res.json({
@@ -1175,6 +1218,9 @@ app.post("/api/buildings/:id/challenge", async (req, res) => {
 app.post("/api/buildings/:id/submit", async (req, res) => {
   const b = getBuilding(req.params.id);
   if (!b) return res.status(404).json({ error: "building not found" });
+  if (b.status !== "playable" && b.status !== "cleared") {
+    return res.status(409).json({ error: "副本尚未解锁，不能提交" });
+  }
   if (b.kind === "flow") {
     const expected: string[] = JSON.parse(b.steps || "[]");
     const order: string[] = Array.isArray(req.body?.order) ? req.body.order : [];
@@ -1201,7 +1247,18 @@ app.post("/api/buildings/:id/submit", async (req, res) => {
       if (judged.correct) ok++;
     } else {
       const accepted = [q.answer, ...(JSON.parse(q.aliases || "[]") as string[])].map(norm);
-      if (accepted.includes(norm(a.answer))) ok++;
+      const got = norm(a.answer);
+      const hit =
+        accepted.some((x) => x === got || (got.length >= 2 && x.includes(got)) || got.includes(x)) ||
+        (() => {
+          const ref = new Set(accepted[0]?.split("") ?? []);
+          const chars = new Set(got.split(""));
+          if (!ref.size) return false;
+          let n = 0;
+          for (const ch of chars) if (ref.has(ch)) n++;
+          return n / ref.size >= 0.6;
+        })();
+      if (hit) ok++;
     }
   }
   const passed = answers.length > 0 && ok / answers.length >= 0.6;
