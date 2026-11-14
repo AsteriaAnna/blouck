@@ -41,6 +41,14 @@ import { placeAround } from "./placement.js";
 import { simulateExplore } from "./explore.js";
 import { wfcGraphLayout } from "./wfc.js";
 import {
+  detectDomainCandidates,
+  detectFlowCandidates,
+  toDungeonEdges,
+  toDungeonNodes,
+  validateDomainCandidate,
+  validateFlowCandidate,
+} from "./dungeons.js";
+import {
   applyHide,
   bumpDomainDaily,
   consumeDirection,
@@ -239,68 +247,87 @@ function longestFormalChain(nodes: NodeRow[], formalEdges: { src: string; dst: s
 }
 
 /**
- * 副本生成 v2（按 MVP 文档）：
- * - 领域：锚点有 ≥3 个正式邻居，且邻居之间至少 2 条正式边（成簇）→ 生成；
- * - 流程：只认 formal 边，拓扑无环、最长链 3—6 步 → 生成，锚点 = 链首；
- * - 状态：locked / playable / cleared，由相关节点当前 tier 决定。
+ * 副本生成 v2：AI/规则只提候选，这里用硬校验（流程唯一序、每步来源、领域共同依据）。
+ * 规则细节见 docs/design/dungeon-generation-rules.md。
  */
 function detectBuildingsV2(worldId: string, _focus: NodeRow, _all: NodeRow[]) {
   const bs = listBuildings(worldId);
   const { nodes, edges } = getGraph(worldId);
-  const knowledge = edges.filter((e) => e.kind === "formal" || e.kind === "source");
-  const nb = new Map<string, Set<string>>();
-  for (const n of nodes) nb.set(n.id, new Set());
-  for (const e of knowledge) {
-    nb.get(e.src)?.add(e.dst);
-    nb.get(e.dst)?.add(e.src);
-  }
+  const dNodes = toDungeonNodes(nodes);
+  const dEdges = toDungeonEdges(edges);
 
   if (!bs.some((b) => b.kind === "domain")) {
-    let bestAnchor: NodeRow | null = null;
-    let bestMembers: string[] = [];
-    for (const n of nodes) {
-      const ns = [...(nb.get(n.id) ?? [])].filter((id) => id !== n.id);
-      if (ns.length < 3) continue;
-      let inter = 0;
-      for (let i = 0; i < ns.length; i++) {
-        for (let j = i + 1; j < ns.length; j++) if (nb.get(ns[i])?.has(ns[j])) inter++;
-      }
-      if (inter >= 2 && ns.length > bestMembers.length - 1) {
-        bestAnchor = n;
-        bestMembers = [n.id, ...ns];
-      }
-    }
-    if (bestAnchor) {
-      const created = createBuilding(
+    const existing = bs
+      .filter((b) => b.kind === "domain")
+      .map((b) => {
+        try {
+          return JSON.parse(b.steps || "[]") as string[];
+        } catch {
+          return [];
+        }
+      });
+    for (const candidate of detectDomainCandidates(dNodes, dEdges, existing)) {
+      const check = validateDomainCandidate(dNodes, dEdges, candidate, existing);
+      if (!check.ok) continue;
+      const degree = (id: string) =>
+        dEdges.filter((e) => e.kind === "formal" && (e.src === id || e.dst === id)).length;
+      const anchorId =
+        candidate.commonParent ??
+        [...candidate.members].sort((a, b) => degree(b.id) - degree(a.id))[0].id;
+      const anchorNode =
+        nodes.find((n) => n.id === anchorId) ?? nodes.find((n) => n.id === candidate.members[0].id)!;
+      createBuilding(
         worldId,
         "domain",
-        bestAnchor.id,
-        "领域副本",
-        "领域每日练习 · 10 题",
-        `## 领域副本\n\n围绕「${bestAnchor.name}」及其 ${bestMembers.length - 1} 个关联节点的每日练习。`,
-        [],
+        anchorNode.id,
+        `${candidate.domainName} · 领域副本`,
+        `领域每日练习 · 10 题 · ${candidate.members.length} 个概念`,
+        `## 领域副本
+
+领域：**${candidate.domainName}**
+
+成员：${candidate.members
+          .map((m) => m.name)
+          .join("、")}
+
+依据：${candidate.commonParent ? "共同上位/共同邻居" : "共同来源"}。`,
+        candidate.members.map((m) => m.id),
       );
       ensureBuildingPositions(worldId);
-      void created;
+      break;
     }
   }
 
   if (!bs.some((b) => b.kind === "flow")) {
-    const chain = longestFormalChain(nodes, edges.filter((e) => e.kind === "formal"));
-    if (chain.length >= 3 && chain.length <= 6) {
-      const head = nodes.find((n) => n.id === chain[0])!;
+    for (const candidate of detectFlowCandidates(dNodes, dEdges)) {
+      const check = validateFlowCandidate(dNodes, candidate);
+      if (!check.ok || !check.order) continue;
+      const head = nodes.find((n) => n.id === check.order![0]);
+      if (!head) continue;
       createBuilding(
         worldId,
         "flow",
         head.id,
-        "流程副本",
-        `流程排序 · ${chain.length} 步`,
-        `## 流程副本\n\n从「${head.name}」开始的 ${chain.length} 个步骤，按正确顺序连接。`,
-        chain,
+        candidate.processName,
+        `流程排序 · ${check.order.length} 步`,
+        `## 流程副本
+
+过程：**${candidate.processName}**
+
+顺序：${check.order
+          .map((id) => nodes.find((n) => n.id === id)?.name ?? id)
+          .join(" → ")}
+
+依据：${candidate.precedence
+          .map((p) => `「${p.evidence}」`)
+          .join("；")}`,
+        check.order,
       );
       ensureBuildingPositions(worldId);
+      break;
     }
   }
+
   refreshAllBuildingStatus(worldId);
 }
 
@@ -570,6 +597,37 @@ app.post("/api/dev/explore", async (req, res) => {
       buildings: buildings.length,
       buildingKinds: buildings.map((b) => b.kind),
     },
+  });
+});
+
+/** 开发用：构造一个必然触发流程/领域副本的世界，便于验证生成与位置 */
+app.post("/api/dev/dungeon-fixture", (_req, res) => {
+  const world = createWorld("副本测试世界", "RAG");
+  const add = (name: string, x: number, y: number) => addNode(world.id, name, x, y);
+
+  const p1 = add("文档分块", 0, 0);
+  const p2 = add("向量检索", 300, 0);
+  const p3 = add("重排", 600, 0);
+  const p4 = add("生成回答", 900, 0);
+  addEdge(world.id, p1.id, p2.id, "formal", "先把文档切成分块，再做向量检索");
+  addEdge(world.id, p2.id, p3.id, "formal", "检索出候选后，然后做重排");
+  addEdge(world.id, p3.id, p4.id, "formal", "最后把重排结果交给生成回答");
+
+  const parent = add("检索技术", 350, 500);
+  const members = ["BM25", "向量召回", "混合检索", "精排"].map((name, i) =>
+    add(name, i * 260, 720),
+  );
+  for (const m of members) addEdge(world.id, m.id, parent.id, "formal", "归类");
+
+  const graph = getGraph(world.id);
+  detectBuildingsV2(world.id, graph.nodes[0], graph.nodes);
+  const buildings = listBuildings(world.id);
+  res.json({
+    ok: true,
+    world,
+    buildings,
+    positions: buildings.map((b) => ({ kind: b.kind, x: b.x, y: b.y })),
+    nodes: graph.nodes.map((n) => ({ name: n.name, x: n.x, y: n.y })),
   });
 });
 

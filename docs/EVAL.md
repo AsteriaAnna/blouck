@@ -1,8 +1,8 @@
 # 生成算法评测（eval）
 
 日期：2026-11-14
-脚本：`server/eval/run.ts`
-用例：`server/eval/cases.json`（12 个中文 AI 产品学习材料，人工标注）
+脚本：`server/eval/run.ts`（抽取/关系）、`server/eval/dungeons.ts`（副本校验）
+用例：`server/eval/cases.json`（12 个中文 AI 产品学习材料，人工标注）、`server/eval/dungeons.ts` 内置 15 个副本正负例
 
 ## 用法
 
@@ -11,6 +11,7 @@ cd server
 pnpm eval                 # 直连 provider（默认 deepseek）
 pnpm eval -- --provider=mock
 pnpm eval -- --api        # 走真实 API（含副本检测），需服务已启动
+pnpm eval:dungeons        # 副本发现/校验正负例（无需服务）
 ```
 
 输出：
@@ -60,6 +61,25 @@ pnpm eval -- --api        # 走真实 API（含副本检测），需服务已启
 5. 别名/去重（精确 + 向量 + LLM 裁决）；
 6. 副本检测单独评测（流程唯一拓扑、领域簇）；
 7. 每次算法改动后重跑 `pnpm eval`，报告进 `docs/reviews/`。
+
+## 副本评测（2026-11-14）
+
+`pnpm eval:dungeons` 跑 15 个用例（流程 8、领域 7），覆盖：
+
+- 流程正例：3–6 步 + 过程词 + 唯一顺序；
+- 流程负例：2 步、7 步、多解、环、无过程词、低置信度、引用不存在节点；
+- 领域正例：4 成员 + 共同上位；
+- 领域负例：3 成员、无共同依据、泛化名、与成员同名、重叠过高、低置信度。
+
+结果：`TP=2 FP=0 FN=0 TN=13`，Precision=1.00、Recall=1.00（小样本，需扩样）；报告写入 `server/eval/report-dungeons.md`。
+
+副本位置实测（`POST /api/dev/dungeon-fixture`）：
+
+- 流程副本在链上方、与最近节点留白 100；
+- 领域副本在领域簇下方、与最近成员留白 116；
+- 两副本互不粘连。
+
+截图见 `docs/screenshots/12-dungeon.png`。
 
 ---
 

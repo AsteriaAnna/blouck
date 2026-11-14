@@ -47,29 +47,125 @@ function nodePoints(worldId: string, exclude?: string, extra: Pt[] = []): Pt[] {
   ];
 }
 
-/** 副本位置：锚点附近找空位，写回 DB；已存在但不合适的会重新放置 */
+/**
+ * 副本位置：放在相关概念节点「旁边或中间」，但保持空隙、不粘连。
+ *
+ * 坐标约定（DB）：
+ * - 节点 n.x/n.y 是 190×170 视框的左上角，中心 = (n.x+95, n.y+85)
+ * - 副本 b.x/b.y 是中心
+ * - 要求副本与任一节点在某一轴至少留出 GAP 像素空隙，副本之间也留空
+ */
+const NODE_CX = 95;
+const NODE_CY = 85;
+const NODE_HALF_W = 95;
+const NODE_HALF_H = 85;
+const BLD_HALF_W = 100;
+const BLD_HALF_H = 95;
+const NODE_GAP = 55;
+const BLD_GAP = 70;
+
+function relatedNodeIds(
+  b: { kind: string; anchor: string; steps: string },
+  nodes: { id: string; x: number; y: number }[],
+  edges: { src: string; dst: string; kind: string }[],
+): string[] {
+  const ids = new Set<string>();
+  const steps = (() => {
+    try {
+      return JSON.parse(b.steps || "[]") as string[];
+    } catch {
+      return [];
+    }
+  })();
+  if (b.kind === "flow" && Array.isArray(steps)) {
+    for (const id of steps) if (id) ids.add(id);
+  }
+  ids.add(b.anchor);
+  if (b.kind === "domain") {
+    for (const e of edges) {
+      if (e.kind !== "formal" && e.kind !== "source") continue;
+      if (e.src === b.anchor) ids.add(e.dst);
+      if (e.dst === b.anchor) ids.add(e.src);
+    }
+  }
+  return [...ids].filter((id) => nodes.some((n) => n.id === id));
+}
+
+/** 点相对所有节点的最小“留白”（负数表示重叠） */
+function clearanceFromNodes(pt: Pt, nodes: { x: number; y: number }[]): number {
+  let min = Infinity;
+  for (const n of nodes) {
+    const dx = Math.abs(pt.x - (n.x + NODE_CX)) - (NODE_HALF_W + BLD_HALF_W);
+    const dy = Math.abs(pt.y - (n.y + NODE_CY)) - (NODE_HALF_H + BLD_HALF_H);
+    min = Math.min(min, Math.max(dx, dy));
+  }
+  return min === Infinity ? 0 : min;
+}
+
+function clearanceFromBuildings(pt: Pt, others: Pt[]): number {
+  let min = Infinity;
+  for (const o of others) {
+    const dx = Math.abs(pt.x - o.x) - (BLD_HALF_W * 2);
+    const dy = Math.abs(pt.y - o.y) - (BLD_HALF_H * 2);
+    min = Math.min(min, Math.max(dx, dy));
+  }
+  return min;
+}
+
+/** 副本位置：相关节点质心附近找“有留白”的位置，优先靠近质心/锚点 */
 export function ensureBuildingPositions(worldId: string) {
-  const nodes = getGraph(worldId).nodes;
+  const graph = getGraph(worldId);
+  const nodes = graph.nodes;
   const byId = new Map(nodes.map((n) => [n.id, n]));
+  const edges = graph.edges;
   const buildings = listBuildings(worldId);
   const placed: Pt[] = [];
+
   for (const b of buildings) {
     const anchor = byId.get(b.anchor);
     if (!anchor) continue;
-    const occupied = [
-      ...nodes.map((n) => ({ x: n.x, y: n.y })),
-      ...placed,
-    ];
-    let pos: Pt = { x: b.x, y: b.y };
-    const overlaps = (p: Pt) =>
-      occupied.some((o) => Math.abs(o.x - p.x) < 200 && Math.abs(o.y - p.y) < 180);
-    if (!b.x && !b.y) {
-      pos = findFreeSpot(anchor, occupied);
-    } else if (overlaps(pos)) {
-      pos = findFreeSpot(anchor, occupied, [260, 360, 470, 600]);
+    const related = relatedNodeIds(b, nodes, edges);
+    const relatedNodes = related.map((id) => byId.get(id)!).filter(Boolean);
+    const cluster = relatedNodes.length ? relatedNodes : [anchor];
+    const cx = cluster.reduce((a, n) => a + n.x + NODE_CX, 0) / cluster.length;
+    const cy = cluster.reduce((a, n) => a + n.y + NODE_CY, 0) / cluster.length;
+
+    const candidates: Pt[] = [];
+    for (const r of [230, 280, 340, 410, 500, 620]) {
+      for (let k = 0; k < 16; k++) {
+        const a = (k * Math.PI) / 8;
+        candidates.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
+      }
     }
+
+    let best: Pt | null = null;
+    let bestScore = -Infinity;
+    for (const p of candidates) {
+      const nodeGap = clearanceFromNodes(p, nodes);
+      const bldGap = clearanceFromBuildings(p, placed);
+      if (nodeGap < NODE_GAP || bldGap < BLD_GAP) continue;
+      const distCentroid = Math.hypot(p.x - cx, p.y - cy);
+      // 靠近质心（旁边/中间），同时保留空间
+      const score = -distCentroid * 0.25 + Math.min(nodeGap, 120) * 0.35;
+      if (score > bestScore) {
+        bestScore = score;
+        best = p;
+      }
+    }
+    if (!best) {
+      // 没有完全合格的候选：选留白最大的
+      let bestGap = -Infinity;
+      for (const p of candidates) {
+        const gap = clearanceFromNodes(p, nodes) + clearanceFromBuildings(p, placed) * 0.5;
+        if (gap > bestGap) {
+          bestGap = gap;
+          best = p;
+        }
+      }
+    }
+    const pos = best ?? { x: cx + 260, y: cy };
     placed.push(pos);
-    if (pos.x !== b.x || pos.y !== b.y) {
+    if (Math.abs(pos.x - b.x) > 0.5 || Math.abs(pos.y - b.y) > 0.5) {
       db.prepare("UPDATE buildings SET x=?, y=? WHERE id=?").run(pos.x, pos.y, b.id);
     }
   }

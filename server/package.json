@@ -7,7 +7,8 @@
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "eval": "tsx eval/run.ts",
-    "eval:api": "tsx eval/run.ts --api"
+    "eval:api": "tsx eval/run.ts --api",
+    "eval:dungeons": "tsx eval/dungeons.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
