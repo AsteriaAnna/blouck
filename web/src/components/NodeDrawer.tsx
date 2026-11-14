@@ -6,6 +6,8 @@ export default function NodeDrawer() {
   const drawer = useStore((s) => s.drawer);
   const world = useStore((s) => s.world);
   const nodes = useStore((s) => s.nodes);
+  const edges = useStore((s) => s.edges);
+  const directions = useStore((s) => s.directions);
   const quizzes = useStore((s) => s.quizzes);
   const passed = useStore((s) => s.passed);
   const tier = useStore((s) => s.tier);
@@ -98,6 +100,77 @@ export default function NodeDrawer() {
         </button>
       </header>
       <div className="body">
+        <div className="section">
+          <h4>概念</h4>
+          <div className="row" style={{ marginBottom: 8 }}>
+            <span className="chip">{node.type || "概念"}</span>
+            {node.frontier ? <span className="chip on">边缘节点 · 地图展示方向</span> : null}
+          </div>
+          {node.definition ? (
+            <div className="hintline" style={{ fontSize: 14, lineHeight: 1.7 }}>
+              {node.definition}
+            </div>
+          ) : (
+            <div className="hintline">还没有定义；编辑自由区或继续探索来补充。</div>
+          )}
+          {(() => {
+            try {
+              const aliases = JSON.parse(node.aliases || "[]") as string[];
+              return aliases.length ? <div className="hintline">别名：{aliases.join("、")}</div> : null;
+            } catch {
+              return null;
+            }
+          })()}
+        </div>
+
+        <div className="section">
+          <h4>关系定位</h4>
+          {edges.filter(
+            (e) =>
+              (e.src === node.id || e.dst === node.id) &&
+              e.kind !== "direction" &&
+              e.kind !== "source",
+          ).length === 0 ? (
+            <div className="hintline">还没有归类/定位关系。</div>
+          ) : (
+            edges
+              .filter(
+                (e) =>
+                  (e.src === node.id || e.dst === node.id) &&
+                  e.kind !== "direction" &&
+                  e.kind !== "source",
+              )
+              .map((e) => {
+                const other = nodes.find((n) => n.id === (e.src === node.id ? e.dst : e.src));
+                return (
+                  <div key={e.id} className="hintline" style={{ marginBottom: 6 }}>
+                    <b>{e.predicate || e.kind}</b> · {other?.name ?? "?"}：{e.label || "—"}
+                    {e.evidence ? <div style={{ opacity: 0.75 }}>依据：{e.evidence}</div> : null}
+                  </div>
+                );
+              })
+          )}
+        </div>
+
+        <div className="section">
+          <h4>继续探索</h4>
+          {directions.filter((d) => d.node_id === node.id && d.status === "open").length === 0 ? (
+            <div className="hintline">暂无方向；下一次抽取/对话会生成。</div>
+          ) : (
+            directions
+              .filter((d) => d.node_id === node.id && d.status === "open")
+              .map((d) => (
+                <div key={d.id} className="hintline" style={{ marginBottom: 6 }}>
+                  → {d.question}
+                  {d.reason ? <div style={{ opacity: 0.75 }}>{d.reason}</div> : null}
+                </div>
+              ))
+          )}
+          {!node.frontier ? (
+            <div className="hintline">非边缘节点：方向只在这里列出，不在地图上画线。</div>
+          ) : null}
+        </div>
+
         <div className="section">
           <h4>自由区（可编辑）</h4>
           <textarea

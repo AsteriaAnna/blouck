@@ -173,7 +173,7 @@ async function evaluateDirect(c: Case) {
   });
   // 直接用 provider 的结果模拟"焦点→目标"的边（当前抽取 schema 只有 target，没有任意 source）
   const edges = result.relations.map((r) => ({
-    src: focusName,
+    src: r.source || focusName,
     dst: r.target,
     kind: r.type,
     label: r.label,

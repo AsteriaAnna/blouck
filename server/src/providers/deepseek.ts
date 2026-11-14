@@ -35,16 +35,31 @@ export const deepseekLLM: LLMProvider = {
   name: "deepseek",
 
   async extract({ text, focus, existing }) {
-    const system =
-      '你是知识图谱抽取器。只输出 JSON：{"entities":[{"name":"","hint":""}],"relations":[{"type":"source|formal|suggest|direction","label":"","target":"","question":""}]}。source=本轮探索来源；suggest=不确定的关联；direction=下一步方向（无 MD，可带 question）。不要编造因果，证据不足用 suggest。';
-    const user = `当前节点：${focus.name}\n已有实体：${existing.join("、")}\n文本：${text}`;
+    const system = `你是知识世界的概念/关系抽取器。只输出 JSON，不要解释。
+格式：
+{"entities":[{"name":"名词概念","type":"概念|方法|组件|指标|工具","definition":"一句定义","aliases":["别名"],"evidence":"原文证据句","confidence":0.0}],
+ "relations":[{"source":"起点概念名（缺省为当前节点）","target":"目标概念名","type":"formal|suggest|source|direction","predicate":"kindOf|partOf|prerequisite|contrast|alternative|related","label":"关系名称","evidence":"同时包含两端概念的原文证据句","confidence":0.0,"question":"direction 时的问题"}]}
+
+规则：
+1. 节点只能是名词概念，不是问句/动词/代词；问题不要当节点。
+2. 关系必须有证据句，evidence 必须是原文子串，且同时出现 source 与 target（或明确指代）。
+3. predicate 方向固定：kindOf 具体→上位；partOf 部分→整体；prerequisite 前置→后续；contrast/related 无方向；alternative 旧→新。
+4. 证据充分且 confidence>=0.75 用 formal；不充分 0.5-0.75 用 suggest；新节点的探索来路用 source；下一步问题用 direction。
+5. 不要编造原文没有的概念。`;
+    const user = `当前节点：${focus.name}\n已有概念：${existing.join("、")}\n文本：${text}`;
     try {
       const raw = await chat(system, user);
       const parsed = JSON.parse(raw) as ExtractResult;
-      return {
-        entities: Array.isArray(parsed.entities) ? parsed.entities : [],
-        relations: Array.isArray(parsed.relations) ? parsed.relations : [],
-      };
+      const entities = (Array.isArray(parsed.entities) ? parsed.entities : []).map((e) => ({
+        ...e,
+        type: e.type ?? "概念",
+        confidence: typeof e.confidence === "number" ? e.confidence : 0.7,
+      }));
+      const relations = (Array.isArray(parsed.relations) ? parsed.relations : []).map((r) => ({
+        ...r,
+        confidence: typeof r.confidence === "number" ? r.confidence : 0.7,
+      }));
+      return { entities, relations };
     } catch (err) {
       console.warn("[llm] deepseek extract 失败，降级 mock：", err);
       return mockLLM.extract({ text, focus, existing });

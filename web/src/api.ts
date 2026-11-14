@@ -37,6 +37,11 @@ export type NodeRow = {
   free_md: string;
   hidden: number;
   tier: number;
+  type: string;
+  definition: string;
+  aliases: string;
+  source_span_id: string | null;
+  frontier: number;
   passed?: Passed;
 };
 
@@ -54,6 +59,12 @@ export type EdgeRow = {
   frontier_x?: number | null;
   frontier_y?: number | null;
   consumed?: number;
+  predicate?: string | null;
+  evidence?: string;
+  confidence?: number;
+  origin?: string;
+  claim_status?: string;
+  revision?: number;
 };
 
 export type BuildingRow = {
@@ -65,9 +76,23 @@ export type BuildingRow = {
   sub: string;
   md: string;
   steps: string;
-  status: "locked" | "playable" | "cleared";
+  status: "detected" | "locked" | "playable" | "cleared" | "stale";
+  version?: number;
+  basis?: string;
+  fingerprint?: string;
   x: number;
   y: number;
+};
+
+export type DirectionRow = {
+  id: string;
+  world_id: string;
+  node_id: string;
+  question: string;
+  reason: string;
+  target_hint: string | null;
+  status: "open" | "consumed" | "archived";
+  created_at: number;
 };
 
 export type Quiz = {
@@ -83,4 +108,5 @@ export type WorldPayload = {
   nodes: NodeRow[];
   edges: EdgeRow[];
   buildings: BuildingRow[];
+  directions?: DirectionRow[];
 };

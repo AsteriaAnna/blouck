@@ -33,7 +33,13 @@ export default function BuildingDrawer() {
   const questions: { id: string; prompt: string }[] = challenge?.questions ?? [];
   const daily = challenge?.daily as { used: number; limit: number } | undefined;
   const statusText =
-    building.status === "cleared" ? "已通关" : building.status === "locked" ? "未解锁" : "可挑战";
+    building.status === "cleared"
+      ? "已通关"
+      : building.status === "playable"
+        ? "可挑战"
+        : building.status === "stale"
+          ? "依据待更新"
+          : "已出现 · 未解锁";
 
   async function saveMd() {
     if (!building) return;
@@ -69,7 +75,7 @@ export default function BuildingDrawer() {
         </button>
       </header>
       <div className="body">
-        {building.status === "locked" && (
+        {(building.status === "locked" || building.status === "detected" || building.status === "stale") && (
           <div className="section">
             <div className="hintline">
               未解锁：{building.kind === "flow" ? "流程链上节点" : "锚点邻域"}至少 2 个当前达到第一档后可挑战。
@@ -77,7 +83,7 @@ export default function BuildingDrawer() {
           </div>
         )}
 
-        {building.status !== "locked" && challenge?.error && (
+        {building.status === "playable" && challenge?.error && (
           <div className="section">
             <div className="hintline">{challenge.error}</div>
           </div>

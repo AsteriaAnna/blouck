@@ -9,6 +9,15 @@ const KIND_LABEL: Record<string, string> = {
   direction: "方向线（无 MD）",
 };
 
+const PRED_LABEL: Record<string, string> = {
+  kindOf: "归类",
+  partOf: "组成",
+  prerequisite: "前置",
+  contrast: "对比",
+  alternative: "替代",
+  related: "相关",
+};
+
 /** 点击线/路牌：关系 MD 编辑、接受建议、方向问题探索 */
 export default function RelationDrawer() {
   const drawer = useStore((s) => s.drawer);
@@ -96,6 +105,24 @@ export default function RelationDrawer() {
           </div>
         ) : (
           <>
+            <div className="section">
+              <h4>语义</h4>
+              <div className="row" style={{ marginBottom: 6 }}>
+                <span className="chip">{PRED_LABEL[edge.predicate ?? ""] ?? edge.predicate ?? "相关"}</span>
+                <span className="chip">置信度 {Math.round((edge.confidence ?? 1) * 100)}%</span>
+                {edge.claim_status && edge.claim_status !== "normal" ? (
+                  <span className="chip">{edge.claim_status}</span>
+                ) : null}
+              </div>
+              {edge.evidence ? (
+                <div className="hintline">依据：{edge.evidence}</div>
+              ) : (
+                <div className="hintline">缺少证据句；建议补来源或降级为虚线。</div>
+              )}
+              <div className="hintline">
+                方向约定：归类（具体→上位）、组成（部分→整体）、前置（前置→后续）、对比/相关无方向、替代（旧→新）。
+              </div>
+            </div>
             <div className="section">
               <h4>关系名</h4>
               <input

@@ -1,5 +1,5 @@
-import { Suspense, useMemo, useRef, useState } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Html, Line, OrbitControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { useStore } from "../store";
@@ -287,6 +287,35 @@ function Edge({
   );
 }
 
+/** 进入世界时自动把全部节点 + 副本框进视野 */
+function CameraFit({ points }: { points: [number, number, number][] }) {
+  const camera = useThree((s) => s.camera);
+  const controls = useThree((s) => s.controls) as any;
+  const signature = points.length;
+  useEffect(() => {
+    if (!points.length) return;
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (const [x, , z] of points) {
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minZ = Math.min(minZ, z);
+      maxZ = Math.max(maxZ, z);
+    }
+    const cx = (minX + maxX) / 2;
+    const cz = (minZ + maxZ) / 2;
+    const size = Math.max(maxX - minX, maxZ - minZ, 600);
+    const dist = Math.max(1250, size * 1.55);
+    camera.position.set(cx, dist * 0.95, cz + dist * 0.95);
+    camera.lookAt(cx, 0, cz);
+    camera.updateProjectionMatrix();
+    if (controls?.target) {
+      controls.target.set(cx, 0, cz);
+      controls.update?.();
+    }
+  }, [signature, camera, controls]);
+  return null;
+}
+
 export default function World3D() {
   const nodes = useStore((s) => s.nodes);
   const edges = useStore((s) => s.edges);
@@ -318,6 +347,18 @@ export default function World3D() {
     return m;
   }, [nodes, cx, cy]);
 
+  const worldPoints = useMemo(() => {
+    const pts: [number, number, number][] = nodes.map((n) => posOf(n.x, n.y));
+    for (const b of buildings) {
+      if (b.x || b.y) pts.push(posOf(b.x, b.y));
+      else {
+        const a = nodes.find((n) => n.id === b.anchor);
+        if (a) pts.push(posOf(a.x, a.y));
+      }
+    }
+    return pts;
+  }, [nodes, buildings, cx, cy]);
+
   return (
     <div className="world3d">
       <Canvas
@@ -342,6 +383,8 @@ export default function World3D() {
         {edges.map((e) => {
           if (e.kind === "direction") {
             if (e.consumed) return null;
+            const srcNode = nodes.find((n) => n.id === e.src);
+            if (!srcNode?.frontier) return null; // 只有边缘节点在地图上画方向
             const a = nodePos.get(e.src);
             const f =
               e.frontier_x != null && e.frontier_y != null
@@ -406,12 +449,14 @@ export default function World3D() {
           );
         })}
         <OrbitControls
+          makeDefault
           enablePan
           minDistance={300}
           maxDistance={2600}
           maxPolarAngle={Math.PI / 2.15}
           target={[0, 0, 0]}
         />
+        <CameraFit points={worldPoints} />
       </Canvas>
       <div className="hud3d">
         <div className="badge">3D · 拖拽旋转 · 滚轮缩放 · 点岛查看</div>

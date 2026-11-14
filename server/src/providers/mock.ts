@@ -32,46 +32,83 @@ export const mockLLM: LLMProvider = {
   async extract({ text, focus, existing }) {
     const entities: ExtractResult["entities"] = [];
     const relations: ExtractResult["relations"] = [];
-    const seen = new Set(existing);
+    const seen = new Set(existing.map((x) => x.toLowerCase()));
     const found: string[] = [];
+    const sentenceFor = (term: string) =>
+      text
+        .split(/[。！？!?；;]/)
+        .map((s) => s.trim())
+        .find((s) => s.includes(term)) ?? text.slice(0, 60);
+
+    const typeOf = (term: string): "概念" | "方法" | "组件" | "指标" | "工具" => {
+      if (["BM25", "向量数据库", "Embedding", "交叉编码器"].includes(term)) return "组件";
+      if (["Rerank", "重排", "精排", "混合检索", "检索", "召回"].includes(term)) return "方法";
+      if (["召回率", "准确率", "延迟"].includes(term)) return "指标";
+      return "概念";
+    };
+
     for (const term of Object.keys(TERMS)) {
-      if (text.includes(term) && !seen.has(term)) {
-        entities.push({ name: term, hint: TERMS[term].relate });
+      if (text.includes(term) && !seen.has(term.toLowerCase())) {
+        entities.push({
+          name: term,
+          type: typeOf(term),
+          definition: `${term}：${TERMS[term].relate}`,
+          aliases: [],
+          evidence: sentenceFor(term),
+          confidence: 0.72,
+        });
         found.push(term);
       }
     }
     if (entities.length === 0) {
       const m = text.match(/[A-Za-z][A-Za-z0-9+.-]{2,20}|[\u4e00-\u9fa5]{2,6}/g) ?? [];
       for (const token of m) {
-        if (token.length < 2 || seen.has(token)) continue;
+        if (token.length < 2 || seen.has(token.toLowerCase())) continue;
         if (["这个", "那个", "然后", "就是", "可以", "我们", "一下", "之后"].includes(token))
           continue;
-        entities.push({ name: token });
+        entities.push({
+          name: token,
+          type: "概念",
+          definition: token,
+          evidence: sentenceFor(token),
+          confidence: 0.62,
+        });
         found.push(token);
         if (entities.length >= 2) break;
       }
     }
-    if (found.length) {
-      // 新节点先只有一条"探索来源"的正式关系；建议线只给已有节点之间
-      relations.push({ type: "source", label: "本轮探索来源", target: found[0] });
-    }
-    if (found.length && existing.length) {
-      const others = existing.filter((x) => x !== focus.name);
-      const other = others[Math.floor(Math.random() * others.length)];
-      if (other) {
+
+    // 每个新节点都有一条探索来源；有关联提示时给低置信度 formal/suggest
+    for (const name of found) {
+      relations.push({
+        type: "source",
+        source: focus.name,
+        target: name,
+        label: "本轮探索来源",
+        evidence: sentenceFor(name),
+        confidence: 0.9,
+      });
+      const hint = TERMS[name];
+      if (hint) {
         relations.push({
-          type: "suggest",
-          label: `「${found[0]}」可能关联？`,
-          target: other,
+          type: hint.kind === "suggest" ? "suggest" : "formal",
+          predicate: "related",
+          source: focus.name,
+          target: name,
+          label: `${focus.name} → ${hint.relate}`,
+          evidence: sentenceFor(name),
+          confidence: hint.kind === "suggest" ? 0.55 : 0.78,
         });
       }
     }
     if (text.includes("?") || text.includes("？")) {
       relations.push({
         type: "direction",
-        label: "",
+        source: focus.name,
         target: focus.name,
+        label: "",
         question: text.split(/[?？]/)[0].slice(-24) + "？",
+        confidence: 0.8,
       });
     }
     return { entities, relations };

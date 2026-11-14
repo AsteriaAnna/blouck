@@ -309,3 +309,27 @@ frontier = 隐藏=false
 4. 非 frontier 方向只放 MD？
 5. 领域副本按"用户+领域"计 10 题/天？
 6. 离线 mock 也要实现同一套规则（用于 eval）？
+
+
+---
+
+## 12. 实施进度（2026-11-14）
+
+已实现：
+
+- 节点 v2：`type/definition/aliases/source_span_id/frontier`；
+- 关系 v2：`source/target/predicate/evidence/confidence/origin/claim_status/revision`；
+- 抽取：证据必须是原文子串、名称名词性校验、类型白名单、confidence 阈值、别名去重、每个新节点强制来源边；
+- 方向：独立 `directions` 表；只给 frontier 节点物化方向线（每节点最多 2 条）；非 frontier 在节点 MD 展示；
+- 副本：流程唯一序校验、领域共同依据校验、位置留白、状态 `detected/playable/cleared`、领域每日 10 道混合题；
+- 3D：相机自适应框住节点+副本。
+
+评测（`pnpm eval`）：实体 P/R = 100%/70%，关系 P/R = 31.5%/46.0%（v2 前为 100%/60% 与 4.3%/6.0%）。
+
+待办：
+
+- gold 增加 `predicate/mapType/evidence` 标注，评谓词准确率与证据覆盖率；
+- LLM 流程/领域候选接入；
+- 手动连线 UI/API 与接受建议后的关系命名；
+- `stale` 自动失效、`version/fingerprint` 变更策略；
+- 方向问题质量校验（当前新节点方向仍是模板）。

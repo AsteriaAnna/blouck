@@ -1,11 +1,35 @@
 /** 服务端 Provider 抽象：DeepSeek（语言）与豆包（流式 ASR）的预留位 */
 
-export type ExtractEntity = { name: string; hint?: string };
+export type NodeType = "概念" | "方法" | "组件" | "指标" | "工具";
+export type RelationPredicate =
+  | "kindOf"
+  | "partOf"
+  | "prerequisite"
+  | "contrast"
+  | "alternative"
+  | "related";
+
+export type ExtractEntity = {
+  name: string;
+  hint?: string;
+  type?: NodeType;
+  definition?: string;
+  aliases?: string[];
+  evidence?: string;
+  confidence?: number;
+};
+
 export type ExtractRelation = {
   type: "source" | "formal" | "suggest" | "direction";
+  /** 知识语义谓词（关系 v2）；source/direction 可空 */
+  predicate?: RelationPredicate;
   label: string;
+  /** 关系起点（概念名）；缺省为焦点 */
+  source?: string;
   target: string;
   question?: string;
+  evidence?: string;
+  confidence?: number;
 };
 
 export type ExtractResult = {

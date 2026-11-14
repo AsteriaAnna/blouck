@@ -313,24 +313,27 @@ detected（出现，锁定） → playable（相关节点 ≥2 个当前 tier≥
 
 ---
 
-## 10. 本轮实现进度（2026-11-14）
+## 10. 实现进度（2026-11-14 更新）
 
 已实现：
 
-1. **校验器** `server/src/dungeons.ts`：
+1. **关系/节点 v2**：节点带 `type/definition/aliases/source_span_id`；关系带 `predicate/evidence/confidence/origin/claim_status/revision`；每个新节点强制探索来源边（孤岛禁令）。
+2. **校验器** `server/src/dungeons.ts`：
    - `validateFlowCandidate`：3–6 步、每步存在且未隐藏、相邻过程证据、唯一线性顺序（枚举线性扩展）、无环、confidence；
    - `validateDomainCandidate`：4–8 成员、共同上位/共同邻居/共同来源、命名合法、重叠度、confidence；
-   - `detectFlowCandidates`：从带过程词的 formal 边发现候选（关系 v2 后替换为 LLM 候选）；
-   - `detectDomainCandidates`：从 `kindOf/归类/属于` 边发现领域簇（成员 → 上位）。
-2. **接入副本生成**：`detectBuildingsV2` 改为"候选 + 校验"，未通过不生成（精确率优先）。
-3. **位置规则**：`ensureBuildingPositions` 按"相关节点质心 + 留白"摆放（见第 5 节）。
-4. **测试入口**：`POST /api/dev/dungeon-fixture`，构造流程链 + 领域簇，验证生成与位置。
-5. **评测**：`pnpm eval:dungeons`，15 个用例（8 流程 + 7 领域，含负例），当前 `TP=2 FP=0 FN=0 TN=13`，Precision=1.00、Recall=1.00（小样本，需扩样）。
+   - `detectFlowCandidates`：带过程词的 formal 边发现候选（后续替换为 LLM 候选）；
+   - `detectDomainCandidates`：`kindOf/归类/属于` 边发现领域簇（成员 → 上位）。
+3. **接入副本生成**：`detectBuildingsV2` 改为"候选 + 校验"，未通过不生成（精确率优先）。
+4. **副本站位**：`ensureBuildingPositions` 按"相关节点质心 + 留白"摆放（第 5 节）。
+5. **状态机**：`detected`（出现，锁定）→ `playable`（可挑战）→ `cleared`；`version/basis/fingerprint` 已落库；`stale` 字段保留（自动失效待接）。
+6. **领域每日题组**：按用户+世界+领域+Asia/Shanghai 日期生成 10 道混合题（填空/判断/解答）；填空/判断本地判定（含别名），解答走 LLM；逐题计分，≥60% 通关；不计节点三档。
+7. **测试入口**：`POST /api/dev/dungeon-fixture`；评测 `pnpm eval:dungeons`（15 例，`TP=2 FP=0 FN=0 TN=13`）。
+8. **相机自适应**：进入世界自动框住全部节点 + 副本（`CameraFit`）。
 
 待办：
 
-- LLM 候选接入（流程候选、领域候选、领域命名）；
-- 状态机 `detected/playable/cleared/stale` 与 `version/basis/fingerprint` 落库；
-- 领域每日题组与混合题型；
-- 副本检测扩展到全图（当前只在新增节点邻域触发）；
-- 副本专项正例扩充与人工评审。
+- LLM 流程/领域候选接入（当前规则候选用 relation v2 的 predicate 与过程词发现）；
+- `stale` 自动检测（成员隐藏/争议/改名）；
+- 领域题组接入 LLM 生成（当前为确定性题面 + 定义答案）；
+- 副本检测全图扩展与正例扩充、人工评审；
+- 流程副本的"唯一序"前端提示（当前只判对错）。

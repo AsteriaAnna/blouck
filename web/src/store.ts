@@ -3,6 +3,7 @@ import {
   get,
   send,
   type BuildingRow,
+  type DirectionRow,
   type EdgeRow,
   type NodeRow,
   type Passed,
@@ -20,6 +21,7 @@ type State = {
   nodes: NodeRow[];
   edges: EdgeRow[];
   buildings: BuildingRow[];
+  directions: DirectionRow[];
   focusId: string | null;
   drawer: Drawer;
   quizzes: Quiz[];
@@ -59,6 +61,7 @@ export const useStore = create<State>((set, getState) => ({
   nodes: [],
   edges: [],
   buildings: [],
+  directions: [],
   focusId: null,
   drawer: null,
   quizzes: [],
@@ -94,6 +97,7 @@ export const useStore = create<State>((set, getState) => ({
       nodes: p.nodes,
       edges: p.edges,
       buildings: p.buildings,
+      directions: p.directions ?? [],
       focusId: p.world.root_node_id,
       drawer: null,
       challenge: null,
@@ -148,6 +152,7 @@ export const useStore = create<State>((set, getState) => ({
         nodes: p.nodes,
         edges: p.edges,
         buildings: p.buildings,
+        directions: p.directions ?? getState().directions,
         busy: false,
       });
       const n = p.createdNodes?.length ?? 0;
