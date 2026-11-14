@@ -608,7 +608,11 @@ export function refreshBuildingStatus(nodeId: string) {
     })();
     let ready = false;
     if (b.kind === "flow") {
-      ready = stepIds.length > 0 && stepIds.every((id) => (getNode(id)?.tier ?? 0) >= 1);
+      const asNodes = stepIds.map((x) => getNode(x)).filter(Boolean);
+      ready =
+        asNodes.length === stepIds.length
+          ? stepIds.length > 0 && asNodes.every((n) => (n?.tier ?? 0) >= 1)
+          : (getNode(b.anchor)?.tier ?? 0) >= 1;
     } else if (stepIds.length) {
       ready = stepIds.filter((id) => (getNode(id)?.tier ?? 0) >= 1).length >= 2;
     } else {

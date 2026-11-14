@@ -151,16 +151,9 @@ app.get("/api/worlds/:id", (req, res) => {
   res.json({ world, nodes, edges: graph.edges, buildings, directions: listDirections(world.id) });
 });
 
-/** 名词化：动作短语补“环节”，避免把“审核发布”直接当概念节点 */
-const ACTION_PREFIX =
-  /^(输入|输出|检索|生成|审核|发布|解析|处理|清洗|召回|排序|评估|评测|训练|部署|监控|编排|构建|拆分|合并|抽取|切分)/;
-const NOUN_SUFFIX = /(环节|阶段|方法|工具|组件|系统|指标|模型|技术|流程|策略|框架|步骤)$/;
+/** 节点名只去掉首尾空白；“是不是一个概念”由抽取阶段的过程/步骤区分决定，不再做字符串补后缀 */
 function normalizeConceptName(raw: string): { name: string; aliases: string[] } {
-  const name = raw.trim();
-  if (!/^[\u4e00-\u9fa5]{4,8}$/.test(name)) return { name, aliases: [] };
-  if (NOUN_SUFFIX.test(name)) return { name, aliases: [] };
-  if (ACTION_PREFIX.test(name)) return { name: `${name}环节`, aliases: [name] };
-  return { name, aliases: [] };
+  return { name: raw.trim(), aliases: [] };
 }
 
 /** 语音/文字 → 概念/关系/方向 → 落图（关系与节点 v2） */
@@ -211,12 +204,18 @@ app.post("/api/worlds/:id/extract", async (req, res) => {
   const sourceSpanId = span.id;
   const placed = graph.nodes.map((n) => ({ id: n.id, x: n.x, y: n.y }));
 
+  // 过程步骤只属于流程副本，不建节点
+  const processStepNames = new Set(
+    (result.processes ?? []).flatMap((p) => p.steps.map((x) => norm(x))),
+  );
+
   for (const ent of result.entities) {
     const rawName = ent.name?.trim() ?? "";
     if (!rawName || rawName.length < 2 || rawName.length > 20) continue;
     if (BAD_NAME.test(rawName)) continue;
     const normalized = normalizeConceptName(rawName);
     const name = normalized.name;
+    if (processStepNames.has(norm(rawName)) && !findExisting(rawName)) continue;
     let evidence = ent.evidence?.trim() ?? "";
     if (evidence && !text.includes(evidence)) evidence = "";
     if (!evidence) evidence = sentenceFor(name);
@@ -339,6 +338,64 @@ app.post("/api/worlds/:id/extract", async (req, res) => {
     graph.edges.push(e);
   }
 
+  // 过程/工作流：只抽“过程本身”作为节点；步骤进入流程副本，不建节点
+  const createdProcesses: { name: string; steps: string[]; buildingId?: string }[] = [];
+  for (const proc of result.processes ?? []) {
+    const steps = [...new Set(proc.steps.map((x) => x.trim()).filter(Boolean))];
+    if (steps.length < 3 || steps.length > 6) continue;
+    let procName = proc.name.trim();
+    if (!procName || procName === focus.name || /^(工作流|流程|系统|体系)$/.test(procName)) {
+      procName = `${focus.name}工作流`;
+    }
+    if (procName.length > 20) procName = procName.slice(0, 20);
+    const stepNames = steps.map((x) => norm(x));
+    let procNode = findExisting(procName);
+    if (!procNode) {
+      const pos = placeAround(
+        placed,
+        { id: focus.id, x: focus.x, y: focus.y },
+        { preferAngle: (placed.length * 1.7) % (Math.PI * 2) },
+      );
+      procNode = addNode(world.id, procName, pos.x, pos.y, "", {
+        type: "概念",
+        definition: `过程：${steps.join(" → ")}`,
+        sourceSpanId,
+      });
+      createdNodes.push(procNode);
+      graph.nodes.push(procNode);
+      placed.push({ id: procNode.id, x: pos.x, y: pos.y });
+    }
+    const fingerprint = steps.slice().sort().join("|");
+    const exists = listBuildings(world.id).some(
+      (b) => b.kind === "flow" && b.fingerprint === fingerprint,
+    );
+    if (exists) continue;
+    const building = createBuilding(
+      world.id,
+      "flow",
+      procNode.id,
+      procName,
+      `流程排序 · ${steps.length} 步`,
+      `## 流程副本\n\n过程：**${procName}**\n\n步骤：${steps
+        .map((x, i) => `${i + 1}. ${x}`)
+        .join("\n")}\n\n依据：${(proc.evidence ?? []).join("；") || "来源片段"}`,
+      steps,
+    );
+    createdProcesses.push({ name: procName, steps, buildingId: building.id });
+    ensureBuildingPositions(world.id);
+    refreshAllBuildingStatus(world.id);
+    // 过程节点至少有一条来源边
+    if (!edgeExists(focus.id, procNode.id, "source", null) && procNode.id !== focus.id) {
+      const e = addEdge(world.id, focus.id, procNode.id, "source", "本轮探索来源", null, "", {
+        evidence: proc.evidence?.[0] ?? sentenceFor(procName),
+        confidence: 0.9,
+        origin: "auto",
+      });
+      createdEdges.push(e);
+      graph.edges.push(e);
+    }
+  }
+
   // 每个新节点都必须有探索来路（孤岛禁令）
   for (const n of createdNodes) {
     if (!edgeExists(focus.id, n.id, "source", null) && n.id !== focus.id) {
@@ -416,6 +473,7 @@ app.post("/api/worlds/:id/extract", async (req, res) => {
     edges: fresh.edges,
     buildings,
     directions: listDirections(world.id),
+    processes: createdProcesses,
     provider: llm.name,
   });
 });
@@ -724,7 +782,11 @@ function refreshAllBuildingStatus(worldId: string) {
     })();
     let ready = false;
     if (b.kind === "flow") {
-      ready = steps.length >= 3 && steps.every((id) => (getNode(id)?.tier ?? 0) >= 1);
+      const asNodes = steps.map((x) => getNode(x)).filter(Boolean);
+      ready =
+        asNodes.length === steps.length
+          ? steps.length >= 3 && asNodes.every((n) => (n?.tier ?? 0) >= 1)
+          : (getNode(b.anchor)?.tier ?? 0) >= 1;
     } else if (steps.length) {
       ready = steps.filter((id) => (getNode(id)?.tier ?? 0) >= 1).length >= 2;
     } else {
@@ -1155,8 +1217,9 @@ app.post("/api/buildings/:id/challenge", async (req, res) => {
     return;
   }
   if (b.kind === "flow") {
-    const steps: string[] = JSON.parse(b.steps || "[]");
-    const shuffled = [...steps].sort(() => Math.random() - 0.5);
+    const rawSteps: string[] = JSON.parse(b.steps || "[]");
+    const names = rawSteps.map((x) => getNode(x)?.name ?? x);
+    const shuffled = [...names].sort(() => Math.random() - 0.5);
     return res.json({
       kind: "flow",
       title: b.title,
@@ -1222,8 +1285,12 @@ app.post("/api/buildings/:id/submit", async (req, res) => {
     return res.status(409).json({ error: "副本尚未解锁，不能提交" });
   }
   if (b.kind === "flow") {
-    const expected: string[] = JSON.parse(b.steps || "[]");
-    const order: string[] = Array.isArray(req.body?.order) ? req.body.order : [];
+    const expected: string[] = (JSON.parse(b.steps || "[]") as string[]).map(
+      (x) => getNode(x)?.name ?? x,
+    );
+    const order: string[] = (Array.isArray(req.body?.order) ? req.body.order : []).map(
+      (x: string) => getNode(x)?.name ?? x,
+    );
     const correct =
       order.length === expected.length && order.every((x, i) => x === expected[i]);
     if (correct) setBuildingStatus(b.id, "cleared");

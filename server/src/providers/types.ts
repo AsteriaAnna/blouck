@@ -32,9 +32,19 @@ export type ExtractRelation = {
   confidence?: number;
 };
 
+export type ExtractProcess = {
+  /** 过程/工作流本身的名称，例如“内容生产工作流” */
+  name: string;
+  /** 有序步骤名（不是节点，只属于流程副本） */
+  steps: string[];
+  evidence?: string[];
+  confidence?: number;
+};
+
 export type ExtractResult = {
   entities: ExtractEntity[];
   relations: ExtractRelation[];
+  processes?: ExtractProcess[];
 };
 
 export type RelationSuggestion = {

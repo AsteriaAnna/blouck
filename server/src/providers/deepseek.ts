@@ -38,14 +38,16 @@ export const deepseekLLM: LLMProvider = {
     const system = `你是知识世界的概念/关系抽取器。只输出 JSON，不要解释。
 格式：
 {"entities":[{"name":"名词概念","type":"概念|方法|组件|指标|工具","definition":"一句定义","aliases":["别名"],"evidence":"原文证据句","confidence":0.0}],
- "relations":[{"source":"起点概念名（缺省为当前节点）","target":"目标概念名","type":"formal|suggest|source|direction","predicate":"kindOf|partOf|prerequisite|contrast|alternative|related","label":"关系名称","evidence":"同时包含两端概念的原文证据句","confidence":0.0,"question":"direction 时的问题"}]}
+ "relations":[{"source":"起点概念名（缺省为当前节点）","target":"目标概念名","type":"formal|suggest|source|direction","predicate":"kindOf|partOf|prerequisite|contrast|alternative|related","label":"关系名称","evidence":"同时包含两端概念的原文证据句","confidence":0.0,"question":"direction 时的问题"}],
+ "processes":[{"name":"过程/工作流的名称（从上下文命名，如“内容生产工作流”，不要只叫“工作流”）","steps":["有序步骤名"],"evidence":["每步的来源句"],"confidence":0.0}]}
 
 规则：
 1. 节点只能是名词概念，不是问句/动词/代词；问题不要当节点。
-2. 关系必须有证据句，evidence 必须是原文子串，且同时出现 source 与 target（或明确指代）。
-3. predicate 方向固定：kindOf 具体→上位；partOf 部分→整体；prerequisite 前置→后续；contrast/related 无方向；alternative 旧→新。
-4. 证据充分且 confidence>=0.75 用 formal；不充分 0.5-0.75 用 suggest；新节点的探索来路用 source；下一步问题用 direction。
-5. 不要编造原文没有的概念。`;
+2. **如果一句话在描述一个过程、工作流、体系：只把“过程本身”作为一个概念节点；步骤放进 processes.steps，不要给每个步骤单独建节点**。过程名要从上下文命名（例如“RAG 检索流程”“内容生产工作流”）。
+3. 关系必须有证据句，evidence 必须是原文子串，且同时出现 source 与 target（或明确指代）。
+4. predicate 方向固定：kindOf 具体→上位；partOf 部分→整体；prerequisite 前置→后续；contrast/related 无方向；alternative 旧→新。
+5. 证据充分且 confidence>=0.75 用 formal；不充分 0.5-0.75 用 suggest；新节点的探索来路用 source；下一步问题用 direction。
+6. 不要编造原文没有的概念；不要为“输入解析/检索资料/生成草稿/审核发布”这类步骤建节点。`;
     const user = `当前节点：${focus.name}\n已有概念：${existing.join("、")}\n文本：${text}`;
     try {
       const raw = await chat(system, user);
@@ -59,7 +61,15 @@ export const deepseekLLM: LLMProvider = {
         ...r,
         confidence: typeof r.confidence === "number" ? r.confidence : 0.7,
       }));
-      return { entities, relations };
+      const processes = (Array.isArray(parsed.processes) ? parsed.processes : [])
+        .filter((p) => p?.name && Array.isArray(p.steps) && p.steps.length >= 3)
+        .map((p) => ({
+          name: String(p.name),
+          steps: p.steps.map((x: unknown) => String(x)),
+          evidence: Array.isArray(p.evidence) ? p.evidence.map((x: unknown) => String(x)) : [],
+          confidence: typeof p.confidence === "number" ? p.confidence : 0.75,
+        }));
+      return { entities, relations, processes };
     } catch (err) {
       console.warn("[llm] deepseek extract 失败，降级 mock：", err);
       return mockLLM.extract({ text, focus, existing });

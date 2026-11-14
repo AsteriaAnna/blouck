@@ -111,7 +111,20 @@ export const mockLLM: LLMProvider = {
         confidence: 0.8,
       });
     }
-    return { entities, relations };
+    const processes: ExtractResult["processes"] = [];
+    const seq = text.match(/依次做?([^。；;]+)/);
+    if (seq) {
+      const steps = seq[1].split(/[、,，]/).map((x) => x.trim()).filter(Boolean);
+      if (steps.length >= 3) {
+        processes.push({
+          name: `${focus.name}工作流`,
+          steps,
+          evidence: [seq[0]],
+          confidence: 0.7,
+        });
+      }
+    }
+    return { entities, relations, processes };
   },
 
   async generateQuiz({ name, md }) {
