@@ -151,28 +151,20 @@ export function validateDomainCandidate(
   if (candidate.members.some((m) => m.name === name)) errors.push("领域名不能是成员名");
   if (name.endsWith("领域") && name.length <= 4) errors.push("领域名过于泛化");
 
-  // 共同依据：kindOf 同父 / 共同正式邻居 / 共享来源片段
+  // 共同依据：kindOf 同父（成员→上位）或共享来源片段；不能只是“连在同一个节点上”
   let basis = false;
   if (candidate.commonParent) {
     const kindOf = edges.filter(
       (e) =>
-        (e.predicate === "kindOf" || /kindof|归类|属于/i.test(e.label ?? "")) &&
+        (e.predicate === "kindOf" ||
+          (e.predicate == null && /kindof|归类/i.test(e.label ?? ""))) &&
         memberSet.has(e.src) &&
         e.dst === candidate.commonParent,
     );
     if (kindOf.length >= Math.ceil(memberIds.length * 0.75)) basis = true;
   }
-  if (!basis) {
-    const counts = new Map<string, number>();
-    for (const e of edges) {
-      if (e.kind !== "formal") continue;
-      const outside = memberSet.has(e.src) ? e.dst : memberSet.has(e.dst) ? e.src : null;
-      if (outside && !memberSet.has(outside)) counts.set(outside, (counts.get(outside) ?? 0) + 1);
-    }
-    if ([...counts.values()].some((c) => c >= Math.min(3, memberIds.length))) basis = true;
-  }
   if (!basis && candidate.sharedSpanIds && candidate.sharedSpanIds.length > 0) basis = true;
-  if (!basis) errors.push("缺少共同上位概念或共同来源");
+  if (!basis) errors.push("缺少共同上位概念（kindOf）或共同来源；仅仅是共同邻居不算领域");
 
   for (const existing of existingMembers) {
     const other = new Set(existing);
@@ -250,7 +242,8 @@ export function detectDomainCandidates(
   const groups = new Map<string, Set<string>>();
   for (const e of edges) {
     if (e.kind !== "formal") continue;
-    const isKindOf = e.predicate === "kindOf" || /kindof|归类|属于/i.test(e.label ?? "");
+    const isKindOf =
+      e.predicate === "kindOf" || (e.predicate == null && /kindof|归类/i.test(e.label ?? ""));
     if (!isKindOf) continue;
     const parent = e.dst;
     const member = e.src;
@@ -282,7 +275,13 @@ export function detectDomainCandidates(
 
 /** 从 EdgeRow[] 适配 */
 export function toDungeonEdges(edges: EdgeRow[]): DungeonEdge[] {
-  return edges.map((e) => ({ src: e.src, dst: e.dst, kind: e.kind, label: e.label }));
+  return edges.map((e) => ({
+    src: e.src,
+    dst: e.dst,
+    kind: e.kind,
+    label: e.label,
+    predicate: e.predicate ?? undefined,
+  }));
 }
 
 export function toDungeonNodes(nodes: NodeRow[]): DungeonNode[] {

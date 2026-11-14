@@ -71,6 +71,10 @@ seedDemoIfEmpty();
 
 /** 把 frontier 节点的方向数据物化成可点击的方向线（每节点最多 2 条） */
 function materializeDirectionEdges(worldId: string) {
+  // 非边缘节点的方向线不再保留（方向数据仍在 directions 表，节点 MD 可看）
+  db.prepare(
+    "DELETE FROM edges WHERE world_id=? AND kind='direction' AND src IN (SELECT id FROM nodes WHERE world_id=? AND frontier=0)",
+  ).run(worldId, worldId);
   const graph = getGraph(worldId);
   const byId = new Map(graph.nodes.map((n) => [n.id, n]));
   const existing = new Set(
@@ -289,9 +293,27 @@ app.post("/api/worlds/:id/extract", async (req, res) => {
     const predicate = PREDICATES.has(rel.predicate ?? "") ? rel.predicate! : "related";
     let kind: "formal" | "suggest" = rel.type === "suggest" ? "suggest" : "formal";
     if (kind === "formal" && (!evidence || confidence < 0.75)) kind = "suggest";
+    // 证据充分时，模型标成 suggest 也升级为正式（由证据+置信度决定线型）
+    if (kind === "suggest" && evidence && confidence >= 0.75 && predicate !== "related") {
+      kind = "formal";
+    }
     if (kind === "suggest" && confidence < 0.5) continue;
-    if (edgeExists(source.id, target.id, kind, predicate)) continue;
-    const e = addEdge(world.id, source.id, target.id, kind, rel.label || predicate, null, "", {
+
+    // 谓词方向归一：前置按证据中出现的先后；组成把“整体→部分”换成“部分→整体”
+    let srcId = source.id;
+    let dstId = target.id;
+    const si = evidence ? evidence.indexOf(source.name) : -1;
+    const ti = evidence ? evidence.indexOf(target.name) : -1;
+    if (predicate === "prerequisite" && si >= 0 && ti >= 0 && si > ti) {
+      [srcId, dstId] = [dstId, srcId];
+    }
+    const partLabel = rel.label ?? "";
+    if (predicate === "partOf" && /组成|包含|由/.test(partLabel) && !/属于/.test(partLabel)) {
+      [srcId, dstId] = [dstId, srcId];
+    }
+    if (srcId === dstId) continue;
+    if (edgeExists(srcId, dstId, kind, predicate)) continue;
+    const e = addEdge(world.id, srcId, dstId, kind, rel.label || predicate, null, "", {
       predicate,
       evidence,
       confidence,
@@ -436,7 +458,8 @@ function detectBuildingsV2(worldId: string, _focus: NodeRow, _all: NodeRow[]) {
   const dNodes = toDungeonNodes(nodes);
   const dEdges = toDungeonEdges(edges);
 
-  if (!bs.some((b) => b.kind === "domain")) {
+  {
+    const domainList = () => listBuildings(worldId).filter((b) => b.kind === "domain");
     const existing = bs
       .filter((b) => b.kind === "domain")
       .map((b) => {
@@ -447,6 +470,9 @@ function detectBuildingsV2(worldId: string, _focus: NodeRow, _all: NodeRow[]) {
         }
       });
     for (const candidate of detectDomainCandidates(dNodes, dEdges, existing)) {
+      if (domainList().length >= 3) break;
+      const fp = candidate.members.map((m) => m.id).sort().join("|");
+      if (domainList().some((b) => b.fingerprint === fp)) continue;
       const check = validateDomainCandidate(dNodes, dEdges, candidate, existing);
       if (!check.ok) continue;
       const degree = (id: string) =>
@@ -478,10 +504,14 @@ function detectBuildingsV2(worldId: string, _focus: NodeRow, _all: NodeRow[]) {
     }
   }
 
-  if (!bs.some((b) => b.kind === "flow")) {
+  {
+    const flowList = () => listBuildings(worldId).filter((b) => b.kind === "flow");
     for (const candidate of detectFlowCandidates(dNodes, dEdges)) {
+      if (flowList().length >= 3) break;
       const check = validateFlowCandidate(dNodes, candidate);
       if (!check.ok || !check.order) continue;
+      const fingerprint = [...check.order].sort().join("|");
+      if (flowList().some((b) => b.fingerprint === fingerprint)) continue;
       const head = nodes.find((n) => n.id === check.order![0]);
       if (!head) continue;
       createBuilding(
@@ -527,8 +557,10 @@ async function detectBuildingsLLM(worldId: string, focus: NodeRow) {
       .map((e) => ({ src: e.src, dst: e.dst, predicate: e.predicate, label: e.label, evidence: e.evidence })),
   });
 
-  if (!bs.some((b) => b.kind === "flow")) {
+  {
+    const flowList = () => listBuildings(worldId).filter((b) => b.kind === "flow");
     for (const f of suggestions.flows ?? []) {
+      if (flowList().length >= 3) break;
       const steps = (f.steps ?? [])
         .map((name) => byName.get(name))
         .filter(Boolean) as NodeRow[];
@@ -540,8 +572,15 @@ async function detectBuildingsLLM(worldId: string, focus: NodeRow) {
         })
         .filter(Boolean) as { before: string; after: string; evidence: string }[];
       if (steps.length < 3) continue;
+      const fingerprint = steps.map((n) => n.id).sort().join("|");
+      if (flowList().some((b) => b.fingerprint === fingerprint)) continue;
+      const rawName = (f.processName ?? "").trim();
+      const processName =
+        !rawName || rawName.length < 3 || rawName === focus.name
+          ? `${steps[0].name}流程`
+          : rawName;
       const candidate = {
-        processName: f.processName || `${steps[0].name}流程`,
+        processName,
         steps: steps.map((n) => ({ id: n.id, name: n.name })),
         precedence,
         confidence: typeof f.confidence === "number" ? f.confidence : 0.8,
@@ -567,12 +606,16 @@ async function detectBuildingsLLM(worldId: string, focus: NodeRow) {
     }
   }
 
-  if (!bs.some((b) => b.kind === "domain")) {
+  {
+    const domainList = () => listBuildings(worldId).filter((b) => b.kind === "domain");
     for (const d of suggestions.domains ?? []) {
+      if (domainList().length >= 3) break;
       const members = (d.members ?? [])
         .map((name) => byName.get(name))
         .filter(Boolean) as NodeRow[];
       if (members.length < 4) continue;
+      const fingerprint = members.map((n) => n.id).sort().join("|");
+      if (domainList().some((b) => b.fingerprint === fingerprint)) continue;
       const parent = d.commonParent ? byName.get(d.commonParent) : undefined;
       const candidate = {
         domainName: d.domainName || `${members[0].name}领域`,
