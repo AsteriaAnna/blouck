@@ -45,6 +45,7 @@ type State = {
   streamText: string;
   mentions: string[];
   ghosts: Ghost[];
+  spawnGhosts: Ghost[];
   stage: StreamStage;
   newNodeIds: string[];
   toast: string;
@@ -95,6 +96,7 @@ export const useStore = create<State>((set, getState) => ({
   streamText: "",
   mentions: [],
   ghosts: [],
+  spawnGhosts: [],
   stage: "idle",
   newNodeIds: [],
   toast: "",
@@ -132,6 +134,7 @@ export const useStore = create<State>((set, getState) => ({
       streamText: "",
       mentions: [],
       ghosts: [],
+      spawnGhosts: [],
       stage: "idle",
       newNodeIds: [],
     });
@@ -176,7 +179,8 @@ export const useStore = create<State>((set, getState) => ({
   async extract(text) {
     if (!getState().world) return;
     const before = new Set(getState().nodes.map((n) => n.id));
-    set({ busy: true, stage: "generating", newNodeIds: [] });
+    const ghostsBefore = getState().ghosts;
+    set({ busy: true, stage: "generating", newNodeIds: [], spawnGhosts: ghostsBefore });
     try {
       const p = await send<any>(`/api/worlds/${getState().world!.id}/extract`, "POST", {
         text,
@@ -190,6 +194,7 @@ export const useStore = create<State>((set, getState) => ({
         directions: p.directions ?? getState().directions,
         newNodeIds: newIds,
         ghosts: [],
+        spawnGhosts: ghostsBefore,
         stage: "done",
         busy: false,
       });
@@ -197,6 +202,7 @@ export const useStore = create<State>((set, getState) => ({
         if (getState().stage === "done") set({ stage: "idle" });
       }, 2400);
       window.setTimeout(() => set({ newNodeIds: [] }), 3800);
+      window.setTimeout(() => set({ spawnGhosts: [] }), 3400);
       const n = p.createdNodes?.length ?? newIds.length;
       getState().showToast(
         n ? `已落图 ${n} 个新节点 · ${p.provider === "mock" ? "mock 抽取" : "DeepSeek 抽取"}` : "已记录，没有新实体",
@@ -300,5 +306,5 @@ export const useStore = create<State>((set, getState) => ({
   setMentions: (ids) => set({ mentions: ids }),
   setGhosts: (ghosts) => set({ ghosts }),
   setStage: (stage) => set({ stage }),
-  clearStream: () => set({ partial: "", streamText: "", mentions: [], ghosts: [], newNodeIds: [], stage: "idle" }),
+  clearStream: () => set({ partial: "", streamText: "", mentions: [], ghosts: [], spawnGhosts: [], newNodeIds: [], stage: "idle" }),
 }));

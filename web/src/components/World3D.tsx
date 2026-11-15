@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+﻿import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Html, Line, OrbitControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
@@ -51,34 +51,47 @@ function Island({
   onOpen,
   appearing,
   mentioned,
+  spawnFrom,
 }: {
   position: [number, number, number];
   node: any;
   onOpen: () => void;
   appearing?: boolean;
   mentioned?: boolean;
+  spawnFrom?: [number, number, number];
 }) {
   const [hover, setHover] = useState(false);
   const ref = useRef<THREE.Group>(null);
+  const motionRef = useRef<THREE.Group>(null);
   const ringRef = useRef<THREE.Mesh>(null);
   const born = useRef<number | null>(null);
   const seed = hash(node.id);
   const accent = ACCENTS[seed % ACCENTS.length];
   const tier = node.tier ?? 0;
   const pulse = Boolean(appearing || mentioned);
+  const deltaX = spawnFrom ? spawnFrom[0] - position[0] : 0;
+  const deltaZ = spawnFrom ? spawnFrom[2] - position[2] : 0;
 
   useFrame((state, dt) => {
     if (!ref.current) return;
     if (appearing) {
       if (born.current === null) born.current = state.clock.elapsedTime;
       const age = state.clock.elapsedTime - born.current;
-      const t = Math.min(1, age / 0.9);
+      const t = Math.min(1, age / 1.2);
       const ease = 1 - Math.pow(1 - t, 3);
       const s = 0.02 + ease * 1.0;
       ref.current.scale.setScalar(s * (hover ? 1.08 : 1));
       ref.current.position.y = -90 * (1 - ease);
+      if (motionRef.current) {
+        motionRef.current.position.x = deltaX * (1 - ease);
+        motionRef.current.position.z = deltaZ * (1 - ease);
+      }
     } else {
       ref.current.position.y = THREE.MathUtils.lerp(ref.current.position.y, 0, Math.min(1, dt * 6));
+      if (motionRef.current) {
+        motionRef.current.position.x = THREE.MathUtils.lerp(motionRef.current.position.x, 0, Math.min(1, dt * 5));
+        motionRef.current.position.z = THREE.MathUtils.lerp(motionRef.current.position.z, 0, Math.min(1, dt * 5));
+      }
       const target = hover ? 1.1 : 1;
       ref.current.scale.lerp(new THREE.Vector3(target, target, target), Math.min(1, dt * 8));
     }
@@ -107,30 +120,32 @@ function Island({
         onOpen();
       }}
     >
-      <group ref={ref}>
-        <Suspense fallback={null}>
-          <Model url={islandModelUrl(node.name ?? "", node.id)} target={120} tint={accent} />
-        </Suspense>
-        {tier >= 1 && (
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 3, 0]}>
-            <torusGeometry args={[tier >= 3 ? 70 : 60, 1.3, 8, 48]} />
-            <meshStandardMaterial color={accent} transparent opacity={0.85} />
-          </mesh>
-        )}
-        {pulse && (
-          <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 4, 0]}>
-            <torusGeometry args={[68, 2.4, 8, 48]} />
-            <meshBasicMaterial color={appearing ? "#e0a458" : "#d8b46a"} transparent opacity={0.55} depthWrite={false} />
-          </mesh>
-        )}
+      <group ref={motionRef}>
+        <group ref={ref}>
+          <Suspense fallback={null}>
+            <Model url={islandModelUrl(node.name ?? "", node.id)} target={120} tint={accent} />
+          </Suspense>
+          {tier >= 1 && (
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 3, 0]}>
+              <torusGeometry args={[tier >= 3 ? 70 : 60, 1.3, 8, 48]} />
+              <meshStandardMaterial color={accent} transparent opacity={0.85} />
+            </mesh>
+          )}
+          {pulse && (
+            <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 4, 0]}>
+              <torusGeometry args={[68, 2.4, 8, 48]} />
+              <meshBasicMaterial color={appearing ? "#e0a458" : "#d8b46a"} transparent opacity={0.55} depthWrite={false} />
+            </mesh>
+          )}
+        </group>
+        <Html center position={[0, 92, 0]} zIndexRange={[30, 0]} style={{ pointerEvents: "none" }}>
+          <div className={"n3d-label" + (appearing ? " new" : "") + (mentioned ? " mentioned" : "")}>
+            <span className="dot" style={{ background: accent }} />
+            {node.name}
+            {appearing ? <span className="spark">＋</span> : null}
+          </div>
+        </Html>
       </group>
-      <Html center position={[0, 92, 0]} zIndexRange={[30, 0]} style={{ pointerEvents: "none" }}>
-        <div className={"n3d-label" + (appearing ? " new" : "") + (mentioned ? " mentioned" : "")}>
-          <span className="dot" style={{ background: accent }} />
-          {node.name}
-          {appearing ? <span className="spark">＋</span> : null}
-        </div>
-      </Html>
     </group>
   );
 }
@@ -362,24 +377,27 @@ function CameraFit({ points }: { points: [number, number, number][] }) {
   const signature = points.length;
   useEffect(() => {
     if (!points.length) return;
-    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-    for (const [x, , z] of points) {
-      minX = Math.min(minX, x);
-      maxX = Math.max(maxX, x);
-      minZ = Math.min(minZ, z);
-      maxZ = Math.max(maxZ, z);
-    }
-    const cx = (minX + maxX) / 2;
-    const cz = (minZ + maxZ) / 2;
-    const size = Math.max(maxX - minX, maxZ - minZ, 600);
-    const dist = Math.max(1250, size * 1.55);
-    camera.position.set(cx, dist * 0.95, cz + dist * 0.95);
-    camera.lookAt(cx, 0, cz);
-    camera.updateProjectionMatrix();
-    if (controls?.target) {
-      controls.target.set(cx, 0, cz);
-      controls.update?.();
-    }
+    const timer = window.setTimeout(() => {
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      for (const [x, , z] of points) {
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minZ = Math.min(minZ, z);
+        maxZ = Math.max(maxZ, z);
+      }
+      const cx = (minX + maxX) / 2;
+      const cz = (minZ + maxZ) / 2;
+      const size = Math.max(maxX - minX, maxZ - minZ, 600);
+      const dist = Math.max(1250, size * 1.55);
+      camera.position.set(cx, dist * 0.95, cz + dist * 0.95);
+      camera.lookAt(cx, 0, cz);
+      camera.updateProjectionMatrix();
+      if (controls?.target) {
+        controls.target.set(cx, 0, cz);
+        controls.update?.();
+      }
+    }, 1000);
+    return () => window.clearTimeout(timer);
   }, [signature, camera, controls]);
   return null;
 }
@@ -394,6 +412,7 @@ export default function World3D() {
   const newNodeIds = useStore((s) => s.newNodeIds);
   const mentions = useStore((s) => s.mentions);
   const ghosts = useStore((s) => s.ghosts);
+  const spawnGhosts = useStore((s) => s.spawnGhosts);
   const focusId = useStore((s) => s.focusId);
 
   const { cx, cy, scale } = useMemo(() => {
@@ -412,6 +431,14 @@ export default function World3D() {
     0,
     (y - cy) * scale,
   ];
+
+  const anchorNode = nodes.find((n) => n.id === focusId) ?? nodes[0];
+  const ghostPos = (i: number): [number, number, number] | undefined => {
+    if (!anchorNode) return undefined;
+    const x = anchorNode.x + 190 + (i % 3) * 120;
+    const y = anchorNode.y + (i % 2 === 0 ? -110 : 120) + Math.floor(i / 3) * 130;
+    return posOf(x, y);
+  };
 
   const nodePos = useMemo(() => {
     const m = new Map<string, THREE.Vector3>();
@@ -449,22 +476,25 @@ export default function World3D() {
           shadow-mapSize-width={2048}
           shadow-mapSize-height={2048}
         />
-        {nodes.map((n) => (
-          <Island
-            key={n.id}
-            position={posOf(n.x, n.y)}
-            node={n}
-            onOpen={() => openNode(n.id)}
-            appearing={newNodeIds.includes(n.id)}
-            mentioned={mentions.includes(n.id)}
-          />
-        ))}
+        {nodes.map((n) => {
+          const appearing = newNodeIds.includes(n.id);
+          const spawnIdx = appearing ? spawnGhosts.findIndex((g) => g.name === n.name) : -1;
+          return (
+            <Island
+              key={n.id}
+              position={posOf(n.x, n.y)}
+              node={n}
+              onOpen={() => openNode(n.id)}
+              appearing={appearing}
+              mentioned={mentions.includes(n.id)}
+              spawnFrom={spawnIdx >= 0 ? ghostPos(spawnIdx) : undefined}
+            />
+          );
+        })}
         {ghosts.map((g, i) => {
-          const anchor = nodes.find((n) => n.id === focusId) ?? nodes[0];
-          if (!anchor) return null;
-          const x = anchor.x + 190 + (i % 3) * 120;
-          const y = anchor.y + (i % 2 === 0 ? -110 : 120) + Math.floor(i / 3) * 130;
-          return <GhostIsland key={`${g.name}-${i}`} position={posOf(x, y)} name={g.name} role={g.role} />;
+          const p = ghostPos(i);
+          if (!p) return null;
+          return <GhostIsland key={`${g.name}-${i}`} position={p} name={g.name} role={g.role} />;
         })}
         {edges.map((e) => {
           if (e.kind === "direction") {
