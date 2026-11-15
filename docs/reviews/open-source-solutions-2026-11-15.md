@@ -1,5 +1,10 @@
 # 需求对照开源技术：能否直接找到解决方案
 
+> **修正说明（2026-11-15 晚）：本文结论"没有参考"过于绝对。**
+> 按第一性原理补充检索后，端到端仍无成品，但分层已有可参考/可复用的开源项目
+> （Knowledge Spaces、Concept Map Extraction、Reor、QuestFusion 等）。
+> 以补充报告为准：[open-source-solutions-addendum-2026-11-15.md](open-source-solutions-addendum-2026-11-15.md)。
+
 日期：2026-11-15
 需求依据：`docs/design/required-implementation.md`（需求基线，只写行为与验收）
 目的：按需求环节对照开源项目，判断"能否直接用、只能借架构、还是必须自研"。
