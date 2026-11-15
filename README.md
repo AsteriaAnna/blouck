@@ -1,4 +1,4 @@
-﻿# 知识世界（blouck）· 桌面 Web MVP
+# 知识世界（blouck）· 桌面 Web MVP
 
 把口头理解变成可继续探索、可编辑、可挑战的知识地图。
 本仓库是依据两份基线文档实现的 **MVP 版本**：
@@ -23,6 +23,7 @@
 - 红队审查报告：[docs/reviews/mvp-red-team-2026-11-14.md](docs/reviews/mvp-red-team-2026-11-14.md)
 - 3D 范围决策：[docs/reviews/scope-decision-3d-2026-11-14.md](docs/reviews/scope-decision-3d-2026-11-14.md)
 - 实体/关系规则参考：[docs/reviews/entity-relation-rules-reference.md](docs/reviews/entity-relation-rules-reference.md)
+- 实时生成流程与任务拆分：[docs/design/realtime-generation-task-breakdown.md](docs/design/realtime-generation-task-breakdown.md)
 
 
 ## 界面
