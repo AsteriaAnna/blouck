@@ -1,5 +1,7 @@
-﻿import { addDirection, addEdge, addNode, computeFrontier, createSourceSpan, getGraph, getNode } from "./db.js";
+import { addDirection, addEdge, addNode, computeFrontier, createSourceSpan, getGraph, getNode } from "./db.js";
 import { env } from "./env.js";
+import { deepseekLLM } from "./providers/deepseek.js";
+import { mockLLM } from "./providers/mock.js";
 
 /**
  * DEV：锚点优先的垂直切片（A 方案，三层串联）
@@ -25,6 +27,7 @@ type JudgeResult = {
   label?: string;
   evidence?: string;
   confidence?: number;
+  direction?: string;
   recommendations?: { target: string; predicate?: string; label?: string; evidence?: string }[];
 };
 
@@ -52,6 +55,24 @@ function sentencePrefilter(text: string, anchorName: string, candidates: Candida
     }
     return { name, role: "topic" as Role, reason: "非喻体，进入词对判断" };
   });
+}
+
+async function extractCandidatesLLM(
+  text: string,
+  anchor: { id: string; name: string },
+  existing: string[],
+): Promise<string[]> {
+  const provider = env.deepseekApiKey ? deepseekLLM : mockLLM;
+  try {
+    const result = await provider.extract({
+      text,
+      focus: { id: anchor.id, name: anchor.name },
+      existing,
+    });
+    return result.entities.map((e) => e.name.trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
 }
 
 async function pairFastLLM(
@@ -119,7 +140,7 @@ async function slowJudge(input: {
   if (!env.deepseekApiKey) return mockJudge(input);
   const system = `你是知识关系判定器。只输出 JSON，不要解释。
 输出格式：
-{"results":[{"name":"候选名","role":"topic|subconcept|process|example|metaphor|step|noise","related":true|false,"predicate":"kindOf|partOf|prerequisite|contrast|related|alternative|none","from":"起点概念名","to":"目标概念名","label":"关系名（可带自由标签，如衡量/组合/使用）","evidence":"原文证据句","confidence":0.0,"recommendations":[{"target":"已有节点名","predicate":"...","label":"...","evidence":"..."}]}]}
+{"results":[{"name":"候选名","role":"topic|subconcept|process|example|metaphor|step|noise","related":true|false,"predicate":"kindOf|partOf|prerequisite|contrast|related|alternative|none","from":"起点概念名","to":"目标概念名","label":"关系名（可带自由标签，如衡量/组合/使用）","evidence":"原文证据句","confidence":0.0,"direction":"下一步探索问题（可空）","recommendations":[{"target":"已有节点名","predicate":"...","label":"...","evidence":"..."}]}]}
 规则：
 1. 只有原文证据能支持时才 related=true；否则 related=false。
 2. 比喻/举例 role=metaphor/example，related=false；不建正式关系。
@@ -199,7 +220,15 @@ export async function runAnchorFirst(input: {
   const existingNames = graph.nodes.map((n) => n.name);
   mark("load", { anchor: anchor.name, existing: existingNames });
 
-  const sentence = sentencePrefilter(input.text, anchor.name, input.candidates);
+  let candidateInput = input.candidates;
+  let candidateSource: "provided" | "extracted" = "provided";
+  if (candidateInput.length === 0) {
+    candidateInput = (await extractCandidatesLLM(input.text, anchor, existingNames)).map((name) => ({ name }));
+    candidateSource = "extracted";
+  }
+  mark("candidates", { source: candidateSource, names: candidateInput.map((c) => c.name) });
+
+  const sentence = sentencePrefilter(input.text, anchor.name, candidateInput);
   mark("sentence", sentence);
 
   const existingSet = new Set(existingNames.map(norm));
@@ -231,7 +260,10 @@ export async function runAnchorFirst(input: {
     const j = judged.find((x) => norm(x.name) === norm(s.name));
     const role: Role = j?.role ?? (s.role === "metaphor" ? "metaphor" : "topic");
     const isAnalogy = /(类比|比喻|举例|就像|一样)/.test(`${j?.label ?? ""} ${j?.evidence ?? ""}`);
-    const related = Boolean(j?.related) && !isAnalogy;
+    const evidence = j?.evidence ?? "";
+    const evidenceValid =
+      !evidence || input.text.includes(evidence) || input.text.includes(evidence.slice(0, Math.min(16, evidence.length)));
+    const related = Boolean(j?.related) && !isAnalogy && evidenceValid;
     let action:
       | "existing"
       | "drop_metaphor"
@@ -254,11 +286,14 @@ export async function runAnchorFirst(input: {
       role,
       related,
       predicate: isAnalogy ? "none" : j?.predicate ?? "none",
-      label: isAnalogy ? "类比（非知识关系）" : j?.label ?? "",
+      label: isAnalogy ? "类比（非知识关系）" : !evidenceValid ? "证据不匹配" : j?.label ?? "",
       from: j?.from ?? anchor.name,
       to: j?.to ?? s.name,
-      evidence: j?.evidence ?? "",
+      evidence,
+      evidenceValid,
       confidence: j?.confidence ?? 0,
+      direction: j?.direction ?? "",
+      recommendations: j?.recommendations ?? [],
       action,
     };
   });
@@ -292,7 +327,7 @@ export async function runAnchorFirst(input: {
           origin: "dev",
         });
       }
-      addDirection(input.worldId, node.id, `「${d.name}」的下一步可以探索什么？`, "dev 原型", null);
+      addDirection(input.worldId, node.id, d.direction || `「${d.name}」的下一步可以探索什么？`, "dev 原型", null);
       computeFrontier(input.worldId);
       committed.push({ node, sourceEdge: srcEdge, relationEdge: relEdge, action: d.action });
     }
@@ -307,6 +342,7 @@ export async function runAnchorFirst(input: {
     text: input.text,
     variant,
     timeline,
+    candidateSource,
     sentence,
     pairFast: pair.results,
     decisions,
