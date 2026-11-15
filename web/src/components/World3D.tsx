@@ -1,4 +1,4 @@
-﻿import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Html, Line, OrbitControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
@@ -439,6 +439,22 @@ export default function World3D() {
     const y = anchorNode.y + (i % 2 === 0 ? -110 : 120) + Math.floor(i / 3) * 130;
     return posOf(x, y);
   };
+  const normName = (s: string) => s.toLowerCase().replace(/[\s\-_·、，。,.；;：:（）()【】\[\]《》"'“”]/g, "");
+  const aliasesOf = (n: any) => {
+    const out = [String(n.name ?? "")];
+    try {
+      const a = JSON.parse(n.aliases || "[]");
+      if (Array.isArray(a)) out.push(...a.map(String));
+    } catch {}
+    return out.filter(Boolean);
+  };
+  const spawnIndexFor = (n: any) => {
+    const names = aliasesOf(n).map(normName);
+    return spawnGhosts.findIndex((g) => {
+      const gn = normName(g.name);
+      return names.some((x) => x === gn || x.includes(gn) || gn.includes(x));
+    });
+  };
 
   const nodePos = useMemo(() => {
     const m = new Map<string, THREE.Vector3>();
@@ -478,7 +494,8 @@ export default function World3D() {
         />
         {nodes.map((n) => {
           const appearing = newNodeIds.includes(n.id);
-          const spawnIdx = appearing ? spawnGhosts.findIndex((g) => g.name === n.name) : -1;
+          const spawnIdx = appearing ? spawnIndexFor(n) : -1;
+          const fallback = appearing && spawnGhosts.length > 0 ? ghostPos(0) : undefined;
           return (
             <Island
               key={n.id}
@@ -487,7 +504,7 @@ export default function World3D() {
               onOpen={() => openNode(n.id)}
               appearing={appearing}
               mentioned={mentions.includes(n.id)}
-              spawnFrom={spawnIdx >= 0 ? ghostPos(spawnIdx) : undefined}
+              spawnFrom={spawnIdx >= 0 ? ghostPos(spawnIdx) : fallback}
             />
           );
         })}

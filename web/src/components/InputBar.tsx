@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { send } from "../api";
 import { useStore } from "../store";
 
@@ -70,7 +70,7 @@ export default function InputBar() {
   const streamRef = useRef<MediaStream | null>(null);
   const nodeRef = useRef<AudioWorkletNode | null>(null);
   const previewTimer = useRef<number | null>(null);
-  const previewedRef = useRef(false);
+  const lastDetectLenRef = useRef(0);
   const previewBusyRef = useRef(false);
   const mentionIdsRef = useRef<string[]>([]);
   const sessionRef = useRef(0);
@@ -119,15 +119,21 @@ export default function InputBar() {
     setGhosts([]);
     setStage("listening");
     mentionIdsRef.current = [];
-    previewedRef.current = false;
+    lastDetectLenRef.current = 0;
     previewBusyRef.current = false;
     if (previewTimer.current) window.clearTimeout(previewTimer.current);
     previewTimer.current = null;
   }
 
-  async function requestPreview(spoken: string) {
-    if (!worldId || spoken.length < 10 || previewedRef.current || previewBusyRef.current) return;
-    previewedRef.current = true;
+  async function requestPreview(spoken: string, force = false) {
+    if (!worldId || (!force && spoken.length < 10)) return;
+    if (previewBusyRef.current) {
+      if (!force) return;
+      for (let i = 0; i < 80 && previewBusyRef.current; i++) {
+        await new Promise((r) => window.setTimeout(r, 50));
+      }
+      if (previewBusyRef.current) return;
+    }
     previewBusyRef.current = true;
     const session = sessionRef.current;
     setStage("detecting");
@@ -139,33 +145,33 @@ export default function InputBar() {
       );
       if (session !== sessionRef.current) return;
       const state = useStore.getState();
-      console.log("[preview-result]", session, sessionRef.current, state.busy, state.stage, r.candidates?.length);
-      if (!state.busy && state.stage !== "detecting" && state.stage !== "confirming") return;
+      if (!force && !state.busy && state.stage !== "detecting" && state.stage !== "confirming") return;
       const existingNames = new Set(useStore.getState().nodes.map((n) => n.name));
-      const incoming = (r.candidates ?? []).filter((c) => !existingNames.has(c.name));
-      setGhosts(
-        incoming.map((c) => ({
-          name: c.name,
-          role: "",
-          action: "detected",
-          label: "实体检测",
-        })),
-      );
-      if (incoming.length) setStage("confirming");
+      const incoming = (r.candidates ?? []).filter((c) => c.name && !existingNames.has(c.name));
+      const merged = new Map(useStore.getState().ghosts.map((g) => [g.name, g]));
+      for (const c of incoming) {
+        if (!merged.has(c.name)) {
+          merged.set(c.name, { name: c.name, role: "", action: "detected", label: "实体检测" });
+        }
+      }
+      setGhosts([...merged.values()]);
+      if (merged.size) setStage("confirming");
     } catch {
-      // 预览失败不阻塞主链路
+      // 检测失败不阻塞主链路
     } finally {
       previewBusyRef.current = false;
     }
   }
 
   function schedulePreview(spoken: string) {
-    if (spoken.length < 10 || previewedRef.current || previewBusyRef.current) return;
+    if (spoken.length < 10 || previewBusyRef.current) return;
+    if (spoken.length - lastDetectLenRef.current < 6) return;
     if (previewTimer.current) return;
     previewTimer.current = window.setTimeout(() => {
       previewTimer.current = null;
+      lastDetectLenRef.current = spoken.length;
       void requestPreview(spoken);
-    }, 120);
+    }, 150);
   }
 
   function connectWS(mock: boolean) {
@@ -177,7 +183,7 @@ export default function InputBar() {
       setRec(true);
       setState(mock ? "模拟语音中…" : "录音中…");
     };
-    ws.onmessage = (ev) => {
+    ws.onmessage = async (ev) => {
       const msg = JSON.parse(ev.data);
       if (msg.type === "partial") {
         setPartial(msg.text);
@@ -199,7 +205,10 @@ export default function InputBar() {
         const ids = matchMentions(msg.text);
         mentionIdsRef.current = ids;
         setMentions(ids);
-        void extract(msg.text);
+        void (async () => {
+          await requestPreview(msg.text, true);
+          await extract(msg.text);
+        })();
       } else if (msg.type === "error") {
         setRec(false);
         setMicError(String(msg.message ?? "语音识别失败"));
