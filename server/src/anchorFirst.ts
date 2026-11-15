@@ -1,18 +1,23 @@
-import { addDirection, addEdge, addNode, computeFrontier, createSourceSpan, getGraph, getNode } from "./db.js";
+﻿import { addDirection, addEdge, addNode, computeFrontier, createSourceSpan, getGraph, getNode } from "./db.js";
 import { env } from "./env.js";
 
 /**
- * DEV：锚点优先的垂直切片（A 方案）
- * 锚点 → 候选 → 快判 → provisional → 慢判 → commit/修复 → 方向/推荐
+ * DEV：锚点优先的垂直切片（A 方案，三层串联）
+ * 1) 句子角色预筛（比喻/例子/已有）
+ * 2) 批量 LLM 词对快筛（possible/unrelated/defer）
+ * 3) 慢判（谓词/方向/证据/无关）
+ * 4) commit / 修复 / 方向
  * 只用于 dev 接口/测试，不影响主链路。
  */
 
-export type FastDecision = "possible" | "unrelated" | "defer" | "existing" | "metaphor";
-export type CandidateInput = { name: string; evidence?: string };
+type Verdict = "possible" | "unrelated" | "defer";
+type Role = "topic" | "subconcept" | "process" | "example" | "metaphor" | "step" | "noise";
+type CandidateInput = { name: string };
 
+type PairFast = { name: string; verdict: Verdict; confidence: number; reason: string };
 type JudgeResult = {
   name: string;
-  role?: "topic" | "subconcept" | "process" | "example" | "metaphor" | "step" | "noise";
+  role?: Role;
   related?: boolean;
   predicate?: string;
   from?: string;
@@ -24,83 +29,140 @@ type JudgeResult = {
 };
 
 const CORE_PREDICATES = new Set(["kindOf", "partOf", "prerequisite", "contrast", "related", "alternative"]);
-const CUE = /(从|用|使用|属于|包含|包括|组成|依赖|基于|先|再|然后|之后|衡量|评价|对比|不同|替代|检索|召回|合并|生成|输入|输出|阶段)/;
+const SIMILE = /(像|好像|如同|似的|一样)/;
 
 function norm(s: string) {
   return s.toLowerCase().replace(/[\s\-_·、，。,.；;：:（）()【】\[\]《》"'“”]/g, "");
 }
 
-function fastPass(text: string, anchorName: string, candidates: CandidateInput[]) {
-  const simileAt = text.search(/(像|好像|如同|似的|一样)/);
+function stripFence(s: string) {
+  return s.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+}
+
+function sentencePrefilter(text: string, anchorName: string, candidates: CandidateInput[]) {
+  const simileAt = text.search(SIMILE);
   return candidates.map((c) => {
     const name = c.name.trim();
-    if (!name) return { name, fast: "defer" as FastDecision, reason: "空候选" };
     const idx = text.indexOf(name);
-    if (idx < 0) return { name, fast: "defer" as FastDecision, reason: "原文未出现" };
-    if (name === anchorName) return { name, fast: "existing" as FastDecision, reason: "锚点" };
+    if (!name) return { name, role: "noise" as Role, reason: "空候选" };
+    if (name === anchorName) return { name, role: "topic" as Role, reason: "锚点" };
+    if (idx < 0) return { name, role: "noise" as Role, reason: "原文未出现" };
     if (simileAt >= 0 && idx > simileAt) {
-      return { name, fast: "metaphor" as FastDecision, reason: "出现在“像/一样”之后，按喻体处理" };
+      return { name, role: "metaphor" as Role, reason: "出现在“像/一样”之后" };
     }
-    if (simileAt >= 0 && idx < simileAt) {
-      return { name, fast: "possible" as FastDecision, reason: "出现在“像/一样”之前，按话题候选" };
-    }
-    const window = text.slice(Math.max(0, idx - 12), idx + name.length + 16);
-    if (CUE.test(window)) {
-      return { name, fast: "possible" as FastDecision, reason: "附近有语义线索" };
-    }
-    return { name, fast: "defer" as FastDecision, reason: "缺少线索，暂缓" };
+    return { name, role: "topic" as Role, reason: "非喻体，进入词对判断" };
   });
 }
 
-async function judgeWithLLM(input: {
+async function pairFastLLM(
+  anchor: { name: string; definition: string },
+  candidates: { name: string }[],
+): Promise<{ results: PairFast[]; ms: number }> {
+  const t = Date.now();
+  if (!env.deepseekApiKey || candidates.length === 0) {
+    return {
+      results: candidates.map((c) => ({ name: c.name, verdict: "possible" as Verdict, confidence: 0.5, reason: "mock" })),
+      ms: Date.now() - t,
+    };
+  }
+  const system = `你是概念相关度快速判定器。只输出 JSON：
+{"results":[{"name":"候选名","verdict":"possible|unrelated|defer","confidence":0.0,"reason":""}]}
+只根据两个概念本身判断是否可能存在知识关系，不要假设句子语境。
+- possible：同一知识域或存在已知/可推断关联；
+- unrelated：明显不同知识域、无已知关联；
+- defer：信息不足。
+不要为了显得聪明而硬找关系。`;
+  const user = `锚点：${anchor.name}（${anchor.definition || "无定义"}）\n候选：${candidates.map((c) => c.name).join("、")}`;
+  try {
+    const res = await fetch(`${env.deepseekBaseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.deepseekApiKey}` },
+      body: JSON.stringify({
+        model: env.deepseekModel,
+        temperature: 0,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+    });
+    const data = (await res.json()) as any;
+    const parsed = JSON.parse(stripFence(data.choices?.[0]?.message?.content ?? "{}"));
+    const list = Array.isArray(parsed.results) ? parsed.results : [];
+    return {
+      results: candidates.map((c) => {
+        const found = list.find((x: any) => norm(String(x.name ?? "")) === norm(c.name));
+        return {
+          name: c.name,
+          verdict: (["possible", "unrelated", "defer"].includes(found?.verdict) ? found.verdict : "defer") as Verdict,
+          confidence: Number(found?.confidence ?? 0),
+          reason: String(found?.reason ?? ""),
+        };
+      }),
+      ms: Date.now() - t,
+    };
+  } catch (err: any) {
+    return {
+      results: candidates.map((c) => ({ name: c.name, verdict: "defer" as Verdict, confidence: 0, reason: String(err?.message ?? err) })),
+      ms: Date.now() - t,
+    };
+  }
+}
+
+async function slowJudge(input: {
   anchor: { name: string; definition: string; md: string };
   existing: string[];
   text: string;
-  candidates: { name: string; fast: string; reason: string }[];
+  candidates: { name: string; pair: PairFast }[];
 }): Promise<JudgeResult[]> {
   if (!env.deepseekApiKey) return mockJudge(input);
   const system = `你是知识关系判定器。只输出 JSON，不要解释。
 输出格式：
-{"results":[{"name":"候选名","role":"topic|subconcept|process|example|metaphor|step|noise","related":true|false,"predicate":"kindOf|partOf|prerequisite|contrast|related|alternative|none","from":"起点概念名","to":"目标概念名","label":"关系名（含自由标签，如衡量/组合/使用）","evidence":"原文证据句","confidence":0.0,"recommendations":[{"target":"已有节点名","predicate":"...","label":"...","evidence":"..."}]}]}
+{"results":[{"name":"候选名","role":"topic|subconcept|process|example|metaphor|step|noise","related":true|false,"predicate":"kindOf|partOf|prerequisite|contrast|related|alternative|none","from":"起点概念名","to":"目标概念名","label":"关系名（可带自由标签，如衡量/组合/使用）","evidence":"原文证据句","confidence":0.0,"recommendations":[{"target":"已有节点名","predicate":"...","label":"...","evidence":"..."}]}]}
 规则：
 1. 只有原文证据能支持时才 related=true；否则 related=false。
 2. 比喻/举例 role=metaphor/example，related=false；不建正式关系。
 3. 候选与锚点/已有节点都可能有关系，按证据判断；不要硬找关系。
-4. 谓词只用 kindOf/partOf/prerequisite/contrast/related/alternative；说不清具体类型用 related，不要编造。
-5. 方向必须符合：kindOf 具体→上位；partOf 部分→整体；prerequisite 前置→后续；contrast/related 无方向；alternative 旧→新。
-6. 只输出与候选相关的结果。`;
-  const user = `锚点：${JSON.stringify(input.anchor)}\n已有节点：${input.existing.join("、")}\n候选（含快判）：${JSON.stringify(input.candidates)}\n原文：${input.text}`;
-  const res = await fetch(`${env.deepseekBaseUrl}/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.deepseekApiKey}` },
-    body: JSON.stringify({
-      model: env.deepseekModel,
-      temperature: 0.1,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-    }),
-  });
-  if (!res.ok) throw new Error(`deepseek ${res.status}`);
-  const data = (await res.json()) as any;
-  const raw = data.choices?.[0]?.message?.content ?? "";
-  const parsed = JSON.parse(raw);
-  return Array.isArray(parsed.results) ? parsed.results : [];
+'4. 谓词只用 kindOf/partOf/prerequisite/contrast/related/alternative；说不清用 related，不要编造。
+   谓词消歧：
+   - “A 是一种 B / A 属于某类” → kindOf；
+   - “A 由 B 组成 / A 包含组件 B” → partOf（方向：组件→整体）；
+   - “A 使用/依赖/从 B 获取/来源是 B” → related（label 使用/来源），不要用 prerequisite；
+   - “A 组合了 B 和 C” → related（label 组合），不要用 partOf；
+   - “先 A 后 B / A 必须在 B 之前” → prerequisite；
+   - 比喻/举例 → related=false。'
+5. 方向：kindOf 具体→上位；partOf 部分→整体；prerequisite 前置→后续；contrast/related 无方向；alternative 旧→新。
+6. 只输出与候选相关的结果。
+7. “像/一样/如同”之前的候选通常是话题主体，role 不要判成 metaphor；只有“像”之后的词才是喻体。
+8. 如果只是类比/比喻/举例，即使 label 写“类比关联”，related 也必须为 false。`;
+  const user = `锚点：${JSON.stringify(input.anchor)}\n已有节点：${input.existing.join("、")}\n候选（含词对快判）：${JSON.stringify(input.candidates)}\n原文：${input.text}`;
+  try {
+    const res = await fetch(`${env.deepseekBaseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.deepseekApiKey}` },
+      body: JSON.stringify({
+        model: env.deepseekModel,
+        temperature: 0.1,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+    });
+    const data = (await res.json()) as any;
+    const parsed = JSON.parse(stripFence(data.choices?.[0]?.message?.content ?? "{}"));
+    return Array.isArray(parsed.results) ? parsed.results : [];
+  } catch {
+    return mockJudge(input);
+  }
 }
 
-function mockJudge(input: {
-  anchor: { name: string };
-  text: string;
-  candidates: { name: string }[];
-}): JudgeResult[] {
+function mockJudge(input: { anchor: { name: string }; text: string; candidates: { name: string }[] }): JudgeResult[] {
   return input.candidates.map((c) => {
-    const simile = /(像|好像|如同|似的|一样)/.test(input.text);
-    const related =
-      !simile &&
-      (input.text.includes("从") || input.text.includes("用") || input.text.includes("包含")) &&
-      c.name !== input.anchor.name;
+    const simile = SIMILE.test(input.text);
+    const related = !simile && (input.text.includes("从") || input.text.includes("用") || input.text.includes("包含"));
     return {
       name: c.name,
       role: simile ? "metaphor" : "topic",
@@ -127,9 +189,8 @@ export async function runAnchorFirst(input: {
   const t0 = Date.now();
   let last = t0;
   const mark = (step: string, detail?: unknown) => {
-    const now = Date.now();
-    timeline.push({ step, ms: now - last, detail });
-    last = now;
+    timeline.push({ step, ms: Date.now() - last, detail });
+    last = Date.now();
   };
 
   const graph = getGraph(input.worldId);
@@ -138,53 +199,64 @@ export async function runAnchorFirst(input: {
   const existingNames = graph.nodes.map((n) => n.name);
   mark("load", { anchor: anchor.name, existing: existingNames });
 
-  const fast = fastPass(input.text, anchor.name, input.candidates).map((f) => {
-    if (existingNames.some((n) => norm(n) === norm(f.name))) {
-      return { ...f, fast: "existing" as FastDecision, reason: "已存在" };
-    }
-    return f;
-  });
-  mark("fast", fast);
+  const sentence = sentencePrefilter(input.text, anchor.name, input.candidates);
+  mark("sentence", sentence);
 
-  const toJudge = fast.filter((f) => f.fast === "possible" || f.fast === "defer");
-  const judgeStart = Date.now();
+  const existingSet = new Set(existingNames.map(norm));
+  const pairCandidates = sentence.filter(
+    (s) => s.role !== "metaphor" && s.role !== "noise" && !existingSet.has(norm(s.name)),
+  );
+  const pair = await pairFastLLM({ name: anchor.name, definition: anchor.definition }, pairCandidates.map((p) => ({ name: p.name })));
+  mark("pair_fast", { results: pair.results, ms: pair.ms });
+
+  const toSlow = pair.results.filter((r) => r.verdict !== "unrelated");
+  const slowStart = Date.now();
   let judged: JudgeResult[] = [];
   try {
-    judged = await judgeWithLLM({
+    judged = await slowJudge({
       anchor: { name: anchor.name, definition: anchor.definition, md: anchor.free_md },
       existing: existingNames,
       text: input.text,
-      candidates: toJudge.map((f) => ({ name: f.name, fast: f.fast, reason: f.reason })),
+      candidates: toSlow.map((r) => ({ name: r.name, pair: r })),
     });
   } catch (err: any) {
-    judged = mockJudge({ anchor, text: input.text, candidates: toJudge });
-    timeline.push({ step: "judge_fallback", ms: Date.now() - judgeStart, detail: String(err?.message ?? err) });
+    judged = mockJudge({ anchor, text: input.text, candidates: toSlow });
+    timeline.push({ step: "slow_fallback", ms: Date.now() - slowStart, detail: String(err?.message ?? err) });
   }
-  mark("judge", { count: judged.length, byName: judged.map((j) => j.name) });
+  mark("slow_judge", { count: judged.length });
 
   const variant = input.variant ?? "A1";
-  const decisions = fast.map((f) => {
-    const j = judged.find((x) => norm(x.name) === norm(f.name));
-    const role = j?.role ?? (f.fast === "metaphor" ? "metaphor" : "topic");
+  const decisions = sentence.map((s) => {
+    const p = pair.results.find((x) => norm(x.name) === norm(s.name));
+    const j = judged.find((x) => norm(x.name) === norm(s.name));
+    const role: Role = j?.role ?? (s.role === "metaphor" ? "metaphor" : "topic");
     const isAnalogy = /(类比|比喻|举例|就像|一样)/.test(`${j?.label ?? ""} ${j?.evidence ?? ""}`);
     const related = Boolean(j?.related) && !isAnalogy;
-    let action: "existing" | "drop_metaphor" | "drop_unrelated" | "commit_relation" | "commit_topic_pending" | "candidate";
-    if (f.fast === "existing") action = "existing";
+    let action:
+      | "existing"
+      | "drop_metaphor"
+      | "drop_unrelated"
+      | "commit_relation"
+      | "commit_topic_pending"
+      | "candidate";
+    if (existingSet.has(norm(s.name))) action = "existing";
     else if (role === "metaphor" || role === "example") action = "drop_metaphor";
+    else if (p?.verdict === "unrelated") action = "drop_unrelated";
     else if (related) action = "commit_relation";
     else if (role === "topic" && variant === "A2") action = "commit_topic_pending";
-    else if (f.fast === "unrelated") action = "drop_unrelated";
     else action = "candidate";
     return {
-      name: f.name,
-      fast: f.fast,
-      fastReason: f.reason,
+      name: s.name,
+      sentenceRole: s.role,
+      sentenceReason: s.reason,
+      pairVerdict: p?.verdict ?? "not_judged",
+      pairConfidence: p?.confidence ?? 0,
       role,
       related,
-      predicate: j?.predicate ?? "none",
+      predicate: isAnalogy ? "none" : j?.predicate ?? "none",
       label: isAnalogy ? "类比（非知识关系）" : j?.label ?? "",
       from: j?.from ?? anchor.name,
-      to: j?.to ?? f.name,
+      to: j?.to ?? s.name,
       evidence: j?.evidence ?? "",
       confidence: j?.confidence ?? 0,
       action,
@@ -211,10 +283,9 @@ export async function runAnchorFirst(input: {
       let relEdge = null;
       if (d.action === "commit_relation") {
         const src = graph.nodes.find((n) => norm(n.name) === norm(d.from));
-        const dst = node;
         const pred = CORE_PREDICATES.has(d.predicate) ? d.predicate : "related";
         const kind = d.evidence && d.confidence >= 0.75 ? "formal" : "suggest";
-        relEdge = addEdge(input.worldId, src?.id ?? anchor.id, dst.id, kind, d.label || pred, null, "", {
+        relEdge = addEdge(input.worldId, src?.id ?? anchor.id, node.id, kind, d.label || pred, null, "", {
           predicate: pred,
           evidence: d.evidence,
           confidence: d.confidence,
@@ -236,7 +307,8 @@ export async function runAnchorFirst(input: {
     text: input.text,
     variant,
     timeline,
-    fast,
+    sentence,
+    pairFast: pair.results,
     decisions,
     committed,
     nodes: fresh.nodes.map((n) => ({ id: n.id, name: n.name, frontier: n.frontier })),
