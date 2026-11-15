@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
+import { send } from "../api";
 import { useStore } from "../store";
 
 /** AudioWorklet：把麦克风 Float32 采样转成 Int16 PCM 块 */
@@ -30,13 +31,36 @@ function toBase64(buf: ArrayBuffer) {
   return btoa(binary);
 }
 
+const STEPS = [
+  { key: "listening", label: "聆听" },
+  { key: "detecting", label: "检测" },
+  { key: "confirming", label: "确认" },
+  { key: "generating", label: "生成" },
+] as const;
+
+function stageIndex(stage: string) {
+  if (stage === "idle") return -1;
+  if (stage === "done") return STEPS.length;
+  return STEPS.findIndex((s) => s.key === stage);
+}
+
 /** 麦克风采集 → 16k PCM16 → WS；失败时可切"模拟语音" */
 export default function InputBar() {
   const extract = useStore((s) => s.extract);
   const partial = useStore((s) => s.partial);
   const setPartial = useStore((s) => s.setPartial);
+  const streamText = useStore((s) => s.streamText);
+  const mentions = useStore((s) => s.mentions);
+  const ghosts = useStore((s) => s.ghosts);
+  const stage = useStore((s) => s.stage);
+  const setMentions = useStore((s) => s.setMentions);
+  const setGhosts = useStore((s) => s.setGhosts);
+  const setStage = useStore((s) => s.setStage);
+  const clearStream = useStore((s) => s.clearStream);
+  const nodes = useStore((s) => s.nodes);
   const busy = useStore((s) => s.busy);
   const worldId = useStore((s) => s.world?.id);
+  const focusId = useStore((s) => s.focusId);
   const [text, setText] = useState("");
   const [rec, setRec] = useState(false);
   const [state, setState] = useState("待输入");
@@ -45,11 +69,17 @@ export default function InputBar() {
   const ctxRef = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const nodeRef = useRef<AudioWorkletNode | null>(null);
+  const previewTimer = useRef<number | null>(null);
+  const previewedRef = useRef(false);
+  const previewBusyRef = useRef(false);
+  const mentionIdsRef = useRef<string[]>([]);
+  const sessionRef = useRef(0);
 
   useEffect(() => {
     return () => {
       stopTracks();
       wsRef.current?.close();
+      if (previewTimer.current) window.clearTimeout(previewTimer.current);
     };
   }, []);
 
@@ -62,6 +92,80 @@ export default function InputBar() {
     } catch {}
     nodeRef.current = null;
     ctxRef.current = null;
+  }
+
+  function matchMentions(input: string) {
+    const found: { id: string; name: string }[] = [];
+    for (const n of nodes) {
+      const names = [n.name];
+      try {
+        const aliases = JSON.parse(n.aliases || "[]");
+        if (Array.isArray(aliases)) names.push(...aliases.map(String));
+      } catch {}
+      for (const name of names) {
+        if (name && name.length >= 2 && input.includes(name)) {
+          found.push({ id: n.id, name });
+          break;
+        }
+      }
+    }
+    found.sort((a, b) => b.name.length - a.name.length);
+    return [...new Set(found.map((x) => x.id))];
+  }
+
+  function resetStream() {
+    sessionRef.current += 1;
+    setMentions([]);
+    setGhosts([]);
+    setStage("listening");
+    mentionIdsRef.current = [];
+    previewedRef.current = false;
+    previewBusyRef.current = false;
+    if (previewTimer.current) window.clearTimeout(previewTimer.current);
+    previewTimer.current = null;
+  }
+
+  async function requestPreview(spoken: string) {
+    if (!worldId || spoken.length < 10 || previewedRef.current || previewBusyRef.current) return;
+    previewedRef.current = true;
+    previewBusyRef.current = true;
+    const session = sessionRef.current;
+    setStage("detecting");
+    try {
+      const r = await send<{ candidates: { name: string; evidence?: string }[] }>(
+        `/api/worlds/${worldId}/stream/detect`,
+        "POST",
+        { text: spoken, anchorId: focusId },
+      );
+      if (session !== sessionRef.current) return;
+      const state = useStore.getState();
+      console.log("[preview-result]", session, sessionRef.current, state.busy, state.stage, r.candidates?.length);
+      if (!state.busy && state.stage !== "detecting" && state.stage !== "confirming") return;
+      const existingNames = new Set(useStore.getState().nodes.map((n) => n.name));
+      const incoming = (r.candidates ?? []).filter((c) => !existingNames.has(c.name));
+      setGhosts(
+        incoming.map((c) => ({
+          name: c.name,
+          role: "",
+          action: "detected",
+          label: "实体检测",
+        })),
+      );
+      if (incoming.length) setStage("confirming");
+    } catch {
+      // 预览失败不阻塞主链路
+    } finally {
+      previewBusyRef.current = false;
+    }
+  }
+
+  function schedulePreview(spoken: string) {
+    if (spoken.length < 10 || previewedRef.current || previewBusyRef.current) return;
+    if (previewTimer.current) return;
+    previewTimer.current = window.setTimeout(() => {
+      previewTimer.current = null;
+      void requestPreview(spoken);
+    }, 120);
   }
 
   function connectWS(mock: boolean) {
@@ -77,17 +181,30 @@ export default function InputBar() {
       const msg = JSON.parse(ev.data);
       if (msg.type === "partial") {
         setPartial(msg.text);
+        setStage("detecting");
+        const ids = matchMentions(msg.text);
+        mentionIdsRef.current = ids;
+        setMentions(ids);
+        schedulePreview(msg.text);
         setState("识别中…");
       } else if (msg.type === "final") {
         setRec(false);
         setPartial("");
-        setState("已稳定 · 正在落图");
+        setStreamTextFinal(msg.text);
+        setStage("confirming");
+        setState("已稳定 · 正在确认");
         ws.close();
-        extract(msg.text);
+        if (previewTimer.current) window.clearTimeout(previewTimer.current);
+        previewTimer.current = null;
+        const ids = matchMentions(msg.text);
+        mentionIdsRef.current = ids;
+        setMentions(ids);
+        void extract(msg.text);
       } else if (msg.type === "error") {
         setRec(false);
         setMicError(String(msg.message ?? "语音识别失败"));
         setState("识别失败");
+        setStage("idle");
         stopTracks();
       } else if (msg.type === "ready") {
         setState(`已连接（${msg.provider}）`);
@@ -96,9 +213,14 @@ export default function InputBar() {
     ws.onerror = () => {
       setRec(false);
       setState("语音连接失败");
+      setStage("idle");
       stopTracks();
     };
     return ws;
+  }
+
+  function setStreamTextFinal(text: string) {
+    useStore.getState().setStreamText(text);
   }
 
   async function startMic() {
@@ -116,6 +238,8 @@ export default function InputBar() {
       return;
     }
     streamRef.current = stream;
+    clearStream();
+    resetStream();
 
     const ctx = new AudioContext({ sampleRate: 16000 });
     ctxRef.current = ctx;
@@ -136,12 +260,10 @@ export default function InputBar() {
     source.connect(node);
 
     const ws = connectWS(false);
-    // 采集到的采样率可能不是 16k：做线性重采样，攒够 6400 字节发一包
     const inRate = ctx.sampleRate;
     const ratio = inRate / 16000;
     let carry = new Float32Array(0);
     let carryPos = 0;
-    let out = new Int16Array(0);
 
     node.port.onmessage = (ev) => {
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
@@ -174,10 +296,7 @@ export default function InputBar() {
         carry = carry.slice(drop);
         carryPos -= drop;
       }
-      if (res.length) {
-        const pcm = new Int16Array(res);
-        flush(pcm);
-      }
+      if (res.length) flush(new Int16Array(res));
     };
 
     let pending: Int16Array[] = [];
@@ -204,6 +323,7 @@ export default function InputBar() {
 
   function stopRec() {
     setState("正在等待最终结果…");
+    setStage("confirming");
     try {
       nodeRef.current?.disconnect();
     } catch {}
@@ -214,18 +334,60 @@ export default function InputBar() {
 
   function startMock() {
     setMicError("");
+    clearStream();
+    resetStream();
     connectWS(true);
   }
 
   function submit() {
     if (!text.trim() || busy) return;
-    extract(text.trim());
+    clearStream();
+    setMentions(matchMentions(text.trim()));
+    void extract(text.trim());
     setText("");
     setState("已提交");
   }
 
+  const active = stageIndex(stage);
+  const showStream = stage !== "idle" || Boolean(streamText) || ghosts.length > 0 || mentions.length > 0;
+
   return (
     <div className="inputbar">
+      {showStream && (
+        <div className="stream-panel">
+          <div className="stream-steps">
+            {STEPS.map((s, i) => (
+              <div key={s.key} className={"stream-step" + (i < active ? " done" : i === active ? " active" : "")}>
+                <span className="dot" />
+                {s.label}
+              </div>
+            ))}
+          </div>
+          {streamText && (
+            <div className="stream-caption">
+              {streamText}
+              {rec && <span className="caret" />}
+            </div>
+          )}
+          {(mentions.length > 0 || ghosts.length > 0) && (
+            <div className="stream-entities">
+              {mentions.map((id) => {
+                const n = nodes.find((x) => x.id === id);
+                return n ? (
+                  <span key={id} className="entity-chip known">
+                    <i />已识别 · {n.name}
+                  </span>
+                ) : null;
+              })}
+              {ghosts.map((g, i) => (
+                <span key={`${g.name}-${i}`} className="entity-chip ghost">
+                  <i />候选 · {g.name}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {partial && <div className="partial">{partial}</div>}
       {micError && (
         <div className="partial">
@@ -235,12 +397,11 @@ export default function InputBar() {
           </button>
         </div>
       )}
-      <button
-        className={"mic" + (rec ? " rec" : "")}
-        title={rec ? "停止录音" : "实时语音"}
-        onClick={() => (rec ? stopRec() : startMic())}
-      >
+      <button className={"mic" + (rec ? " rec" : "")} title={rec ? "停止录音" : "实时语音"} onClick={() => (rec ? stopRec() : startMic())}>
         {rec ? "■" : "🎙"}
+      </button>
+      <button className="mock-btn" onClick={startMock} title="模拟一段语音，体验流式生成">
+        试听
       </button>
       <textarea
         placeholder="说点什么，或写下你此刻的理解…（Ctrl/⌘ + Enter 提交）"
@@ -250,7 +411,7 @@ export default function InputBar() {
           if ((e.metaKey || e.ctrlKey) && e.key === "Enter") submit();
         }}
       />
-      <div className="state">{busy ? "处理中…" : state}</div>
+      <div className="state">{busy ? "生成中…" : state}</div>
       <button className="send" onClick={submit} title="提交">
         ↑
       </button>

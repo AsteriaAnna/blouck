@@ -49,21 +49,45 @@ function Island({
   position,
   node,
   onOpen,
+  appearing,
+  mentioned,
 }: {
   position: [number, number, number];
   node: any;
   onOpen: () => void;
+  appearing?: boolean;
+  mentioned?: boolean;
 }) {
   const [hover, setHover] = useState(false);
   const ref = useRef<THREE.Group>(null);
+  const ringRef = useRef<THREE.Mesh>(null);
+  const born = useRef<number | null>(null);
   const seed = hash(node.id);
   const accent = ACCENTS[seed % ACCENTS.length];
   const tier = node.tier ?? 0;
+  const pulse = Boolean(appearing || mentioned);
 
-  useFrame((_, dt) => {
+  useFrame((state, dt) => {
     if (!ref.current) return;
-    const target = hover ? 1.1 : 1;
-    ref.current.scale.lerp(new THREE.Vector3(target, target, target), Math.min(1, dt * 8));
+    if (appearing) {
+      if (born.current === null) born.current = state.clock.elapsedTime;
+      const age = state.clock.elapsedTime - born.current;
+      const t = Math.min(1, age / 0.9);
+      const ease = 1 - Math.pow(1 - t, 3);
+      const s = 0.02 + ease * 1.0;
+      ref.current.scale.setScalar(s * (hover ? 1.08 : 1));
+      ref.current.position.y = -90 * (1 - ease);
+    } else {
+      ref.current.position.y = THREE.MathUtils.lerp(ref.current.position.y, 0, Math.min(1, dt * 6));
+      const target = hover ? 1.1 : 1;
+      ref.current.scale.lerp(new THREE.Vector3(target, target, target), Math.min(1, dt * 8));
+    }
+    if (ringRef.current && pulse) {
+      const k = 1 + Math.sin(state.clock.elapsedTime * 3.2) * 0.05;
+      ringRef.current.scale.setScalar(k);
+      const mat = ringRef.current.material as THREE.MeshBasicMaterial;
+      mat.opacity = 0.35 + 0.25 * (0.5 + 0.5 * Math.sin(state.clock.elapsedTime * 3.2));
+    }
   });
 
   return (
@@ -93,11 +117,55 @@ function Island({
             <meshStandardMaterial color={accent} transparent opacity={0.85} />
           </mesh>
         )}
+        {pulse && (
+          <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 4, 0]}>
+            <torusGeometry args={[68, 2.4, 8, 48]} />
+            <meshBasicMaterial color={appearing ? "#e0a458" : "#d8b46a"} transparent opacity={0.55} depthWrite={false} />
+          </mesh>
+        )}
       </group>
       <Html center position={[0, 92, 0]} zIndexRange={[30, 0]} style={{ pointerEvents: "none" }}>
-        <div className="n3d-label">
+        <div className={"n3d-label" + (appearing ? " new" : "") + (mentioned ? " mentioned" : "")}>
           <span className="dot" style={{ background: accent }} />
           {node.name}
+          {appearing ? <span className="spark">＋</span> : null}
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+function GhostIsland({
+  position,
+  name,
+  role,
+}: {
+  position: [number, number, number];
+  name: string;
+  role?: string;
+}) {
+  const ref = useRef<THREE.Group>(null);
+  useFrame((state) => {
+    if (!ref.current) return;
+    ref.current.position.y = 6 + Math.sin(state.clock.elapsedTime * 2.2 + name.length) * 5;
+    const k = 1 + Math.sin(state.clock.elapsedTime * 2.6) * 0.04;
+    ref.current.scale.setScalar(k);
+  });
+  return (
+    <group ref={ref} position={position}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 2, 0]}>
+        <circleGeometry args={[42, 32]} />
+        <meshBasicMaterial color="#a3937c" transparent opacity={0.16} depthWrite={false} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 3, 0]}>
+        <torusGeometry args={[44, 1.1, 8, 40]} />
+        <meshBasicMaterial color="#b49f82" transparent opacity={0.55} depthWrite={false} />
+      </mesh>
+      <Html center position={[0, 58, 0]} zIndexRange={[25, 0]} style={{ pointerEvents: "none" }}>
+        <div className={"n3d-label ghost"}>
+          <span className="dot" />
+          候选 · {name}
+          {role ? <em>{role}</em> : null}
         </div>
       </Html>
     </group>
@@ -323,6 +391,10 @@ export default function World3D() {
   const openNode = useStore((s) => s.openNode);
   const openBuilding = useStore((s) => s.openBuilding);
   const openEdge = useStore((s) => s.openEdge);
+  const newNodeIds = useStore((s) => s.newNodeIds);
+  const mentions = useStore((s) => s.mentions);
+  const ghosts = useStore((s) => s.ghosts);
+  const focusId = useStore((s) => s.focusId);
 
   const { cx, cy, scale } = useMemo(() => {
     if (!nodes.length) return { cx: 0, cy: 0, scale: 0.85 };
@@ -378,8 +450,22 @@ export default function World3D() {
           shadow-mapSize-height={2048}
         />
         {nodes.map((n) => (
-          <Island key={n.id} position={posOf(n.x, n.y)} node={n} onOpen={() => openNode(n.id)} />
+          <Island
+            key={n.id}
+            position={posOf(n.x, n.y)}
+            node={n}
+            onOpen={() => openNode(n.id)}
+            appearing={newNodeIds.includes(n.id)}
+            mentioned={mentions.includes(n.id)}
+          />
         ))}
+        {ghosts.map((g, i) => {
+          const anchor = nodes.find((n) => n.id === focusId) ?? nodes[0];
+          if (!anchor) return null;
+          const x = anchor.x + 190 + (i % 3) * 120;
+          const y = anchor.y + (i % 2 === 0 ? -110 : 120) + Math.floor(i / 3) * 130;
+          return <GhostIsland key={`${g.name}-${i}`} position={posOf(x, y)} name={g.name} role={g.role} />;
+        })}
         {edges.map((e) => {
           if (e.kind === "direction") {
             if (e.consumed) return null;

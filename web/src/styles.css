@@ -248,3 +248,33 @@ input, textarea { font: inherit; color: inherit; }
 .rail-stem { width: 1.5px; height: 12px; background: #8a7a63; opacity: .55; }
 .rail-post.dir .rail-board { border-style: dashed; color: #7a6f60; }
 .rail-post.suggest .rail-board { border-color: #8a8278; }
+
+/* ---------- 流式语音生成面板 ---------- */
+.inputbar { flex-wrap: wrap; }
+.inputbar .stream-panel {
+  position: absolute; left: 14px; right: 14px; bottom: calc(100% + 8px);
+  background: rgba(255, 253, 247, 0.96); border: 1px solid var(--line);
+  border-radius: 14px; padding: 10px 12px; box-shadow: 0 14px 34px rgba(90, 70, 40, 0.14);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.stream-steps { display: flex; gap: 14px; align-items: center; }
+.stream-step { display: flex; gap: 5px; align-items: center; font-size: 10px; color: #a39a8d; letter-spacing: 1px; }
+.stream-step .dot { width: 6px; height: 6px; border-radius: 50%; background: #d9cfbf; }
+.stream-step.active { color: #2a2620; }
+.stream-step.active .dot { background: #c97b6b; box-shadow: 0 0 0 4px rgba(201, 123, 107, 0.16); animation: pulseDot 1.2s infinite; }
+.stream-step.done .dot { background: #7e8c78; }
+.stream-caption { font-size: 13px; color: #3f382e; line-height: 1.6; letter-spacing: .2px; }
+.stream-caption .caret { display: inline-block; width: 2px; height: 14px; background: #c97b6b; margin-left: 3px; vertical-align: -2px; animation: caretBlink .9s infinite; }
+.stream-entities { display: flex; flex-wrap: wrap; gap: 6px; }
+.entity-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: #6e6558; background: #fffdf7; }
+.entity-chip i { width: 5px; height: 5px; border-radius: 50%; background: #9a9186; display: inline-block; }
+.entity-chip.known { border-color: #7e8fa8; color: #4d5f78; background: rgba(126, 143, 168, .08); }
+.entity-chip.known i { background: #7e8fa8; }
+.entity-chip.ghost { border-style: dashed; border-color: #c97b6b; color: #8a5a4d; animation: ghostIn .35s ease-out; }
+.entity-chip.ghost i { background: #c97b6b; }
+.inputbar .mock-btn { height: 40px; padding: 0 10px; border-radius: 999px; border: 1px dashed var(--line); background: #fffdf7; color: #7a736a; font-size: 11px; }
+.inputbar .mic.rec { animation: micPulse 1.4s infinite; }
+@keyframes pulseDot { 0%,100% { box-shadow: 0 0 0 3px rgba(201,123,107,.12); } 50% { box-shadow: 0 0 0 7px rgba(201,123,107,.04); } }
+@keyframes caretBlink { 0%,45% { opacity: 1; } 50%,100% { opacity: 0; } }
+@keyframes ghostIn { from { opacity: 0; transform: translateY(4px) scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes micPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(201,123,107,.35); } 50% { box-shadow: 0 0 0 10px rgba(201,123,107,0); } }

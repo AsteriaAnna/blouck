@@ -14,6 +14,18 @@ import {
 
 type Drawer = { kind: "node" | "building" | "edge"; id: string } | null;
 
+export type Ghost = {
+  name: string;
+  role?: string;
+  action: string;
+  label?: string;
+  predicate?: string;
+  confidence?: number;
+  pairVerdict?: string;
+};
+
+export type StreamStage = "idle" | "listening" | "detecting" | "confirming" | "generating" | "done";
+
 type State = {
   view: "home" | "world";
   worlds: World[];
@@ -30,6 +42,11 @@ type State = {
   quizStatus: string;
   challenge: any | null;
   partial: string;
+  streamText: string;
+  mentions: string[];
+  ghosts: Ghost[];
+  stage: StreamStage;
+  newNodeIds: string[];
   toast: string;
   busy: boolean;
 
@@ -50,6 +67,11 @@ type State = {
   submitFlow: (id: string, order: string[]) => Promise<void>;
   submitDomain: (id: string, answers: { id: string; answer: string }[]) => Promise<void>;
   setPartial: (text: string) => void;
+  setStreamText: (text: string) => void;
+  setMentions: (ids: string[]) => void;
+  setGhosts: (ghosts: Ghost[]) => void;
+  setStage: (stage: StreamStage) => void;
+  clearStream: () => void;
   showToast: (text: string) => void;
   setFocus: (id: string) => void;
 };
@@ -70,6 +92,11 @@ export const useStore = create<State>((set, getState) => ({
   quizStatus: "idle",
   challenge: null,
   partial: "",
+  streamText: "",
+  mentions: [],
+  ghosts: [],
+  stage: "idle",
+  newNodeIds: [],
   toast: "",
   busy: false,
 
@@ -101,6 +128,12 @@ export const useStore = create<State>((set, getState) => ({
       focusId: p.world.root_node_id,
       drawer: null,
       challenge: null,
+      partial: "",
+      streamText: "",
+      mentions: [],
+      ghosts: [],
+      stage: "idle",
+      newNodeIds: [],
     });
   },
 
@@ -142,20 +175,29 @@ export const useStore = create<State>((set, getState) => ({
 
   async extract(text) {
     if (!getState().world) return;
-    set({ busy: true });
+    const before = new Set(getState().nodes.map((n) => n.id));
+    set({ busy: true, stage: "generating", newNodeIds: [] });
     try {
       const p = await send<any>(`/api/worlds/${getState().world!.id}/extract`, "POST", {
         text,
         fromNodeId: getState().focusId,
       });
+      const newIds = (p.nodes ?? []).filter((n: any) => !before.has(n.id)).map((n: any) => n.id);
       set({
         nodes: p.nodes,
         edges: p.edges,
         buildings: p.buildings,
         directions: p.directions ?? getState().directions,
+        newNodeIds: newIds,
+        ghosts: [],
+        stage: "done",
         busy: false,
       });
-      const n = p.createdNodes?.length ?? 0;
+      window.setTimeout(() => {
+        if (getState().stage === "done") set({ stage: "idle" });
+      }, 2400);
+      window.setTimeout(() => set({ newNodeIds: [] }), 3800);
+      const n = p.createdNodes?.length ?? newIds.length;
       getState().showToast(
         n ? `已落图 ${n} 个新节点 · ${p.provider === "mock" ? "mock 抽取" : "DeepSeek 抽取"}` : "已记录，没有新实体",
       );
@@ -253,5 +295,10 @@ export const useStore = create<State>((set, getState) => ({
     getState().openBuilding(id);
   },
 
-  setPartial: (text) => set({ partial: text }),
+  setPartial: (text) => set({ partial: text, streamText: text }),
+  setStreamText: (text) => set({ streamText: text }),
+  setMentions: (ids) => set({ mentions: ids }),
+  setGhosts: (ghosts) => set({ ghosts }),
+  setStage: (stage) => set({ stage }),
+  clearStream: () => set({ partial: "", streamText: "", mentions: [], ghosts: [], newNodeIds: [], stage: "idle" }),
 }));
