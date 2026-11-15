@@ -23,7 +23,8 @@
 - 红队审查报告：[docs/reviews/mvp-red-team-2026-11-14.md](docs/reviews/mvp-red-team-2026-11-14.md)
 - 3D 范围决策：[docs/reviews/scope-decision-3d-2026-11-14.md](docs/reviews/scope-decision-3d-2026-11-14.md)
 - 实体/关系规则参考：[docs/reviews/entity-relation-rules-reference.md](docs/reviews/entity-relation-rules-reference.md)
-- 实时生成流程与任务拆分：[docs/design/realtime-generation-task-breakdown.md](docs/design/realtime-generation-task-breakdown.md)
+- 实时生成需求基线：[docs/design/required-implementation.md](docs/design/required-implementation.md)
+- 实时生成技术讨论（非需求）：[docs/design/realtime-generation-task-breakdown.md](docs/design/realtime-generation-task-breakdown.md)
 
 
 ## 界面
