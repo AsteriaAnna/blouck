@@ -292,3 +292,31 @@ POST /api/dev/anchor-first
 ### 7.6 一句话
 
 **我之前的快判是"句子模式"，不是你要的"词对判断"；词对判断本身可行且结果合理，但 LLM 版本不够快，需要 embedding/小模型 + 批量。**
+
+
+### 7.7 重复测试：LLM + 只给两个词（3 轮）
+
+说明：这不是原型里的快判（原型快判仍是确定性句子规则），而是单独验证"pair-only LLM 判断"。
+
+| 词对 | 3 轮 verdict | 稳定性 | 平均耗时 | 置信度 |
+| --- | --- | --- | --- | --- |
+| 知识库 ↔ RAG | possible / possible / possible | ✅ | 1004ms | 0.95 |
+| 知识库 ↔ 白雪公主 | unrelated / unrelated / unrelated | ✅ | 965ms | 0.85 |
+| 知识库 ↔ 猎人 | unrelated / unrelated / unrelated | ✅ | 834ms | 0.85 |
+| 知识库 ↔ 公主 | unrelated / unrelated / unrelated | ✅ | 953ms | 0.85–0.90 |
+| 知识库 ↔ 后妈 | unrelated / unrelated / unrelated | ✅ | 1032ms | 0.90 |
+| RAG ↔ 灰姑娘 | unrelated / unrelated / unrelated | ✅ | 955ms | 0.90 |
+| 召回 ↔ 召回率 | possible / possible / possible | ✅ | 892ms | 0.95 |
+| 语义检索 ↔ 混合检索 | possible / possible / possible | ✅ | 929ms | 0.95 |
+
+总计：24 次调用，**avg 946ms、p50 968ms、p95 1148ms**。
+
+结论：
+
+1. **pair-only LLM 判断很稳定**：8/8 对 3 轮一致；
+2. **语义判断符合直觉**：知识库↔RAG possible；童话角色 unrelated；召回↔召回率 possible；语义检索↔混合检索 possible；
+3. **RAG↔灰姑娘被判 unrelated**：pair-only 会直接排除它——这对"不建节点"是对的，但**无法留下"类比"笔记**；比喻/类比必须靠句子级角色判定；
+4. **仍然不快**：每个 pair 约 1s；如果 5 个候选逐个调用就是 5–6s；必须批量（一次多对）或用 embedding/小模型，才能叫"快判"；
+5. 置信度不能替代证据：possible 只说明"可能相关"，谓词/方向/证据仍要慢判。
+
+**因此：pair-only LLM 可以作为"慢速的粗筛"或"批量候选判断"，但不能当毫秒级快判；真正的快判需要本地小模型/embedding，或一次批量 LLM。**
