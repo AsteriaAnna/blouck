@@ -46,6 +46,7 @@ import { mockASR, mockLLM } from "./providers/mock.js";
 import { elkLayout, wfcLayout } from "./layout.js";
 import { placeAround } from "./placement.js";
 import { simulateExplore } from "./explore.js";
+import { runAnchorFirst } from "./anchorFirst.js";
 import { wfcGraphLayout } from "./wfc.js";
 import {
   detectDomainCandidates,
@@ -1123,6 +1124,29 @@ app.post("/api/dev/explore", async (req, res) => {
       buildingKinds: buildings.map((b) => b.kind),
     },
   });
+});
+
+/** DEV：锚点优先垂直切片（A 方案），只用于测试 */
+app.post("/api/dev/anchor-first", async (req, res) => {
+  try {
+    const world = getWorld(String(req.body?.worldId ?? ""));
+    if (!world) return res.status(404).json({ error: "world not found" });
+    const text = String(req.body?.text ?? "").trim();
+    if (!text) return res.status(400).json({ error: "text required" });
+    const result = await runAnchorFirst({
+      worldId: world.id,
+      anchorId: req.body?.anchorId ? String(req.body.anchorId) : undefined,
+      text,
+      candidates: Array.isArray(req.body?.candidates)
+        ? req.body.candidates.map((c: any) => ({ name: String(c?.name ?? "") }))
+        : [],
+      variant: req.body?.variant === "A2" ? "A2" : "A1",
+      apply: Boolean(req.body?.apply),
+    });
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: String(err?.message ?? err) });
+  }
 });
 
 /** 开发用：构造一个必然触发流程/领域副本的世界，便于验证生成与位置 */
