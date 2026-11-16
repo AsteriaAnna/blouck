@@ -8,9 +8,10 @@
 - 之前讨论过的设想：[docs/01-ideas.md](docs/01-ideas.md)（历史，不是实现依据）
 - 之前尝试/推断过的措施：[docs/02-reasoning.md](docs/02-reasoning.md)（历史，不是实现依据）
 - 使用问题与探索记录：[docs/04-problems.md](docs/04-problems.md)（过程记录，不是实现依据）
+- 线系统设计草稿：[docs/05-line-system-draft.md](docs/05-line-system-draft.md)（草稿，待评审）
 - 索引：[docs/00-index.md](docs/00-index.md)
 
-> `01/02` 是历史记录，`04` 是问题/方案探索过程；代码里有没有某个能力，只以 `03-implemented.md` 和源码为准。
+> `01/02` 是历史记录，`04` 是问题/方案探索过程，`05` 是设计草稿；代码里有没有某个能力，只以 `03-implemented.md` 和源码为准。
 
 ## 当前实际链路
 

@@ -45,6 +45,8 @@
 
 ### 0.6 全流程公布（本轮设计草案，标注“已定/待定”）
 
+> 详细交互/字段/任务草稿见 [05-line-system-draft.md](05-line-system-draft.md)（v0，待评审）；本节只保留问题视角的流程结论，冲突处以 05 为准。
+
 #### 0.6.1 MD 文档的真正结构
 
 现状：`nodes.free_md`、`edges.md`、`buildings.md` 都是**单个 TEXT blob**，节点另有 definition/aliases 等字段，但没有“人读的 MD”和“机器可校验的结构”之间的分层；也没有版本/来源引用规范。
