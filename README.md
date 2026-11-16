@@ -1,3 +1,9 @@
+# [👉 打开本地应用：http://localhost:5173](http://localhost:5173)
+
+**前端** http://localhost:5173 ｜ **后端** http://localhost:8787 ｜ **麦克风/ASR 自检** http://localhost:5173/mic-test.html
+
+---
+
 # 知识世界（blouck）
 
 把语音/文字输入变成可探索、可编辑、可挑战的 3D 知识地图。
