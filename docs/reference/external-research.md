@@ -200,3 +200,33 @@
 - 这些资料覆盖了问题 6 的**组件**：焦点栈、指代、实体链接、DST、流式图、provisional UI；
 - 没有任何一份资料给出"教学图 + 多焦点 + 父子链 + provisional"的端到端实现；
 - 所以能做，但必须组合，不是找一个库接上。
+
+
+---
+
+## 9. 工程侧参考（只用于持久化/多端阶段，不是 MVP 必需）
+
+这些不是 KG 论文，而是工程模式；现在不需要全上。
+
+| 问题 | 参考 | 用在哪 | 现在需要吗 |
+| --- | --- | --- | --- |
+| 先显示、后确认 | [React useOptimistic](https://react.dev/reference/react/useOptimistic) | provisional/ghost 的 UI 状态 | ✅ 概念可用 |
+| 感知延迟 | Perceived performance / skeleton screen 模式 | 占位、渐进呈现 | ✅ 概念可用 |
+| 并发写冲突 | [Optimistic concurrency control（Kung & Robinson, 1981）](https://dl.acm.org/doi/abs/10.1145/319566.319567) | 多端/多请求同时改图 | ❌ 延后 |
+| 失败补偿 | [Sagas（Garcia-Molina & Salem, 1987）](https://dl.acm.org/doi/abs/10.1145/38714.38742) | 长事务式的 provisional→commit 失败回滚 | ❌ 延后 |
+| 实体消解 | [Entity Resolution survey（VLDB 2012）](https://dl.acm.org/doi/abs/10.14778/2367502.2367564) | 同一实体多名称/多轮合并 | ⚠️ 先只用别名/模糊；完整方案延后 |
+| 多端最终一致 | CRDT / event sourcing / CQRS | 多标签页、离线、重放 | ❌ 延后 |
+| 幂等 | API idempotency key 工程模式 | 重复提交/重试 | ❌ 延后 |
+
+### 9.1 结论
+
+- **MVP 不需要三层一致性、并发控制、Saga、CRDT、完整实体消解**；
+- 这些是"有持久化、多端、失败补偿"之后的问题；
+- 现在只需要：本地匹配 + provisional + 简单父链 + 单端内存状态；
+- 过早引入会把 MVP 拖死。
+
+### 9.2 边界
+
+- 参考只说明"方向存在"，不代表"现在必须做"；
+- 不要把生产期方案写进 MVP 验收；
+- 如果后续要做持久化/多端，再逐项引入。
