@@ -4,6 +4,7 @@
 
 - [asr.md](asr.md)：partial / segment final / hotwords / 自动结束
 - [provisional.md](provisional.md)：节点 provisional 状态、同 ID、坐标、commit
+- [focus.md](focus.md)：焦点栈、parent 选择、指代
 - [relation-binding.md](relation-binding.md)：新节点与已有节点的关系绑定
 - [issues.md](issues.md)：真实语音跑通后的文本/位置/启动时序问题
 

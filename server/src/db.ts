@@ -190,6 +190,11 @@ CREATE TABLE IF NOT EXISTS source_spans(
   id TEXT PRIMARY KEY, world_id TEXT NOT NULL, text TEXT NOT NULL,
   revision INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS focus_stack(
+  world_id TEXT PRIMARY KEY,
+  stack TEXT NOT NULL DEFAULT '[]',
+  updated_at INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS directions(
   id TEXT PRIMARY KEY, world_id TEXT NOT NULL, node_id TEXT NOT NULL,
   question TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '',
@@ -337,6 +342,26 @@ export function updateNodeMeta(
     patch.sourceSpanId ?? cur.source_span_id,
     id,
   );
+}
+
+export function getFocusStack(worldId: string): string[] {
+  const row = db.prepare("SELECT stack FROM focus_stack WHERE world_id=?").get(worldId) as
+    | { stack: string }
+    | undefined;
+  if (!row) return [];
+  try {
+    const arr = JSON.parse(row.stack);
+    return Array.isArray(arr) ? arr.map(String).slice(0, 12) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function setFocusStack(worldId: string, stack: string[]) {
+  const clean = [...new Set(stack.filter(Boolean))].slice(0, 12);
+  db.prepare(
+    "INSERT INTO focus_stack(world_id,stack,updated_at) VALUES(?,?,?) ON CONFLICT(world_id) DO UPDATE SET stack=excluded.stack, updated_at=excluded.updated_at",
+  ).run(worldId, JSON.stringify(clean), now());
 }
 
 /** 重新计算前沿节点：没有向外知识关系的节点（隐藏节点不算） */

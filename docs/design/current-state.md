@@ -198,7 +198,7 @@ RAG → 检索 → 语义检索/向量检索/混合检索
 | 连续 ASR 会话 | 句末 close 自动重连；自检页真人验证 final 完整 | ✅ |
 | provisional 同 ID | `status` 字段；commit 只改状态 | ✅ |
 | provisional 坐标 = 最终坐标 | 服务端 placeAround 写库，前端直接渲染 | ✅ |
-| 多焦点/父节点 | 单 focus；source 缺省 focus | ❌ |
+| 多焦点/父节点 | focus 栈 + parent 选择 + 前者/后者 | ✅ |
 | 新节点绑已有节点 | 只有 LLM 主动输出 target 才绑 | ⚠️ |
 | 关系 edge 生命周期 | 无 relationId/revision | ❌ |
 | hotwords/context | 已接（本轮） | ✅ |
@@ -222,4 +222,4 @@ RAG → 检索 → 语义检索/向量检索/混合检索
 
 - 不是"完全虚构"，组件和基础链路是真的；
 - "按句建图、provisional 同 ID、共享坐标、音频采集"已接进主链路；"多焦点、启动预暖、文本重写"仍未完全对标；
-- 下一步优先：focus/多焦点与父节点选择，再补关系绑定、启动预暖、文本重写。
+- 下一步优先：关系绑定补全、启动预暖、文本重写。
