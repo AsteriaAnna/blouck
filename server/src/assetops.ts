@@ -1,4 +1,4 @@
-﻿import { db, getGraph, getNode, getWorld, listBuildings, getBuilding, type BuildingRow, type EdgeRow, type NodeRow } from "./db.js";
+import { db, getGraph, getNode, getWorld, listBuildings, getBuilding, type BuildingRow, type EdgeRow, type NodeRow } from "./db.js";
 
 const DOMAIN_DAILY_LIMIT = 10;
 
@@ -189,16 +189,16 @@ export function ensureDirectionFrontiers(worldId: string) {
       ...buildings.map((b) => ({ x: b.x, y: b.y })),
     ];
     let spot: Pt | null = null;
-    for (const r of [260, 340, 440, 560]) {
+    for (const r of [312, 408, 528, 672]) {
       const p = { x: src.x + Math.cos(angle) * r, y: src.y + Math.sin(angle) * r };
-      const clear = occupied.every((o) => dist(p, o) > 180);
+      const clear = occupied.every((o) => dist(p, o) > 216);
       if (clear) {
         spot = p;
         break;
       }
     }
     if (!spot) {
-      spot = findFreeSpot({ x: src.x, y: src.y }, occupied, [260, 360, 470, 600], false);
+      spot = findFreeSpot({ x: src.x, y: src.y }, occupied, [312, 432, 564, 720], false);
     }
     db.prepare("UPDATE edges SET frontier_x=?, frontier_y=? WHERE id=?").run(spot.x, spot.y, e.id);
   }

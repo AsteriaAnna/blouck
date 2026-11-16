@@ -177,8 +177,28 @@ app.post("/api/worlds/:id/extract", async (req, res) => {
   const text = String(req.body?.text ?? "").trim();
   const fromNodeId = String(req.body?.fromNodeId ?? world.root_node_id);
   if (!text) return res.status(400).json({ error: "text required" });
-  const focus = getNode(fromNodeId) ?? getNode(world.root_node_id);
+  let focus = getNode(fromNodeId) ?? getNode(world.root_node_id);
   if (!focus) return res.status(400).json({ error: "focus node missing" });
+
+  // 从“探索方向”点进来的：新节点必须落在这个方向延伸出去的位置，而不是 focus 周围
+  let exploreAnchor: { x: number; y: number } | null = null;
+  let exploreAngle: number | null = null;
+  const exploreEdgeId = String(req.body?.exploreEdgeId ?? "");
+  if (exploreEdgeId) {
+    const edge = db.prepare("SELECT * FROM edges WHERE id=?").get(exploreEdgeId) as
+      | { src: string; kind: string; frontier_x: number | null; frontier_y: number | null }
+      | undefined;
+    if (edge && edge.kind === "direction") {
+      const src = getNode(edge.src);
+      if (src) {
+        focus = src;
+        const fx = edge.frontier_x ?? src.x + 312;
+        const fy = edge.frontier_y ?? src.y;
+        exploreAnchor = { x: fx, y: fy };
+        exploreAngle = Math.atan2(fy - src.y, fx - src.x);
+      }
+    }
+  }
 
   const span = createSourceSpan(world.id, text);
   const graph = getGraph(world.id);
@@ -251,10 +271,14 @@ app.post("/api/worlds/:id/extract", async (req, res) => {
       continue;
     }
 
+    const anchor = exploreAnchor ?? { x: focus.x, y: focus.y };
+    const baseAngle = exploreAngle ?? (placed.length * 1.7) % (Math.PI * 2);
+    // 同一轮多个新节点沿探索方向小角度扇形展开，避免叠在一起
+    const preferAngle = baseAngle + (createdNodes.length % 3) * 0.24 - 0.24;
     const pos = placeAround(
       placed,
-      { id: focus.id, x: focus.x, y: focus.y },
-      { preferAngle: (placed.length * 1.7) % (Math.PI * 2) },
+      { id: "__explore_anchor", x: anchor.x, y: anchor.y },
+      { preferAngle },
     );
     const node = addNode(world.id, name, pos.x, pos.y, "", {
       type,

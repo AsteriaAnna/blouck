@@ -91,7 +91,7 @@ export default function RelationDrawer() {
                 // 从这条方向线的起点探索，而不是当前焦点
                 useStore.getState().setFocus(edge.src);
                 closeDrawer();
-                await extract(edge.question || "继续探索这个方向");
+                await extract(edge.question || "继续探索这个方向", edge.id);
               }}
             >
               去探索

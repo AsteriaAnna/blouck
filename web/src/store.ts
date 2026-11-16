@@ -112,7 +112,7 @@ type State = {
   openBuilding: (id: string) => Promise<void>;
   openEdge: (id: string) => void;
   closeDrawer: () => void;
-  extract: (text: string) => Promise<void>;
+  extract: (text: string, exploreEdgeId?: string) => Promise<void>;
   ingestSegment: (text: string) => Promise<void>;
   commitStream: () => Promise<void>;
   saveMd: (id: string, md: string) => Promise<void>;
@@ -231,7 +231,7 @@ export const useStore = create<State>((set, getState) => ({
 
   setFocus: (id) => set({ focusId: id }),
 
-  async extract(text) {
+  async extract(text, exploreEdgeId) {
     if (!getState().world) return;
     const before = new Set(getState().nodes.map((n) => n.id));
     const ghostsBefore = getState().ghosts;
@@ -240,6 +240,7 @@ export const useStore = create<State>((set, getState) => ({
       const p = await send<any>(`/api/worlds/${getState().world!.id}/extract`, "POST", {
         text,
         fromNodeId: getState().focusId,
+        ...(exploreEdgeId ? { exploreEdgeId } : {}),
       });
       const newIds = (p.nodes ?? []).filter((n: any) => !before.has(n.id)).map((n: any) => n.id);
       set({

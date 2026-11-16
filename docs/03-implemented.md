@@ -235,8 +235,11 @@ parent 选择顺序（新节点挂到谁）：
 - 点线显示**一句话文档**（按语义类型）：正式/来源/建议线用 predicate 关系类型（归类/组成/前置/对比/替代/相关；来源线为“探索来源”）；建议线额外提供「接受为正式关系」，方向线提供「去探索」。MVP 不再展示证据/置信度/关系 MD 编辑器。
 - 题目/答题：后端 quizzes 接口仍在，但 MVP 前端不展示题目区，也不展示节点 tier。
 - 抽屉（.drawer）`z-index: 100`；3D HTML 标签的 `zIndexRange` 被限制在 30 以下（副本标题 20 以下），避免副本标题/节点标签穿透打开中的 MD 文档。
-- 关系路牌：`suggest`（建议标签）与 `direction`（方向问题）在 3D 里有木柱牌（Canvas 文字、始终面向相机、可点击）；`source` 只画起点圆点、不立牌。
+- 关系路牌：`suggest`（建议标签）与 `direction`（方向问题）在 3D 里有木柱路牌（旧版样式：Canvas 文字、始终面向相机、可点击）；`source` 只画起点圆点、不立牌。方向线末端用「木柱路牌 + 地面方向箭头」表示探索方向。
 - `GET /api/worlds/:id` 会先 `computeFrontier` 再 `ensureDirectionFrontiers`：老世界/示例世界如果从未算过 frontier，方向线会全部不渲染；现在打开世界会修正 frontier（示例世界 17/24 个 frontier 节点）。
+- 节点间距：`placeAround` 默认最小间距 282、环半径 300–936（整体约为上一版的 1.2 倍）；方向 frontier 偏移也 ×1.2（312/408/528/672，净空 216）。
+- 关系线弧度：使用三次贝塞尔（bow = clamp(len×0.16, 18, 110)），比原来的二次弧更缓、两端切线更顺。
+- 从方向线探索时：`/extract` 可带 `exploreEdgeId`；新节点围绕该方向线的 frontier 点、沿 source→frontier 的方向扇形延伸（mock 验证：与方向夹角 ~0.05 rad，距 frontier 约 300），不会再挂到 focus 周围。
 - provisional 节点直接作为地图节点渲染，与 committed 同一套坐标（不用另一套 ghost 坐标）；标签显示「候选 · 名字」、虚线弱化样式与脉冲环，commit 后恢复普通标签样式。
 - 相机只在进入世界（world id 变化）时自动 fit 一次，把全部节点+副本框进视野；之后新增节点不重设相机，也不给 OrbitControls 传会随每次重渲染重设的 `target` prop。
 - 节点坐标到世界坐标的映射用“当前节点包围盒质心”居中（`World3D.tsx` 的 `posOf` 用 `cx/cy`），所以节点集合变化时整张地图会按新包围盒重新居中；这是既有布局行为，不是相机移动。
@@ -282,6 +285,7 @@ pnpm build
 - 验收期间还发现并修复两处 dev 环境问题：React StrictMode 下 InputBar 挂载 effect 双调用导致 `.mic`/`.mock-btn` 无响应（挂载 effect 复位状态机 ref）；OrbitControls 收到的 `target` prop 会在每次重渲染时把 target 设回原点（已移除该 prop，世界中心只由 CameraFit 设置）。
 - 2026-11-16 MVP 前端改动（Chrome CDP + 真实 DeepSeek 验收）：四种线美术（管状/虚线/点线+信标）、线点击打开一句话关系文档、节点文档（名称/正文/来源）、MVP 隐藏答题区与 tier；正式/来源/方向文档与节点文档实测通过，建议线「接受」后 kind 变 formal，console 无异常；`pnpm typecheck`/`pnpm build` 通过。验收脚本与截图在仓库外：`_verify/probe-mvp-lines.mjs`、`_verify/probe-mvp-suggest.mjs`、`_verify/probe-line-click.mjs`、`_verify/probe-drawer-z.mjs`、`_verify/shots/mvp-*.png`。
 - 2026-11-16 修复：示例世界所有节点 frontier=0 导致方向线全部不渲染（GET world 现在先 computeFrontier，示例世界修复后 frontier=17/24、未消费方向 7 条可见）；恢复建议/方向路牌（木柱牌），并把副本标题的 Html 层级压到抽屉以下（drawer z=100）。
+- 2026-11-16 交互调整：节点间距与 frontier 偏移 ×1.2；关系线改三次贝塞尔缓弧；方向线末端改为「旧版木柱路牌 + 地面方向箭头」；从方向探索时新节点在 frontier 点沿方向延伸（mock API 验证）。
 
 没有 CI、没有自动化单元测试框架；以上验证用的是临时复现/验收脚本（不在本仓库内），没有引入测试框架。LLM 失败时的前端 warning/toast 本轮只做了代码级确认，未在真实失败场景下动态验证。
 

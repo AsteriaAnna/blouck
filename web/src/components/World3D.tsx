@@ -231,18 +231,18 @@ function Building({
   );
 }
 
-/** 贴地弧线：所有点 y=0，只在 XZ 平面里弯（与岛屿的平面高度一致） */
+/** 贴地弧线：两端切线更顺的缓弧，避免长线看起来像硬折 */
 function edgeCurve(a: THREE.Vector3, b: THREE.Vector3) {
   const s = a.clone().setY(0);
   const t = b.clone().setY(0);
-  const mid = s.clone().add(t).multiplyScalar(0.5);
   const dx = t.x - s.x;
   const dz = t.z - s.z;
   const len = Math.hypot(dx, dz) || 1;
-  const bow = Math.min(60, len * 0.12);
-  mid.x += (-dz / len) * bow;
-  mid.z += (dx / len) * bow;
-  return new THREE.QuadraticBezierCurve3(s, mid, t);
+  const bow = Math.min(110, Math.max(18, len * 0.16));
+  const perp = new THREE.Vector3(-dz / len, 0, dx / len);
+  const p1 = s.clone().add(t.clone().sub(s).multiplyScalar(1 / 3)).add(perp.clone().multiplyScalar(bow));
+  const p2 = s.clone().add(t.clone().sub(s).multiplyScalar(2 / 3)).add(perp.clone().multiplyScalar(bow));
+  return new THREE.CubicBezierCurve3(s, p1, p2, t);
 }
 
 /** 沿线的透明命中体：线太细，用一根不可见管子接点击 */
@@ -271,90 +271,14 @@ function HitTube({
   );
 }
 
-/** 探索点：雾里发光的“？”信标（对应方向线末端） */
-function makeQuestionTexture() {
-  const canvas = document.createElement("canvas");
-  canvas.width = 128;
-  canvas.height = 128;
-  const ctx = canvas.getContext("2d")!;
-  const cx = 64;
-  const cy = 64;
-  const grad = ctx.createRadialGradient(cx, cy, 8, cx, cy, 62);
-  grad.addColorStop(0, "rgba(255,252,240,0.98)");
-  grad.addColorStop(0.55, "rgba(255,246,222,0.72)");
-  grad.addColorStop(1, "rgba(255,240,200,0)");
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 62, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#fffdf7";
-  ctx.strokeStyle = "#8a7a63";
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 30, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = "#6f6252";
-  ctx.font = "bold 42px 'Microsoft YaHei','Segoe UI',sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("?", cx, cy + 2);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-function QuestionBeacon({
-  position,
-  onOpen,
-}: {
-  position: [number, number, number];
-  onOpen: () => void;
-}) {
-  const ref = useRef<THREE.Group>(null);
-  const tex = useMemo(makeQuestionTexture, []);
-  useFrame(({ clock }) => {
-    if (!ref.current) return;
-    const t = clock.elapsedTime;
-    ref.current.position.y = 14 + Math.sin(t * 1.8 + position[0] * 0.01) * 5;
-    const k = 1.04 + Math.sin(t * 2.2) * 0.08;
-    ref.current.scale.setScalar(k);
-    const glow = ref.current.children[1] as THREE.Mesh | undefined;
-    if (glow) {
-      const mat = glow.material as THREE.MeshBasicMaterial;
-      mat.opacity = 0.3 + 0.16 * (0.5 + 0.5 * Math.sin(t * 2.2));
-    }
-  });
-  return (
-    <group
-      ref={ref}
-      position={position}
-      onPointerDown={(e) => {
-        e.stopPropagation();
-        onOpen();
-      }}
-      onPointerOver={() => (document.body.style.cursor = "pointer")}
-      onPointerOut={() => (document.body.style.cursor = "auto")}
-    >
-      <sprite scale={[38, 38, 1]}>
-        <spriteMaterial map={tex} transparent depthWrite={false} />
-      </sprite>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -10, 0]}>
-        <ringGeometry args={[17, 22, 28]} />
-        <meshBasicMaterial color="#c2ac8d" transparent opacity={0.32} depthWrite={false} side={THREE.DoubleSide} />
-      </mesh>
-    </group>
-  );
-}
-
-/** 立体路牌：木柱 + 牌面（Canvas 文字），始终转向相机，可点击 */
+/** 立体路牌：木柱 + 牌面（Canvas 文字），始终转向相机，可点击（建议线用） */
 function makeBoardTexture(text: string) {
   const font = "500 30px 'Microsoft YaHei','Segoe UI',system-ui,sans-serif";
   const pad = 22;
   const probe = document.createElement("canvas").getContext("2d")!;
   probe.font = font;
   const rawW = Math.ceil(probe.measureText(text).width);
-  const W = Math.min(440, Math.max(120, rawW + pad * 2));
+  const W = Math.min(520, Math.max(150, rawW + pad * 2));
   const H = 64;
   const canvas = document.createElement("canvas");
   canvas.width = W * 2;
@@ -390,7 +314,7 @@ function makeBoardTexture(text: string) {
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
-  return { tex, width: Math.min(260, Math.max(120, rawW * 0.8)), height: 34 };
+  return { tex, width: W * 0.32, height: H * 0.32 };
 }
 
 function SignPost({
@@ -422,21 +346,58 @@ function SignPost({
       onPointerOver={() => (document.body.style.cursor = "pointer")}
       onPointerOut={() => (document.body.style.cursor = "auto")}
     >
-      <mesh position={[0, 9, 0]} castShadow>
-        <cylinderGeometry args={[1.4, 1.8, 18, 8]} />
-        <meshStandardMaterial color="#8a7455" flatShading />
+      <mesh position={[0, 11, 0]} castShadow>
+        <cylinderGeometry args={[1.6, 2.0, 22, 8]} />
+        <meshStandardMaterial color="#a08a6a" flatShading />
       </mesh>
-      <mesh position={[0, 22, 0]} castShadow>
-        <boxGeometry args={[width, height, 1.2]} />
-        <meshBasicMaterial color="#fffdf7" />
+      <mesh position={[0, 26, 0]} castShadow>
+        <boxGeometry args={[width, height, 1.6]} />
+        <meshStandardMaterial color="#fffdf7" />
       </mesh>
-      <mesh position={[0, 22, 0.75]}>
-        <planeGeometry args={[width - 1.2, height - 1.2]} />
+      <mesh position={[0, 26, 0.95]}>
+        <planeGeometry args={[width - 1.4, height - 1.4]} />
         <meshBasicMaterial map={tex} transparent />
       </mesh>
-      <mesh position={[0, 22, -0.75]} rotation={[0, Math.PI, 0]}>
-        <planeGeometry args={[width - 1.2, height - 1.2]} />
+      <mesh position={[0, 26, -0.95]} rotation={[0, Math.PI, 0]}>
+        <planeGeometry args={[width - 1.4, height - 1.4]} />
         <meshBasicMaterial map={tex} transparent />
+      </mesh>
+    </group>
+  );
+}
+
+/** 童话指路牌：旧版木柱路牌 + 地面方向箭头（箭头指向探索方向） */
+function DirectionSign({
+  position,
+  angle,
+  label,
+  onOpen,
+}: {
+  position: [number, number, number];
+  angle: number;
+  label: string;
+  onOpen: () => void;
+}) {
+  const arrow = useMemo(() => {
+    const shape = new THREE.Shape();
+    shape.moveTo(0, -5);
+    shape.lineTo(20, 0);
+    shape.lineTo(0, 5);
+    shape.closePath();
+    return shape;
+  }, []);
+  return (
+    <group position={position}>
+      <SignPost position={[0, 0, 0]} label={label || "下一步方向"} onOpen={onOpen} />
+      <group rotation={[0, -angle, 0]}>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[8, 1.5, 0]}>
+          <shapeGeometry args={[arrow]} />
+          <meshStandardMaterial color="#a9814f" roughness={0.8} flatShading side={THREE.DoubleSide} />
+        </mesh>
+      </group>
+      <mesh position={[0, 45, 0]}>
+        <sphereGeometry args={[3, 10, 10]} />
+        <meshStandardMaterial color="#f3d7a2" emissive="#e0a95e" emissiveIntensity={0.55} />
       </mesh>
     </group>
   );
@@ -500,12 +461,6 @@ function Edge({
         dashSize={dotted ? 2 : 9}
         gapSize={dotted ? 10 : 7}
       />
-      {kind === "suggest" ? (
-        <mesh position={[mid.x, 4, mid.z]} castShadow>
-          <sphereGeometry args={[4, 12, 10]} />
-          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.35} roughness={0.7} flatShading />
-        </mesh>
-      ) : null}
       {kind === "suggest" && label ? (
         <SignPost position={[mid.x, 0, mid.z]} label={label} onOpen={onOpen} />
       ) : null}
@@ -514,7 +469,7 @@ function Edge({
   );
 }
 
-/** 方向线：点线 + 中点路牌（问题）+ 末端发光的“？”探索点 */
+/** 方向线：点线 + 末端童话指路牌（木柱 + 箭头牌 + 可读文字牌） */
 function DirectionEdge({
   a,
   b,
@@ -531,7 +486,7 @@ function DirectionEdge({
     () => curve.getPoints(28).map((p) => [p.x, p.y, p.z] as [number, number, number]),
     [curve],
   );
-  const mid = useMemo(() => curve.getPoint(0.5), [curve]);
+  const angle = Math.atan2(b.z - a.z, b.x - a.x);
   return (
     <group>
       <Line
@@ -544,9 +499,8 @@ function DirectionEdge({
         dashSize={2}
         gapSize={10}
       />
-      {label ? <SignPost position={[mid.x, 0, mid.z]} label={label} onOpen={onOpen} /> : null}
       <HitTube curve={curve} onOpen={onOpen} radius={12} />
-      <QuestionBeacon position={[b.x, 0, b.z]} onOpen={onOpen} />
+      <DirectionSign position={[b.x, 0, b.z]} angle={angle} label={label} onOpen={onOpen} />
     </group>
   );
 }

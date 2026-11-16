@@ -15,8 +15,8 @@ export function placeAround(
   anchor: Placed,
   opts: { minGap?: number; preferAngle?: number } = {},
 ): { x: number; y: number } {
-  const minGap = opts.minGap ?? 235;
-  if (existing.length === 0) return { x: anchor.x + 300, y: anchor.y };
+  const minGap = opts.minGap ?? 282;
+  if (existing.length === 0) return { x: anchor.x + 360, y: anchor.y };
 
   // 地图重心 → 用来判断"朝外"方向
   const cx = existing.reduce((a, p) => a + p.x, 0) / existing.length;
@@ -37,7 +37,7 @@ export function placeAround(
   let best: { x: number; y: number } | null = null;
   let bestScore = -Infinity;
 
-  for (const radius of [250, 330, 420, 520, 640, 780]) {
+  for (const radius of [300, 396, 504, 624, 768, 936]) {
     for (let k = 0; k < 16; k++) {
       const angle = prefer + k * (Math.PI / 8) + existing.length * 0.17;
       const x = anchor.x + Math.cos(angle) * radius;
@@ -67,7 +67,7 @@ export function placeAround(
     if (best && bestScore > 0) break;
   }
 
-  return best ?? { x: anchor.x + 300, y: anchor.y };
+  return best ?? { x: anchor.x + 360, y: anchor.y };
 }
 
 /** 局部松弛：只在新节点附近消掉残留重叠，不整体重排 */
