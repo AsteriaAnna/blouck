@@ -5,12 +5,35 @@ import { useStore } from "../store";
 /** AudioWorklet：把麦克风 Float32 采样转成 Int16 PCM 块 */
 const WORKLET_SRC = `
 class PCMWorklet extends AudioWorkletProcessor {
+  constructor(options) {
+    super();
+    this.inRate = (options.processorOptions && options.processorOptions.sampleRate) || 48000;
+    this.outRate = 16000;
+    this.ratio = this.inRate / this.outRate;
+    this.carry = new Float32Array(0);
+    this.pos = 0;
+  }
   process(inputs) {
     const ch = inputs[0] && inputs[0][0];
-    if (ch && ch.length) {
-      const pcm = new Int16Array(ch.length);
-      for (let i = 0; i < ch.length; i++) {
-        const s = Math.max(-1, Math.min(1, ch[i]));
+    if (!ch || !ch.length) return true;
+    const merged = new Float32Array(this.carry.length + ch.length);
+    merged.set(this.carry, 0);
+    merged.set(ch, this.carry.length);
+    const out = [];
+    let pos = this.pos;
+    while (pos + 1 < merged.length) {
+      const i0 = Math.floor(pos);
+      const frac = pos - i0;
+      out.push(merged[i0] * (1 - frac) + merged[i0 + 1] * frac);
+      pos += this.ratio;
+    }
+    const drop = Math.floor(pos);
+    this.carry = merged.slice(drop);
+    this.pos = pos - drop;
+    if (out.length) {
+      const pcm = new Int16Array(out.length);
+      for (let i = 0; i < out.length; i++) {
+        const s = Math.max(-1, Math.min(1, out[i]));
         pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
       }
       this.port.postMessage(pcm.buffer, [pcm.buffer]);

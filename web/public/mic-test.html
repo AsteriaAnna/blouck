@@ -60,12 +60,35 @@
 <script>
 const WORKLET = `
 class PCMWorklet extends AudioWorkletProcessor {
+  constructor(options) {
+    super();
+    this.inRate = (options.processorOptions && options.processorOptions.sampleRate) || 48000;
+    this.outRate = 16000;
+    this.ratio = this.inRate / this.outRate;
+    this.carry = new Float32Array(0);
+    this.pos = 0;
+  }
   process(inputs) {
     const ch = inputs[0] && inputs[0][0];
-    if (ch && ch.length) {
-      const pcm = new Int16Array(ch.length);
-      for (let i = 0; i < ch.length; i++) {
-        const s = Math.max(-1, Math.min(1, ch[i]));
+    if (!ch || !ch.length) return true;
+    const merged = new Float32Array(this.carry.length + ch.length);
+    merged.set(this.carry, 0);
+    merged.set(ch, this.carry.length);
+    const out = [];
+    let pos = this.pos;
+    while (pos + 1 < merged.length) {
+      const i0 = Math.floor(pos);
+      const frac = pos - i0;
+      out.push(merged[i0] * (1 - frac) + merged[i0 + 1] * frac);
+      pos += this.ratio;
+    }
+    const drop = Math.floor(pos);
+    this.carry = merged.slice(drop);
+    this.pos = pos - drop;
+    if (out.length) {
+      const pcm = new Int16Array(out.length);
+      for (let i = 0; i < out.length; i++) {
+        const s = Math.max(-1, Math.min(1, out[i]));
         pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
       }
       this.port.postMessage(pcm.buffer, [pcm.buffer]);
@@ -87,8 +110,6 @@ const b64 = (buf) => {
 let ws = null, ctx = null, stream = null, node = null;
 let chunks = [];
 let sentBytes = 0;
-let rCarry = new Float32Array(0);
-let rPos = 0;
 let pcmPending = new Int16Array(0);
 let recorder = null;
 let recordedParts = [];
@@ -98,31 +119,6 @@ function setStatus(s) { $("status").textContent = s; }
 function fail(e) {
   $("error").textContent = String((e && (e.stack || e.message)) || e);
   setStatus("出错");
-}
-
-function resample(samples, inRate) {
-  if (inRate === 16000) return samples;
-  const ratio = inRate / 16000;
-  const merged = new Float32Array(rCarry.length + samples.length);
-  merged.set(rCarry, 0);
-  merged.set(samples, rCarry.length);
-  const out = [];
-  let pos = rPos;
-  while (pos + 1 < merged.length) {
-    const i0 = Math.floor(pos);
-    const frac = pos - i0;
-    out.push(merged[i0] * (1 - frac) + merged[i0 + 1] * frac);
-    pos += ratio;
-  }
-  const drop = Math.floor(pos);
-  if (drop > 0) {
-    rCarry = merged.slice(drop);
-    rPos = pos - drop;
-  } else {
-    rCarry = merged;
-    rPos = pos;
-  }
-  return Float32Array.from(out);
 }
 
 function sendPcm(pcm) {
@@ -161,12 +157,7 @@ function sendSilence(ms) {
   sendPcm(pcm);
 }
 
-function flush(samples) {
-  const pcm = new Int16Array(samples.length);
-  for (let j = 0; j < samples.length; j++) {
-    const s = Math.max(-1, Math.min(1, samples[j]));
-    pcm[j] = s < 0 ? s * 0x8000 : s * 0x7fff;
-  }
+function flush(pcm) {
   pushPcm(pcm);
 }
 
@@ -175,7 +166,7 @@ async function start() {
   $("partial").textContent = "";
   $("final").textContent = "";
   chunks = []; sentBytes = 0; recordedParts = [];
-  rCarry = new Float32Array(0); rPos = 0; pcmPending = new Int16Array(0);
+  pcmPending = new Int16Array(0);
   if (originalUrl) URL.revokeObjectURL(originalUrl);
   originalUrl = "";
   $("sent").textContent = "0 字节 / 0.0 秒";
@@ -207,7 +198,8 @@ async function start() {
     $("error").textContent = "MediaRecorder 不可用：" + e;
   }
 
-  ctx = new AudioContext({ sampleRate: 16000 });
+  // 不强制 16k：用浏览器原生采样率，重采样放到 AudioWorklet 里
+  ctx = new AudioContext();
   await ctx.resume();
   $("rate").textContent = ctx.sampleRate + " Hz, state=" + ctx.state;
 
@@ -217,8 +209,10 @@ async function start() {
   URL.revokeObjectURL(url);
 
   const source = ctx.createMediaStreamSource(stream);
-  node = new AudioWorkletNode(ctx, "pcm-worklet");
-  node.port.onmessage = (ev) => flush(resample(new Float32Array(ev.data), ctx.sampleRate));
+  node = new AudioWorkletNode(ctx, "pcm-worklet", {
+    processorOptions: { sampleRate: ctx.sampleRate },
+  });
+  node.port.onmessage = (ev) => flush(new Int16Array(ev.data));
   source.connect(node);
 
   const proto = location.protocol === "https:" ? "wss" : "ws";
