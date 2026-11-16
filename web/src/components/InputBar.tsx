@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { send } from "../api";
 import { useStore } from "../store";
 
@@ -104,6 +104,10 @@ export default function InputBar() {
   const finishOnceRef = useRef(false);
   const reconnectTimerRef = useRef<number | null>(null);
   const pendingAudioRef = useRef<string[]>([]);
+  const flushTailRef = useRef<null | (() => void)>(null);
+  const lastAudioAtRef = useRef(0);
+  const keepAliveRef = useRef<number | null>(null);
+  const asrErrorCountRef = useRef(0);
 
   useEffect(() => {
     return () => {
@@ -230,9 +234,21 @@ export default function InputBar() {
       if (wsRef.current !== ws) return;
       const hotwords = nodes.map((n) => n.name).filter(Boolean).slice(0, 80);
       ws.send(JSON.stringify({ type: mock ? "mock" : "start", hotwords }));
+      // 立即发一点静音，避免 ASR 在等第一包音频时超时
+      const silence = toBase64(new Int16Array(1600).buffer);
+      ws.send(JSON.stringify({ type: "audio", chunk: silence }));
+      lastAudioAtRef.current = Date.now();
       // 补发 WS ready 之前的早期音频
       const queued = pendingAudioRef.current.splice(0);
       for (const chunk of queued) ws.send(JSON.stringify({ type: "audio", chunk }));
+      if (keepAliveRef.current) window.clearInterval(keepAliveRef.current);
+      keepAliveRef.current = window.setInterval(() => {
+        if (wsRef.current?.readyState !== WebSocket.OPEN || !recordingRef.current) return;
+        if (Date.now() - lastAudioAtRef.current < 1500) return;
+        const chunk = toBase64(new Int16Array(1600).buffer);
+        wsRef.current.send(JSON.stringify({ type: "audio", chunk }));
+        lastAudioAtRef.current = Date.now();
+      }, 1000);
       setRec(true);
       setState(mock ? "模拟语音中…" : "录音中…（再点一次结束）");
     };
@@ -269,17 +285,30 @@ export default function InputBar() {
           } catch {}
         }
       } else if (msg.type === "error") {
+        if (recordingRef.current && !stoppingRef.current) {
+          asrErrorCountRef.current += 1;
+          if (asrErrorCountRef.current <= 2) {
+            setState("语音会话超时，正在重连…");
+            try { ws.close(); } catch {}
+            return;
+          }
+        }
         setMicError(String(msg.message ?? "语音识别失败"));
         setState("识别失败");
         setStage("idle");
         recordingRef.current = false;
         stopTracks();
       } else if (msg.type === "ready") {
+        asrErrorCountRef.current = 0;
         setState((prev) => (prev.includes("录音中") ? prev : `已连接（${msg.provider}）`));
       }
     };
     ws.onclose = () => {
       if (wsRef.current !== ws) return;
+      if (keepAliveRef.current) {
+        window.clearInterval(keepAliveRef.current);
+        keepAliveRef.current = null;
+      }
       if (recordingRef.current && !stoppingRef.current) {
         // ASR 在句末关闭：保持录音，重连继续
         if (reconnectTimerRef.current) window.clearTimeout(reconnectTimerRef.current);

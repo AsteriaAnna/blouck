@@ -173,6 +173,17 @@ export const doubaoASR: ASRProvider = {
     ws.on("message", (data) => {
       const frame = parseServerFrame(Buffer.from(data as Buffer));
       if (frame.type === 15) {
+        // 45000081：等待下一包音频超时。不是致命错误，按会话结束处理，交给前端重连。
+        if (frame.code === 45000081) {
+          if (!finalSent) {
+            finalSent = true;
+            events.onFinal(lastPartial || lastDefinite || "");
+          }
+          try {
+            ws?.close();
+          } catch {}
+          return;
+        }
         fallback(`服务端错误 ${frame.code} ${frame.text.slice(0, 120)}`);
         return;
       }
