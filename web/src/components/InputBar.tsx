@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { send } from "../api";
 import { useStore } from "../store";
 
@@ -209,6 +209,10 @@ export default function InputBar() {
           await requestPreview(msg.text, true);
           await extract(msg.text);
         })();
+      } else if (msg.type === "segment") {
+        setStreamTextFinal(msg.text);
+        setStage("confirming");
+        setState("本句已确认 · 继续说话，或再点一次结束");
       } else if (msg.type === "error") {
         setRec(false);
         setMicError(String(msg.message ?? "语音识别失败"));
@@ -216,7 +220,7 @@ export default function InputBar() {
         setStage("idle");
         stopTracks();
       } else if (msg.type === "ready") {
-        setState(`已连接（${msg.provider}）`);
+        setState((prev) => (prev.includes("录音中") ? prev : `已连接（${msg.provider}）`));
       }
     };
     ws.onerror = () => {

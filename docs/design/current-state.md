@@ -170,3 +170,54 @@ RAG → 检索 → 语义检索/向量检索/混合检索
 - 没有现成"教学语义 + 多焦点 + provisional"系统。
 
 因此这不是 prompt 或 Ghost 能修的；需要换状态模型。详见 [problems-and-approaches.md](problems-and-approaches.md) 第 6 节。
+
+
+---
+
+## 9. 对标审计：方向 vs 当前实现（2026-11-16）
+
+### 9.1 不是空壳，但核心新方向没有接进主链路
+
+真实存在的部分：
+
+- 豆包流式 ASR（`/ws/asr`）；
+- DeepSeek 抽取；
+- SQLite 节点/关系/方向/副本；
+- 3D 地图、抽屉、题目、副本；
+- 评测脚本。
+
+这些不是 mock 空壳，能跑。
+
+但"新方向"里的大部分只存在于测试脚本/文档，主链路仍是旧批量管线：
+
+| 目标方向 | 当前主链路 | 状态 |
+| --- | --- | --- |
+| 流式语音 partial → 实时反馈 | 有 partial；segment 只更新文字 | ⚠️ 部分 |
+| 按句 final → 建图/修正 | segment 已发；主链路不按句 extract | ❌ |
+| provisional 同 ID | 主链路没有 provisional | ❌ |
+| provisional 坐标 = 最终坐标 | ghost 前端算，final 后端算 | ❌ |
+| 多焦点/父节点 | 单 focus；source 缺省 focus | ❌ |
+| 新节点绑已有节点 | 只有 LLM 主动输出 target 才绑 | ⚠️ |
+| 关系 edge 生命周期 | 无 relationId/revision | ❌ |
+| hotwords/context | 已接（本轮） | ✅ |
+| 热词覆盖所有领域词 | 只用当前图谱节点名 | ⚠️ |
+| 启动预暖/早音频缓存 | 无；ws open 前丢 PCM | ❌ |
+
+### 9.2 会间接影响你观察到的现象
+
+1. **focusId 不推进** → 所有句子都可能挂初始节点；
+2. **placeAround(focus)** → 正式节点全围绕同一焦点；
+3. **ghost 位置前端临时算** → 和 final 位置不一致；
+4. **final 重新建节点** → ghost 消失、新 ID/新位置；
+5. **/extract 等待方向/副本检测** → 用户感觉 final 很慢；
+6. **segment 只更新文字** → 没有"每句落图"；
+7. **ws open 前丢 PCM** → 开头没识别；
+8. **ready 覆盖录音状态**（本轮已修）；
+9. **ASR 标点不重写** → 卡壳逗号留在文本里；
+10. **关系 source 缺省 focus** → 城堡/新节点关系可能挂错端点。
+
+### 9.3 结论
+
+- 不是"完全虚构"，组件和基础链路是真的；
+- 但"多焦点、provisional 同 ID、按句建图、共享坐标"这些当前只在测试/文档里，主链路没有完全对标；
+- 下一步应先把 **segment → extract / provisional 状态** 接进主链路，而不是继续调动画。
