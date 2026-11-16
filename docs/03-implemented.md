@@ -230,7 +230,10 @@ parent 选择顺序（新节点挂到谁）：
 
 - `web/src/components/InputBar.tsx`：麦克风、Worklet、WS、keepalive、重连、按句去重、segment/commit、失败 toast、停止后兜底 commit；“试听”按钮走 mock ASR。
 - `web/src/store.ts`：`splitCumulativeText` / `sentenceKey` / `pickNewSentences` 纯函数（累计文本切句与去重）；`ingestSegment` / `commitStream` 更新 nodes/edges/focus，失败 toast，`warning` 防御式读取后 toast。
-- `web/src/components/World3D.tsx`：节点、关系、建筑、方向线。
+- `web/src/components/World3D.tsx`：节点、关系、建筑、方向线。四种线按类型分美术：正式关系=深色 3D 管状实线（半径约 2.8）、探索来源=蓝灰管状实线 + 起点圆点（半径约 2.0）、待确认建议=统一色虚线 + 中点圆珠、方向=点线 + 末端发光“？”探索信标（sprite + 脉冲环）。所有线都带透明命中管，点击可打开关系/方向文档。
+- 点节点显示**节点文档**：标题（节点名）、正文（`definition` + `free_md`，ReactMarkdown 渲染）、来源 blockquote（来自 `source_text/source_at`）、以及「编辑」自由区；MVP 暂不展示答题/档位/关系列表/手动关联/继续探索/隐藏面板。
+- 点线显示**一句话文档**（按语义类型）：正式/来源/建议线用 predicate 关系类型（归类/组成/前置/对比/替代/相关；来源线为“探索来源”）；建议线额外提供「接受为正式关系」，方向线提供「去探索」。MVP 不再展示证据/置信度/关系 MD 编辑器。
+- 题目/答题：后端 quizzes 接口仍在，但 MVP 前端不展示题目区，也不展示节点 tier。
 - provisional 节点直接作为地图节点渲染，与 committed 同一套坐标（不用另一套 ghost 坐标）；标签显示「候选 · 名字」、虚线弱化样式与脉冲环，commit 后恢复普通标签样式。
 - 相机只在进入世界（world id 变化）时自动 fit 一次，把全部节点+副本框进视野；之后新增节点不重设相机，也不给 OrbitControls 传会随每次重渲染重设的 `target` prop。
 - 节点坐标到世界坐标的映射用“当前节点包围盒质心”居中（`World3D.tsx` 的 `posOf` 用 `cx/cy`），所以节点集合变化时整张地图会按新包围盒重新居中；这是既有布局行为，不是相机移动。
@@ -249,6 +252,8 @@ parent 选择顺序（新节点挂到谁）：
 - 关系方向做了归一：`prerequisite` 按证据中两端出现先后交换；`partOf` 且 label 含“组成/包含/由”但不含“属于”时交换成“部分→整体”。
 
 语音 `/stream/segment` + `/stream/commit` 当前**不会**触发出题、副本、方向；这是当前实际行为，不要假设它会自动发生。
+
+MVP 前端目前不展示答题与 tier；后端题目接口（`/api/nodes/:id/quiz`、`/api/quiz/:id/answer`）仍保留，`/extract` 仍会为前 3 个新节点异步生成题目。
 
 ## 10. 当前验证方式
 
@@ -272,6 +277,7 @@ pnpm build
   - console 无未捕获异常（只有 THREE 版本警告/favicon/HMR 噪音）；
   - 相机矩阵实测：三条链路新增节点/commit 期间 viewMatrix 不变；用户拖拽视角后再新增节点，旧代码 1.6s 后被 CameraFit 重置（view 差 0.986），现在保持（0.001）；
 - 验收期间还发现并修复两处 dev 环境问题：React StrictMode 下 InputBar 挂载 effect 双调用导致 `.mic`/`.mock-btn` 无响应（挂载 effect 复位状态机 ref）；OrbitControls 收到的 `target` prop 会在每次重渲染时把 target 设回原点（已移除该 prop，世界中心只由 CameraFit 设置）。
+- 2026-11-16 MVP 前端改动（Chrome CDP + 真实 DeepSeek 验收）：四种线美术（管状/虚线/点线+信标）、线点击打开一句话关系文档、节点文档（名称/正文/来源）、MVP 隐藏答题区与 tier；正式/来源/方向文档与节点文档实测通过，建议线「接受」后 kind 变 formal，console 无异常；`pnpm typecheck`/`pnpm build` 通过。验收脚本与截图在仓库外：`_verify/probe-mvp-lines.mjs`、`_verify/probe-mvp-suggest.mjs`、`_verify/shots/mvp-*.png`。
 
 没有 CI、没有自动化单元测试框架；以上验证用的是临时复现/验收脚本（不在本仓库内），没有引入测试框架。LLM 失败时的前端 warning/toast 本轮只做了代码级确认，未在真实失败场景下动态验证。
 

@@ -382,3 +382,18 @@ POST /api/worlds/:id/explore/commit    { directionId, selected[] } → { nodes, 
 - 外部参考（04 §3 已列）：[GraphRAG](https://github.com/microsoft/graphrag)、[LightRAG](https://github.com/HKUDS/LightRAG)、[Graphiti](https://github.com/getzep/graphiti)、[llm-graph-builder](https://github.com/neo4j-labs/llm-graph-builder)、[DeepKE](https://aclanthology.org/2022.emnlp-demos.10/)、[REBEL](https://aclanthology.org/2021.acl-long.17/)、[GLiNER](https://github.com/urchade/GLiNER)、[MiniCheck](https://aclanthology.org/2024.emnlp-main.499.pdf)、[AlignScore](https://aclanthology.org/2023.acl-long.634.pdf)、[SHACL](https://www.w3.org/TR/shacl/)、[Look before you hop](https://ar5iv.labs.arxiv.org/html/1910.03262)。
 
 > 本稿所有“建议/候选/假设”都待你评审；确认后我再升级为设计规格并拆实现任务。
+
+---
+
+## 9. MVP 实施记录（2026-11-16，只改前端表现层）
+
+用户已确认的 MVP 改动已实施，与本文设计的关系：
+
+| MVP 要求 | 实施 | 与本文的关系 |
+|---|---|---|
+| 线美术与节点统一、待确认线虚线统一色 | 正式/来源=3D 管；建议=统一色虚线+中点珠；方向=点线+“？”信标 | 采用 §0.6.2/§0.6.4 的视觉候选，未改语义 |
+| 线点击打开 MD（一句话关系） | 所有线点击 → RelationDrawer 一句话文档（按关系类型）；建议可接受、方向可探索 | 实现 §0.6.3 的最小版，字段收敛为“一句话” |
+| 节点 MD 文档按早期格式 | 节点文档=标题/正文（definition+free_md）/来源 blockquote/编辑 | 沿用早期样片 `h/body/q` 结构 |
+| 答题暂不展示 | 前端隐藏题目区与 tier（后端接口保留） | MVP 取舍，不影响 §2 的 D14 |
+
+未实施（仍待设计决策）：4 方向生成与刷新、关系 meaningfulness 校验、线型生命周期/删除修正、MD 结构化（frontmatter/版本）、关系题。

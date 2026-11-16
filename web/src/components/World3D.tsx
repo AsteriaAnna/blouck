@@ -16,8 +16,8 @@ function hash(s: string) {
 const EDGE_COLORS: Record<string, string> = {
   formal: "#6f6252",
   source: "#7d9994",
-  suggest: "#a2947f",
-  direction: "#b0a390",
+  suggest: "#b08a5f", // 待确认的线统一颜色（虚线）
+  direction: "#9a8f7a",
 };
 
 /** 加载 GLB 并归一化：底部落在 y=0，尺寸缩放到 target */
@@ -231,69 +231,99 @@ function Building({
   );
 }
 
-function makeBoardTexture(text: string) {
-  const font = "500 30px 'Microsoft YaHei','Segoe UI',system-ui,sans-serif";
-  const pad = 22;
-  const probe = document.createElement("canvas").getContext("2d")!;
-  probe.font = font;
-  const rawW = Math.ceil(probe.measureText(text).width);
-  const W = Math.min(520, Math.max(150, rawW + pad * 2));
-  const H = 64;
-  const canvas = document.createElement("canvas");
-  canvas.width = W * 2;
-  canvas.height = H * 2;
-  const ctx = canvas.getContext("2d")!;
-  ctx.scale(2, 2);
-  ctx.font = font;
-  ctx.fillStyle = "#fffdf7";
-  ctx.strokeStyle = "#8a7a63";
-  ctx.lineWidth = 2;
-  const r = 8;
-  ctx.beginPath();
-  ctx.moveTo(r, 1);
-  ctx.lineTo(W - r, 1);
-  ctx.quadraticCurveTo(W - 1, 1, W - 1, r);
-  ctx.lineTo(W - 1, H - r);
-  ctx.quadraticCurveTo(W - 1, H - 1, W - r, H - 1);
-  ctx.lineTo(r, H - 1);
-  ctx.quadraticCurveTo(1, H - 1, 1, H - r);
-  ctx.lineTo(1, r);
-  ctx.quadraticCurveTo(1, 1, r, 1);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = "#4a4034";
-  ctx.textBaseline = "middle";
-  let shown = text;
-  while (probe.measureText(shown).width > W - pad * 2 && shown.length > 2) {
-    shown = shown.slice(0, -1);
-  }
-  if (shown !== text) shown = shown.slice(0, -1) + "…";
-  ctx.fillText(shown, pad, H / 2 + 1);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return { tex, width: W * 0.32, height: H * 0.32 };
+/** 贴地弧线：所有点 y=0，只在 XZ 平面里弯（与岛屿的平面高度一致） */
+function edgeCurve(a: THREE.Vector3, b: THREE.Vector3) {
+  const s = a.clone().setY(0);
+  const t = b.clone().setY(0);
+  const mid = s.clone().add(t).multiplyScalar(0.5);
+  const dx = t.x - s.x;
+  const dz = t.z - s.z;
+  const len = Math.hypot(dx, dz) || 1;
+  const bow = Math.min(60, len * 0.12);
+  mid.x += (-dz / len) * bow;
+  mid.z += (dx / len) * bow;
+  return new THREE.QuadraticBezierCurve3(s, mid, t);
 }
 
-/** 立体路牌：木柱 + 牌面（Canvas 文字），始终转向相机，可点击 */
-function SignPost({
+/** 沿线的透明命中体：线太细，用一根不可见管子接点击 */
+function HitTube({
+  curve,
+  onOpen,
+  radius = 14,
+}: {
+  curve: THREE.Curve<THREE.Vector3>;
+  onOpen: () => void;
+  radius?: number;
+}) {
+  const geo = useMemo(() => new THREE.TubeGeometry(curve, 24, radius, 4, false), [curve, radius]);
+  return (
+    <mesh
+      geometry={geo}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        onOpen();
+      }}
+      onPointerOver={() => (document.body.style.cursor = "pointer")}
+      onPointerOut={() => (document.body.style.cursor = "auto")}
+    >
+      <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+    </mesh>
+  );
+}
+
+/** 探索点：雾里发光的“？”信标（对应方向线末端） */
+function makeQuestionTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext("2d")!;
+  const cx = 64;
+  const cy = 64;
+  const grad = ctx.createRadialGradient(cx, cy, 8, cx, cy, 62);
+  grad.addColorStop(0, "rgba(255,252,240,0.98)");
+  grad.addColorStop(0.55, "rgba(255,246,222,0.72)");
+  grad.addColorStop(1, "rgba(255,240,200,0)");
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 62, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#fffdf7";
+  ctx.strokeStyle = "#8a7a63";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 30, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#6f6252";
+  ctx.font = "bold 42px 'Microsoft YaHei','Segoe UI',sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("?", cx, cy + 2);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function QuestionBeacon({
   position,
-  label,
   onOpen,
 }: {
   position: [number, number, number];
-  label: string;
   onOpen: () => void;
 }) {
   const ref = useRef<THREE.Group>(null);
-  const { tex, width, height } = useMemo(() => makeBoardTexture(label || "方向"), [label]);
-  useFrame(({ camera }) => {
+  const tex = useMemo(makeQuestionTexture, []);
+  useFrame(({ clock }) => {
     if (!ref.current) return;
-    ref.current.rotation.y = Math.atan2(
-      camera.position.x - position[0],
-      camera.position.z - position[2],
-    );
+    const t = clock.elapsedTime;
+    ref.current.position.y = 14 + Math.sin(t * 1.8 + position[0] * 0.01) * 5;
+    const k = 1.04 + Math.sin(t * 2.2) * 0.08;
+    ref.current.scale.setScalar(k);
+    const glow = ref.current.children[1] as THREE.Mesh | undefined;
+    if (glow) {
+      const mat = glow.material as THREE.MeshBasicMaterial;
+      mat.opacity = 0.3 + 0.16 * (0.5 + 0.5 * Math.sin(t * 2.2));
+    }
   });
   return (
     <group
@@ -306,21 +336,12 @@ function SignPost({
       onPointerOver={() => (document.body.style.cursor = "pointer")}
       onPointerOut={() => (document.body.style.cursor = "auto")}
     >
-      <mesh position={[0, 11, 0]} castShadow>
-        <cylinderGeometry args={[1.6, 2.0, 22, 8]} />
-        <meshStandardMaterial color="#a08a6a" flatShading />
-      </mesh>
-      <mesh position={[0, 26, 0]} castShadow>
-        <boxGeometry args={[width, height, 1.6]} />
-        <meshStandardMaterial color="#fffdf7" />
-      </mesh>
-      <mesh position={[0, 26, 0.95]}>
-        <planeGeometry args={[width - 1.4, height - 1.4]} />
-        <meshBasicMaterial map={tex} transparent />
-      </mesh>
-      <mesh position={[0, 26, -0.95]} rotation={[0, Math.PI, 0]}>
-        <planeGeometry args={[width - 1.4, height - 1.4]} />
-        <meshBasicMaterial map={tex} transparent />
+      <sprite scale={[38, 38, 1]}>
+        <spriteMaterial map={tex} transparent depthWrite={false} />
+      </sprite>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -10, 0]}>
+        <ringGeometry args={[17, 22, 28]} />
+        <meshBasicMaterial color="#c2ac8d" transparent opacity={0.32} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
     </group>
   );
@@ -330,59 +351,98 @@ function Edge({
   a,
   b,
   kind,
-  label,
-  onSign,
+  onOpen,
 }: {
   a: THREE.Vector3;
   b: THREE.Vector3;
   kind: string;
-  label: string;
-  onSign: () => void;
+  onOpen: () => void;
 }) {
-  const curve = useMemo(() => {
-    // 完全贴地：所有点高度 y=0，只在 XZ 平面里弯
-    const s = a.clone().setY(0);
-    const t = b.clone().setY(0);
-    const mid = s.clone().add(t).multiplyScalar(0.5);
-    const dx = t.x - s.x;
-    const dz = t.z - s.z;
-    const len = Math.hypot(dx, dz) || 1;
-    const bow = Math.min(60, len * 0.12);
-    mid.x += (-dz / len) * bow;
-    mid.z += (dx / len) * bow;
-    return new THREE.QuadraticBezierCurve3(s, mid, t);
-  }, [a, b]);
+  const curve = useMemo(() => edgeCurve(a, b), [a, b]);
   const pts = useMemo(
-    () => curve.getPoints(26).map((p) => [p.x, p.y, p.z] as [number, number, number]),
+    () => curve.getPoints(28).map((p) => [p.x, p.y, p.z] as [number, number, number]),
     [curve],
   );
-  const end = pts[pts.length - 1];
-  const prev = pts[pts.length - 2];
-  const q = useMemo(() => {
-    const dir = new THREE.Vector3(end[0] - prev[0], end[1] - prev[1], end[2] - prev[2]).normalize();
-    return new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-  }, [end, prev]);
-  const mid = curve.getPoint(0.5);
+  const start = useMemo(() => curve.getPoint(0), [curve]);
+  const mid = useMemo(() => curve.getPoint(0.5), [curve]);
   const color = EDGE_COLORS[kind] ?? EDGE_COLORS.formal;
+  const solid = kind === "formal" || kind === "source";
+  const tubeGeo = useMemo(
+    () =>
+      solid
+        ? new THREE.TubeGeometry(curve, 28, kind === "source" ? 2.0 : 2.8, 6, false)
+        : null,
+    [curve, kind, solid],
+  );
+  if (solid) {
+    return (
+      <group>
+        <mesh geometry={tubeGeo!} castShadow receiveShadow>
+          <meshStandardMaterial color={color} roughness={0.86} metalness={0} flatShading />
+        </mesh>
+        {kind === "source" ? (
+          <mesh position={[start.x, 4, start.z]} castShadow>
+            <sphereGeometry args={[6, 14, 12]} />
+            <meshStandardMaterial color={color} roughness={0.8} flatShading />
+          </mesh>
+        ) : null}
+        <HitTube curve={curve} onOpen={onOpen} radius={14} />
+      </group>
+    );
+  }
+  const dotted = kind === "direction";
   return (
     <group>
       <Line
         points={pts}
         color={color}
-        lineWidth={1.4}
+        lineWidth={1.7}
         transparent
-        opacity={kind === "direction" ? 0.35 : 0.55}
-        dashed={kind === "suggest"}
-        dashSize={6}
-        gapSize={6}
+        opacity={dotted ? 0.55 : 0.85}
+        dashed
+        dashSize={dotted ? 2 : 9}
+        gapSize={dotted ? 10 : 7}
       />
-      <mesh position={end} quaternion={q}>
-        <coneGeometry args={[3.2, 9, 6]} />
-        <meshBasicMaterial color={color} transparent opacity={0.65} />
-      </mesh>
-      {(kind === "direction" || kind === "suggest") && label ? (
-        <SignPost position={[mid.x, 0, mid.z]} label={label} onOpen={onSign} />
+      {kind === "suggest" ? (
+        <mesh position={[mid.x, 4, mid.z]} castShadow>
+          <sphereGeometry args={[4, 12, 10]} />
+          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.35} roughness={0.7} flatShading />
+        </mesh>
       ) : null}
+      <HitTube curve={curve} onOpen={onOpen} radius={12} />
+    </group>
+  );
+}
+
+/** 方向线：点线 + 末端发光的“？”探索点 */
+function DirectionEdge({
+  a,
+  b,
+  onOpen,
+}: {
+  a: THREE.Vector3;
+  b: THREE.Vector3;
+  onOpen: () => void;
+}) {
+  const curve = useMemo(() => edgeCurve(a, b), [a, b]);
+  const pts = useMemo(
+    () => curve.getPoints(28).map((p) => [p.x, p.y, p.z] as [number, number, number]),
+    [curve],
+  );
+  return (
+    <group>
+      <Line
+        points={pts}
+        color={EDGE_COLORS.direction}
+        lineWidth={1.5}
+        transparent
+        opacity={0.55}
+        dashed
+        dashSize={2}
+        gapSize={10}
+      />
+      <HitTube curve={curve} onOpen={onOpen} radius={12} />
+      <QuestionBeacon position={[b.x, 0, b.z]} onOpen={onOpen} />
     </group>
   );
 }
@@ -565,26 +625,12 @@ export default function World3D() {
                 : null;
             if (!a || !f) return null;
             return (
-              <group key={e.id}>
-                <Line
-                  points={[
-                    [a.x, 2, a.z],
-                    [f.x, 2, f.z],
-                  ]}
-                  color="#b9ab97"
-                  lineWidth={1.4}
-                  dashed
-                  dashSize={6}
-                  gapSize={6}
-                  transparent
-                  opacity={0.5}
-                />
-                <SignPost
-                  position={[f.x, 0, f.z]}
-                  label={e.question || "下一步方向"}
-                  onOpen={() => openEdge(e.id)}
-                />
-              </group>
+              <DirectionEdge
+                key={e.id}
+                a={a.clone().setY(0)}
+                b={f.clone().setY(0)}
+                onOpen={() => openEdge(e.id)}
+              />
             );
           }
           const a = nodePos.get(e.src);
@@ -596,8 +642,7 @@ export default function World3D() {
               a={a.clone().setY(0)}
               b={b.clone().setY(0)}
               kind={e.kind}
-              label={e.label || ""}
-              onSign={() => openEdge(e.id)}
+              onOpen={() => openEdge(e.id)}
             />
           );
         })}

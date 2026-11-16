@@ -145,11 +145,21 @@ app.get("/api/worlds/:id", (req, res) => {
   ensureDirectionFrontiers(world.id);
   const graph = getGraph(world.id);
   const buildings = listBuildings(world.id);
-  const nodes = graph.nodes.map((n) => ({
-    ...n,
-    passed: countPassed(n.id),
-    tier: computeTier(n.id),
-  }));
+  // 节点 MD 的“来源”引用：把来源片段文本/时间一起下发（只读，供节点文档展示）
+  const spanRows = db
+    .prepare("SELECT id, text, created_at FROM source_spans WHERE world_id=?")
+    .all(world.id) as { id: string; text: string; created_at: number }[];
+  const spanById = new Map(spanRows.map((s) => [s.id, s]));
+  const nodes = graph.nodes.map((n) => {
+    const span = n.source_span_id ? spanById.get(n.source_span_id) : undefined;
+    return {
+      ...n,
+      passed: countPassed(n.id),
+      tier: computeTier(n.id),
+      source_text: span?.text ?? null,
+      source_at: span?.created_at ?? null,
+    };
+  });
   res.json({ world, nodes, edges: graph.edges, buildings, directions: listDirections(world.id) });
 });
 

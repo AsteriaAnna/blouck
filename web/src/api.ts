@@ -44,6 +44,9 @@ export type NodeRow = {
   frontier: number;
   status?: "provisional" | "committed";
   passed?: Passed;
+  /** 节点来源片段（只读，节点 MD 的“来源”引用） */
+  source_text?: string | null;
+  source_at?: number | null;
 };
 
 export type EdgeKind = "formal" | "source" | "suggest" | "direction";
