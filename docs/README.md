@@ -11,6 +11,7 @@
 
 ## 阅读顺序
 
+0. [项目说明（给没有上下文的 AI）](onboarding/README.md)：先读这个。
 1. [产品基线](reference/product-baseline.md)：产品是什么、对象怎么定义。
 2. [需求](design/requirements.md)：系统必须表现出的行为与验收。
 3. [算法](reference/algorithms.md)：节点/关系/方向/副本的实际规则。
@@ -33,6 +34,14 @@
 ```text
 docs/
   README.md
+  onboarding/
+    README.md
+    contracts.md
+    tech.md
+    files.md
+    review.md
+    results.md
+    decisions.md
   reference/
     product-baseline.md
     algorithms.md
@@ -41,6 +50,13 @@ docs/
     requirements.md
     problems-and-approaches.md
     current-state.md
+    streaming/
+      README.md
+      asr.md
+      provisional.md
+      focus.md
+      relation-binding.md
+      issues.md
   ops/
     runtime.md
   screenshots/
