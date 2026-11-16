@@ -33,11 +33,13 @@
     <div class="row">
       <button id="start" class="primary">开始录音</button>
       <button id="stop" disabled>停止并识别</button>
-      <button id="play" disabled>回放我录到的声音</button>
-      <button id="download" disabled>下载 WAV</button>
+      <button id="play" disabled>回放原始麦克风</button>
+      <button id="download" disabled>下载原始录音</button>
+      <button id="download-wav" disabled>下载 PCM WAV</button>
     </div>
     <div class="kv" style="margin-top:12px">
       <b>麦克风</b><span id="device">-</span>
+      <b>轨道参数</b><span id="settings">-</span>
       <b>AudioContext</b><span id="rate">-</span>
       <b>已发送</b><span id="sent">0 字节 / 0.0 秒</span>
       <b>状态</b><span id="status">待开始</span>
@@ -86,6 +88,9 @@ let ws = null, ctx = null, stream = null, node = null;
 let chunks = [];
 let sentBytes = 0;
 let startedAt = 0;
+let recorder = null;
+let recordedParts = [];
+let originalUrl = "";
 
 function setStatus(s) { $("status").textContent = s; }
 function fail(e) {
@@ -132,13 +137,37 @@ async function start() {
   $("partial").textContent = "";
   $("final").textContent = "";
   chunks = []; sentBytes = 0; startedAt = Date.now();
+  recordedParts = [];
+  if (originalUrl) URL.revokeObjectURL(originalUrl);
+  originalUrl = "";
   $("sent").textContent = "0 字节 / 0.0 秒";
   $("start").disabled = true;
   setStatus("请求麦克风…");
   stream = await navigator.mediaDevices.getUserMedia({
     audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
   });
-  $("device").textContent = stream.getAudioTracks().map(t => t.label).join(" / ") || "未知";
+  const track = stream.getAudioTracks()[0];
+  $("device").textContent = track?.label || "未知";
+  try {
+    const st = track.getSettings();
+    $("settings").textContent = `sampleRate=${st.sampleRate ?? "?"} channelCount=${st.channelCount ?? "?"} echoCancellation=${st.echoCancellation ?? "?"} noiseSuppression=${st.noiseSuppression ?? "?"}`;
+  } catch { $("settings").textContent = "-"; }
+
+  // 原始麦克风录音：用来判断“麦克风本身”还是“我手写 WAV 转码”
+  try {
+    const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "";
+    recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    recorder.ondataavailable = (e) => { if (e.data && e.data.size) recordedParts.push(e.data); };
+    recorder.onstop = () => {
+      const blob = new Blob(recordedParts, { type: recorder.mimeType || "audio/webm" });
+      originalUrl = URL.createObjectURL(blob);
+      $("play").disabled = false;
+      $("download").disabled = false;
+    };
+    recorder.start(100);
+  } catch (e) {
+    $("error").textContent = "MediaRecorder 不可用：" + e;
+  }
 
   ctx = new AudioContext({ sampleRate: 16000 });
   await ctx.resume();
@@ -181,16 +210,21 @@ async function stop() {
   $("stop").disabled = true;
   setStatus("等待 final…");
   try { node?.disconnect(); } catch {}
+  try { recorder?.state === "recording" && recorder.stop(); } catch {}
   try { stream?.getTracks().forEach(t => t.stop()); } catch {}
   try { await ctx?.close(); } catch {}
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ type: "stop" }));
     setTimeout(() => { setStatus("已停止（如果 final 为空，说明 ASR 没返回）"); ws.close(); }, 3500);
   }
-  if (chunks.length) {
-    $("play").disabled = false;
-    $("download").disabled = false;
-  }
+  if (chunks.length) $("download-wav").disabled = false;
+  setTimeout(() => {
+    if (!originalUrl && recordedParts.length) {
+      originalUrl = URL.createObjectURL(new Blob(recordedParts, { type: "audio/webm" }));
+      $("play").disabled = false;
+      $("download").disabled = false;
+    }
+  }, 500);
 }
 
 function wavBlob() {
@@ -208,14 +242,29 @@ function wavBlob() {
 }
 
 function play() {
+  if (!originalUrl) {
+    playPcmWav();
+    return;
+  }
+  $("audio").src = originalUrl;
+  $("audio").play().catch(fail);
+}
+function playPcmWav() {
   const url = URL.createObjectURL(wavBlob());
   $("audio").src = url;
   $("audio").play().catch(fail);
 }
 function download() {
+  if (!originalUrl) return;
+  const a = document.createElement("a");
+  a.href = originalUrl;
+  a.download = "mic-original.webm";
+  a.click();
+}
+function downloadWav() {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(wavBlob());
-  a.download = "mic-test.wav";
+  a.download = "mic-pcm.wav";
   a.click();
 }
 
@@ -223,6 +272,7 @@ $("start").onclick = () => start().catch(fail);
 $("stop").onclick = () => stop().catch(fail);
 $("play").onclick = play;
 $("download").onclick = download;
+$("download-wav").onclick = downloadWav;
 </script>
 </body>
 </html>
