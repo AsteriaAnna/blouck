@@ -42,6 +42,7 @@ export type NodeRow = {
   aliases: string;
   source_span_id: string | null;
   frontier: number;
+  status?: "provisional" | "committed";
   passed?: Passed;
 };
 

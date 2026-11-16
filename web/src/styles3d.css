@@ -1,4 +1,4 @@
-/* ---------- 3D 世界视图 ---------- */
+﻿/* ---------- 3D 世界视图 ---------- */
 .world3d {
   position: absolute;
   inset: 0;
@@ -81,3 +81,13 @@
 @keyframes labelPop { 0% { transform: translateY(8px) scale(.9); opacity: 0; } 100% { transform: none; opacity: 1; } }
 @keyframes sparkFloat { 0%,100% { transform: translateY(0); opacity: .8; } 50% { transform: translateY(-4px); opacity: 1; } }
 @keyframes ghostLabel { 0%,100% { transform: translateY(0); opacity: .72; } 50% { transform: translateY(-3px); opacity: .98; } }
+'
+
+.n3d-label.provisional {
+  border-style: dashed;
+  border-color: #b49f82;
+  background: rgba(255, 253, 247, 0.8);
+  color: #6f6252;
+  box-shadow: 0 0 0 4px rgba(180, 159, 130, 0.12);
+}
+'

@@ -98,7 +98,7 @@ MVP 范围：
 - RAG 场景验收；
 - 不做持久化、多端、Saga/CRDT、完整实体消解、通用 benchmark。
 
-**当前代码仍是旧的 detect/extract 双链路，尚未切换到这个方案。**
+**正式链路已接：ASR segment → `/stream/segment` 建 provisional → `/stream/commit` 同 ID 升级；typed text 仍走旧 `/extract`。**
 
 ## 6. 本轮讨论中明确不做
 
@@ -176,7 +176,7 @@ RAG → 检索 → 语义检索/向量检索/混合检索
 
 ## 9. 对标审计：方向 vs 当前实现（2026-11-16）
 
-### 9.1 不是空壳，但核心新方向没有接进主链路
+### 9.1 不是空壳，正式链路已接一部分
 
 真实存在的部分：
 
@@ -193,9 +193,9 @@ RAG → 检索 → 语义检索/向量检索/混合检索
 | 目标方向 | 当前主链路 | 状态 |
 | --- | --- | --- |
 | 流式语音 partial → 实时反馈 | 有 partial；segment 只更新文字 | ⚠️ 部分 |
-| 按句 final → 建图/修正 | segment 已发；主链路不按句 extract | ❌ |
-| provisional 同 ID | 主链路没有 provisional | ❌ |
-| provisional 坐标 = 最终坐标 | ghost 前端算，final 后端算 | ❌ |
+| 按句 final → 建图/修正 | segment → `/stream/segment` → provisional | ✅ |
+| provisional 同 ID | `status` 字段；commit 只改状态 | ✅ |
+| provisional 坐标 = 最终坐标 | 服务端 placeAround 写库，前端直接渲染 | ✅ |
 | 多焦点/父节点 | 单 focus；source 缺省 focus | ❌ |
 | 新节点绑已有节点 | 只有 LLM 主动输出 target 才绑 | ⚠️ |
 | 关系 edge 生命周期 | 无 relationId/revision | ❌ |
@@ -219,5 +219,5 @@ RAG → 检索 → 语义检索/向量检索/混合检索
 ### 9.3 结论
 
 - 不是"完全虚构"，组件和基础链路是真的；
-- 但"多焦点、provisional 同 ID、按句建图、共享坐标"这些当前只在测试/文档里，主链路没有完全对标；
-- 下一步应先把 **segment → extract / provisional 状态** 接进主链路，而不是继续调动画。
+- "按句建图、provisional 同 ID、共享坐标"已接进主链路；"多焦点、启动预暖、文本重写"仍未完全对标；
+- 下一步优先：启动预暖、文本重写、focus 推进/多候选、关系绑定补全。

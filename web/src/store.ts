@@ -60,6 +60,8 @@ type State = {
   openEdge: (id: string) => void;
   closeDrawer: () => void;
   extract: (text: string) => Promise<void>;
+  ingestSegment: (text: string) => Promise<void>;
+  commitStream: () => Promise<void>;
   saveMd: (id: string, md: string) => Promise<void>;
   generateQuiz: (id: string) => Promise<void>;
   answerQuiz: (id: string, answer: string) => Promise<void>;
@@ -211,6 +213,37 @@ export const useStore = create<State>((set, getState) => ({
       set({ busy: false });
       getState().showToast(e.message ?? "抽取失败");
     }
+  },
+
+  async ingestSegment(text) {
+    if (!getState().world) return;
+    set({ stage: "confirming" });
+    const r = await send<any>(`/api/worlds/${getState().world!.id}/stream/segment`, "POST", {
+      text,
+      focusId: getState().focusId,
+    });
+    set({
+      nodes: r.nodes,
+      edges: r.edges,
+      focusId: r.focusId ?? getState().focusId,
+      ghosts: [],
+      stage: "confirming",
+    });
+  },
+
+  async commitStream() {
+    if (!getState().world) return;
+    set({ stage: "generating", busy: true });
+    const r = await send<any>(`/api/worlds/${getState().world!.id}/stream/commit`, "POST", {});
+    set({
+      nodes: r.nodes,
+      edges: r.edges,
+      busy: false,
+      stage: "done",
+    });
+    window.setTimeout(() => {
+      if (getState().stage === "done") set({ stage: "idle" });
+    }, 1600);
   },
 
   async saveMd(id, md) {

@@ -26,6 +26,7 @@ export type NodeRow = {
   aliases: string;
   source_span_id: string | null;
   frontier: number;
+  status: "provisional" | "committed";
   created_at: number;
 };
 
@@ -152,6 +153,7 @@ for (const [col, ddl] of [
   ["aliases", "TEXT NOT NULL DEFAULT '[]'"],
   ["source_span_id", "TEXT"],
   ["frontier", "INTEGER NOT NULL DEFAULT 0"],
+  ["status", "TEXT NOT NULL DEFAULT 'committed'"],
 ] as const) {
   if (!columnNames("nodes").includes(col)) db.exec(`ALTER TABLE nodes ADD COLUMN ${col} ${ddl}`);
 }
@@ -285,11 +287,12 @@ export function addNode(
     definition?: string;
     aliases?: string[];
     sourceSpanId?: string | null;
+    status?: "provisional" | "committed";
   } = {},
 ): NodeRow {
   const id = uid();
   db.prepare(
-    "INSERT INTO nodes(id,world_id,name,x,y,free_md,hidden,tier,type,definition,aliases,source_span_id,frontier,created_at) VALUES(?,?,?,?,?,?,0,0,?,?,?,?,0,?)",
+    "INSERT INTO nodes(id,world_id,name,x,y,free_md,hidden,tier,type,definition,aliases,source_span_id,frontier,status,created_at) VALUES(?,?,?,?,?,?,0,0,?,?,?,?,0,?,?)",
   ).run(
     id,
     worldId,
@@ -301,9 +304,18 @@ export function addNode(
     meta.definition ?? "",
     JSON.stringify(meta.aliases ?? []),
     meta.sourceSpanId ?? null,
+    meta.status ?? "committed",
     now(),
   );
   return getNode(id)!;
+}
+
+export function setNodeStatus(id: string, status: "provisional" | "committed") {
+  db.prepare("UPDATE nodes SET status=? WHERE id=?").run(status, id);
+}
+
+export function setNodesStatus(ids: string[], status: "provisional" | "committed") {
+  for (const id of ids) setNodeStatus(id, status);
 }
 
 export function updateNodeMeta(

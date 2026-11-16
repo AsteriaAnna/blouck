@@ -47,6 +47,7 @@ import { elkLayout, wfcLayout } from "./layout.js";
 import { placeAround } from "./placement.js";
 import { simulateExplore } from "./explore.js";
 import { runAnchorFirst } from "./anchorFirst.js";
+import { ingestSegment, commitStream } from "./stream/session.js";
 import { wfcGraphLayout } from "./wfc.js";
 import {
   detectDomainCandidates,
@@ -1144,6 +1145,37 @@ app.post("/api/dev/anchor-first", async (req, res) => {
       apply: Boolean(req.body?.apply),
     });
     res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: String(err?.message ?? err) });
+  }
+});
+
+/** 正式流式链路：稳定文本 → provisional 节点/关系 */
+app.post("/api/worlds/:id/stream/segment", async (req, res) => {
+  try {
+    const world = getWorld(req.params.id);
+    if (!world) return res.status(404).json({ error: "world not found" });
+    const text = String(req.body?.text ?? "").trim();
+    if (!text) return res.status(400).json({ error: "text required" });
+    const result = await ingestSegment(
+      world.id,
+      text,
+      req.body?.focusId ? String(req.body.focusId) : null,
+      llm,
+    );
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: String(err?.message ?? err) });
+  }
+});
+
+/** 正式流式链路：句/段 final → commit */
+app.post("/api/worlds/:id/stream/commit", (req, res) => {
+  try {
+    const world = getWorld(req.params.id);
+    if (!world) return res.status(404).json({ error: "world not found" });
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : undefined;
+    res.json(commitStream(world.id, ids));
   } catch (err: any) {
     res.status(500).json({ error: String(err?.message ?? err) });
   }

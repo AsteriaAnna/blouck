@@ -22,9 +22,9 @@
 
 ## 当前节点（一句话）
 
-流式语音 → 多步实体检测 → ghost 候选 → final 全量检测 → 现有 `/extract` 落图 → 候选位置起飞动画。
+流式语音 → segment final → `/stream/segment` 建 provisional → `/stream/commit` 同 ID 升级。
 
-**现在能看效果，但 ghost 仍只是前端预览，不是权威 provisional 实体；最终落图与预览是两条链路。** 详见 [current-state.md](design/current-state.md)。
+**正式链路已接 provisional 同 ID；typed text 仍走旧 `/extract`。** 详见 [current-state.md](design/current-state.md)。
 
 ---
 
