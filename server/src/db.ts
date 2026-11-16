@@ -245,13 +245,46 @@ export function createWorld(name: string, rootName: string): World {
 }
 
 export function deleteWorld(id: string) {
-  for (const t of ["edges", "buildings", "nodes"]) {
-    db.prepare(`DELETE FROM ${t} WHERE world_id=?`).run(id);
-  }
+  // 先取节点与题目，再删数据：quizzes/attempts 没有 world_id，只能经 node 关联清理
   const nodeIds = db
     .prepare("SELECT id FROM nodes WHERE world_id=?")
     .all(id) as { id: string }[];
-  for (const n of nodeIds) db.prepare("DELETE FROM quizzes WHERE node_id=?").run(n.id);
+  const quizIds = nodeIds.length
+    ? (db
+        .prepare(
+          `SELECT id FROM quizzes WHERE node_id IN (${nodeIds.map(() => "?").join(",")})`,
+        )
+        .all(...nodeIds.map((n) => n.id)) as { id: string }[])
+    : [];
+  if (quizIds.length) {
+    db.prepare(
+      `DELETE FROM attempts WHERE quiz_id IN (${quizIds.map(() => "?").join(",")})`,
+    ).run(...quizIds.map((q) => q.id));
+    db.prepare(
+      `DELETE FROM quizzes WHERE id IN (${quizIds.map(() => "?").join(",")})`,
+    ).run(...quizIds.map((q) => q.id));
+  }
+  for (const t of [
+    "edges",
+    "nodes",
+    "source_spans",
+    "directions",
+    "hide_batches",
+    "daily_domain",
+  ]) {
+    db.prepare(`DELETE FROM ${t} WHERE world_id=?`).run(id);
+  }
+  // domain_questions 只有 building_id，没有 world_id：先按本世界建筑清掉，再删建筑
+  const buildingIds = db
+    .prepare("SELECT id FROM buildings WHERE world_id=?")
+    .all(id) as { id: string }[];
+  if (buildingIds.length) {
+    db.prepare(
+      `DELETE FROM domain_questions WHERE building_id IN (${buildingIds.map(() => "?").join(",")})`,
+    ).run(...buildingIds.map((b) => b.id));
+  }
+  db.prepare("DELETE FROM buildings WHERE world_id=?").run(id);
+  db.prepare("DELETE FROM focus_stack WHERE world_id=?").run(id);
   db.prepare("DELETE FROM worlds WHERE id=?").run(id);
 }
 
