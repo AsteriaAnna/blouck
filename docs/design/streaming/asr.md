@@ -47,7 +47,7 @@
 - 关系绑定：混合检索 kindOf 检索；语义/向量 partOf 混合检索；
 - 仍有一个问题：句子间停顿不够时，ASR 可能把"检索 + 召回率"粘成"检索召回率"，导致关系端点错。需要 VAD/句末停顿或前端纠错。
 
-### 7.4 其他接入问题
+### 7.4 其他接入问题（部分已解决，保留为风险记录）
 
 最小测试只在"单会话、内存图、干净分句、无下游"成立。接主链路会出现：
 
@@ -74,3 +74,43 @@
 
 ---
 
+
+
+---
+
+## 8. 音频采集链路（2026-11-16 收口）
+
+### 8.1 现象
+
+- 自检页 final 文字基本完整正确；
+- 但下载的 PCM WAV 有明显“炸麦/电音”；
+- 关闭 AEC/降噪/AGC 后仍然存在；
+- 原始 MediaRecorder 录音正常。
+
+### 8.2 根因
+
+1. 麦克风轨道原生 48000，之前强制 `AudioContext({sampleRate:16000})`；
+2. 在主线程按 128 帧逐块重采样，块间相位断开，产生周期性断裂；
+3. 48k→16k 没有抗混叠低通，句尾气音/齿音会折叠成金属感；
+4. 停止时尾部 PCM 不足一个 1600 采样块，没有 flush，最后一句会缺。
+
+### 8.3 已实现
+
+- `AudioContext` 不再强制 16k，使用原生采样率；
+- 重采样移入 AudioWorklet，连续相位线性插值；
+- 停止前 flush 尾部 PCM，并补 300ms 静音；
+- 自检页保留原始 MediaRecorder 回放；
+- 自检页可关闭 AEC/降噪/AGC 对比。
+
+参考实现：
+
+- [openqht/doubao-s2s-example audio-processor.js](https://github.com/openqht/doubao-s2s-example/blob/master/static/audio-processor.js)
+- [AvatarChatbot 修复：不强制 16k，worklet 重采样](https://huggingface.co/spaces/wishartgroup/AvatarChatbot/commit/13295a63a459ca66fd4de9d7d788e8b5037f506f)
+- [libsamplerate-js](https://github.com/aolsenjazz/libsamplerate-js)
+
+### 8.4 验证与决策
+
+- 修复后 PCM WAV 明显改善，ASR 实时/final 文字完整正确；
+- 仍有偶发句尾短瞬态；对比原始 webm 同一位置也有一瞬态，高质量浏览器重采样后仍存在，判断为源采集流本身，不是重采样；
+- 线性插值不做抗混叠，句尾气音仍会比原始略“炸”，但不影响识别；
+- 决策：**不再为 PCM WAV 音质加复杂度**。PCM 只是 ASR 输入；如果未来要存证/回放，保留原始 MediaRecorder 录音，或再加 7.5kHz 低通/高质量重采样。

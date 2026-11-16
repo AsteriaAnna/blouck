@@ -194,6 +194,8 @@ RAG → 检索 → 语义检索/向量检索/混合检索
 | --- | --- | --- |
 | 流式语音 partial → 实时反馈 | 有 partial；segment 只更新文字 | ⚠️ 部分 |
 | 按句 final → 建图/修正 | segment → `/stream/segment` → provisional | ✅ |
+| 音频采集/重采样 | 原生采样率 + AudioWorklet 连续相位；尾部 flush | ✅ |
+| 连续 ASR 会话 | 句末 close 自动重连；自检页真人验证 final 完整 | ✅ |
 | provisional 同 ID | `status` 字段；commit 只改状态 | ✅ |
 | provisional 坐标 = 最终坐标 | 服务端 placeAround 写库，前端直接渲染 | ✅ |
 | 多焦点/父节点 | 单 focus；source 缺省 focus | ❌ |
@@ -219,5 +221,5 @@ RAG → 检索 → 语义检索/向量检索/混合检索
 ### 9.3 结论
 
 - 不是"完全虚构"，组件和基础链路是真的；
-- "按句建图、provisional 同 ID、共享坐标"已接进主链路；"多焦点、启动预暖、文本重写"仍未完全对标；
-- 下一步优先：启动预暖、文本重写、focus 推进/多候选、关系绑定补全。
+- "按句建图、provisional 同 ID、共享坐标、音频采集"已接进主链路；"多焦点、启动预暖、文本重写"仍未完全对标；
+- 下一步优先：focus/多焦点与父节点选择，再补关系绑定、启动预暖、文本重写。
