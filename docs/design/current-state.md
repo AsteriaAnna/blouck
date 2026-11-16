@@ -79,30 +79,26 @@
 
 ---
 
-## 5. 下一步尝试（待产品拍板）
+## 5. 已选定方向（2026-11-16）
 
-### 路线 A：保持预览型
+按 [problems-and-approaches.md](problems-and-approaches.md) 6.5：
 
-- 只优化 detect/extract 合并与动画；
-- 成本低；
-- 接受 ghost 与最终节点不一致。
+**Ghost 不是 preview，而是 provisional 实体本身：同一 ID、异步填充、可见修正。**
 
-### 路线 B：统一 provisional 链路（推荐如果体验优先）
+```text
+本地匹配已有节点 → 未知 mention 建 provisional（同 ID）
+→ 异步 LLM 填名字/父节点/关系 → commit / 淡出
+```
 
-- detect 生成 provisional 实体（有 ID/状态）；
-- final 确认同一批 provisional；
-- commit 后 provisional 变正式节点；
-- 失败/无关 → tombstone；
-- 需要 provisional 表、revision、幂等、前端按 ID morph。
+MVP 范围：
 
-### 路线 C：真流式提交
+- 本地名称/别名/模糊匹配；
+- 简单活跃焦点（最近焦点 + 显式线索）；
+- provisional 占位 + 同一 ID merge；
+- RAG 场景验收；
+- 不做持久化、多端、Saga/CRDT、完整实体消解、通用 benchmark。
 
-- 稳定短语提交 provisional，ASR 修订时 merge/rename；
-- 最难，ASR 不稳时会抖。
-
-**当前没有选路线；A 是现状，B 是下一步候选。**
-
----
+**当前代码仍是旧的 detect/extract 双链路，尚未切换到这个方案。**
 
 ## 6. 本轮讨论中明确不做
 
