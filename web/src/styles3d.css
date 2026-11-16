@@ -55,11 +55,31 @@
 }
 
 
-/* 新节点 / 已识别 / 候选 ghost */
+/* 新节点 / 已识别 / 候选 provisional / 候选 ghost */
+
+/* provisional（候选）节点：与 committed 是同一套地图坐标，只弱化标签（虚线框 + 低透明度 + 保留脉冲环） */
+.n3d-label.provisional {
+  border-style: dashed;
+  border-color: #b49f82;
+  background: rgba(255, 253, 247, 0.8);
+  color: #6f6252;
+  opacity: 0.86;
+  box-shadow: 0 0 0 4px rgba(180, 159, 130, 0.12);
+}
+.n3d-label.provisional .tag {
+  font-size: 10px;
+  color: #9a8a70;
+  letter-spacing: 0.02em;
+}
+.n3d-label.provisional .dot {
+  opacity: 0.75;
+}
+
 .n3d-label.new {
   border-color: #d8a24a;
   color: #6b4b1f;
   background: rgba(255, 248, 232, 0.96);
+  opacity: 1;
   box-shadow: 0 0 0 4px rgba(216, 162, 74, 0.12), 0 4px 14px rgba(90, 70, 40, 0.16);
   animation: labelPop .5s ease-out;
 }
@@ -81,13 +101,3 @@
 @keyframes labelPop { 0% { transform: translateY(8px) scale(.9); opacity: 0; } 100% { transform: none; opacity: 1; } }
 @keyframes sparkFloat { 0%,100% { transform: translateY(0); opacity: .8; } 50% { transform: translateY(-4px); opacity: 1; } }
 @keyframes ghostLabel { 0%,100% { transform: translateY(0); opacity: .72; } 50% { transform: translateY(-3px); opacity: .98; } }
-'
-
-.n3d-label.provisional {
-  border-style: dashed;
-  border-color: #b49f82;
-  background: rgba(255, 253, 247, 0.8);
-  color: #6f6252;
-  box-shadow: 0 0 0 4px rgba(180, 159, 130, 0.12);
-}
-'

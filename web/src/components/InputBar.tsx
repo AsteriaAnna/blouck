@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { send } from "../api";
-import { useStore } from "../store";
+import { pickNewSentences, useStore } from "../store";
 
 /** AudioWorklet：把麦克风 Float32 采样转成 Int16 PCM 块 */
 const WORKLET_SRC = `
@@ -83,7 +82,6 @@ export default function InputBar() {
   const nodes = useStore((s) => s.nodes);
   const busy = useStore((s) => s.busy);
   const worldId = useStore((s) => s.world?.id);
-  const focusId = useStore((s) => s.focusId);
   const [text, setText] = useState("");
   const [rec, setRec] = useState(false);
   const [state, setState] = useState("待输入");
@@ -92,17 +90,17 @@ export default function InputBar() {
   const ctxRef = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const nodeRef = useRef<AudioWorkletNode | null>(null);
-  const previewTimer = useRef<number | null>(null);
-  const lastDetectLenRef = useRef(0);
-  const previewBusyRef = useRef(false);
   const mentionIdsRef = useRef<string[]>([]);
-  const sessionRef = useRef(0);
-  const segmentsRef = useRef(0);
   const segmentQueueRef = useRef<Promise<void>>(Promise.resolve());
+  /** 本次录音已送去 /stream/segment 的句子 key（跨 ASR 重连仍有效，防止累计文本重复落图） */
+  const ingestedSentencesRef = useRef<Set<string>>(new Set());
+  /** 串行 commit 链：兜底 commit 与迟到 final 的补 commit 不得并发 */
+  const commitChainRef = useRef<Promise<void>>(Promise.resolve());
   const recordingRef = useRef(false);
   const stoppingRef = useRef(false);
   const finishOnceRef = useRef(false);
   const reconnectTimerRef = useRef<number | null>(null);
+  const stopFallbackTimerRef = useRef<number | null>(null);
   const pendingAudioRef = useRef<string[]>([]);
   const flushTailRef = useRef<null | (() => void)>(null);
   const lastAudioAtRef = useRef(0);
@@ -110,12 +108,39 @@ export default function InputBar() {
   const asrErrorCountRef = useRef(0);
 
   useEffect(() => {
+    // React StrictMode（dev）会 mount → cleanup → mount：cleanup 会把状态机置为“已结束”，
+    // 新 mount 若不在这里复位，stoppingRef/finishOnceRef 会一直是 true → 麦克风/试听按钮
+    // 的 guard 直接 return，表现为点了没反应（生产 build 不双调用 effect，故只在 dev 暴露）。
+    recordingRef.current = false;
+    stoppingRef.current = false;
+    finishOnceRef.current = false;
     return () => {
-      stopTracks();
+      // 卸载后不得再重连/再 commit：先关状态机，再清定时器与连接
+      recordingRef.current = false;
+      stoppingRef.current = true;
+      finishOnceRef.current = true;
+      clearKeepAlive();
+      if (reconnectTimerRef.current) {
+        window.clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      if (stopFallbackTimerRef.current) {
+        window.clearTimeout(stopFallbackTimerRef.current);
+        stopFallbackTimerRef.current = null;
+      }
+      pendingAudioRef.current = [];
       wsRef.current?.close();
-      if (previewTimer.current) window.clearTimeout(previewTimer.current);
+      wsRef.current = null;
+      stopTracks();
     };
   }, []);
+
+  function clearKeepAlive() {
+    if (keepAliveRef.current) {
+      window.clearInterval(keepAliveRef.current);
+      keepAliveRef.current = null;
+    }
+  }
 
   function stopTracks() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -148,90 +173,110 @@ export default function InputBar() {
   }
 
   function resetStream() {
-    sessionRef.current += 1;
+    // 新的一轮录音：上一轮的状态机/队列/去重集合全部复位（否则第二次录音 finishOnce 会直接短路）
+    finishOnceRef.current = false;
+    stoppingRef.current = false;
+    recordingRef.current = false;
+    asrErrorCountRef.current = 0;
+    pendingAudioRef.current = [];
+    ingestedSentencesRef.current = new Set();
+    segmentQueueRef.current = Promise.resolve();
+    mentionIdsRef.current = [];
+    if (reconnectTimerRef.current) {
+      window.clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+    if (stopFallbackTimerRef.current) {
+      window.clearTimeout(stopFallbackTimerRef.current);
+      stopFallbackTimerRef.current = null;
+    }
+    clearKeepAlive();
     setMentions([]);
     setGhosts([]);
     setStage("listening");
-    mentionIdsRef.current = [];
-    lastDetectLenRef.current = 0;
-    previewBusyRef.current = false;
-    if (previewTimer.current) window.clearTimeout(previewTimer.current);
-    previewTimer.current = null;
   }
 
-  async function requestPreview(spoken: string, force = false) {
-    if (!worldId || (!force && spoken.length < 10)) return;
-    if (previewBusyRef.current) {
-      if (!force) return;
-      for (let i = 0; i < 80 && previewBusyRef.current; i++) {
-        await new Promise((r) => window.setTimeout(r, 50));
+  /**
+   * 豆包 segment/final 的 text 是“本次 ASR 会话累计文本”（不是增量），累计文本里
+   * 已经 ingest 过的句子必须跳过，否则同一句会重复落图（F1）。切句与去重规则在
+   * store.ts 的 splitCumulativeText / pickNewSentences 里，便于单独自测。
+   */
+  function enqueueSentence(sentence: string, key: string) {
+    segmentQueueRef.current = segmentQueueRef.current.then(async () => {
+      try {
+        await useStore.getState().ingestSegment(sentence);
+      } catch {
+        // toast 由 store 负责；key 回滚，后续累计文本再次到达时这一句还能重试
+        ingestedSentencesRef.current.delete(key);
       }
-      if (previewBusyRef.current) return;
-    }
-    previewBusyRef.current = true;
-    const session = sessionRef.current;
-    setStage("detecting");
-    try {
-      const r = await send<{ candidates: { name: string; evidence?: string }[] }>(
-        `/api/worlds/${worldId}/stream/detect`,
-        "POST",
-        { text: spoken, anchorId: focusId },
-      );
-      if (session !== sessionRef.current) return;
-      const state = useStore.getState();
-      if (!force && !state.busy && state.stage !== "detecting" && state.stage !== "confirming") return;
-      const existingNames = new Set(useStore.getState().nodes.map((n) => n.name));
-      const incoming = (r.candidates ?? []).filter((c) => c.name && !existingNames.has(c.name));
-      const merged = new Map(useStore.getState().ghosts.map((g) => [g.name, g]));
-      for (const c of incoming) {
-        if (!merged.has(c.name)) {
-          merged.set(c.name, { name: c.name, role: "", action: "detected", label: "实体检测" });
-        }
+    });
+  }
+
+  /** 返回本次新入队的句子数（0 = 这段累计文本全是已 ingest 内容） */
+  function ingestNewText(cumulative: string, final = false): number {
+    if (!cumulative || !useStore.getState().world) return 0;
+    const fresh = pickNewSentences(cumulative, ingestedSentencesRef.current, final);
+    for (const s of fresh) enqueueSentence(s.text, s.key);
+    return fresh.length;
+  }
+
+  /** 等 segment 队列彻底排空（等待期间可能又有 segment/final 追加） */
+  async function drainSegmentQueue() {
+    let seen: Promise<void>;
+    do {
+      seen = segmentQueueRef.current;
+      await seen;
+    } while (seen !== segmentQueueRef.current);
+  }
+
+  /** 串行 commit：先排空队列再提交，避免并发 commit 与早提交丢尾句 */
+  function commitSerialized() {
+    commitChainRef.current = commitChainRef.current.then(async () => {
+      await drainSegmentQueue();
+      try {
+        await useStore.getState().commitStream();
+      } catch {
+        // store 已 toast，这里保证 commit 链不因失败断掉
       }
-      setGhosts([...merged.values()]);
-      if (merged.size) setStage("confirming");
-    } catch {
-      // 检测失败不阻塞主链路
-    } finally {
-      previewBusyRef.current = false;
-    }
-  }
-
-  function schedulePreview(spoken: string) {
-    if (spoken.length < 10 || previewBusyRef.current) return;
-    if (spoken.length - lastDetectLenRef.current < 6) return;
-    if (previewTimer.current) return;
-    previewTimer.current = window.setTimeout(() => {
-      previewTimer.current = null;
-      lastDetectLenRef.current = spoken.length;
-      void requestPreview(spoken);
-    }, 150);
-  }
-
-  function enqueueSegment(text: string) {
-    if (!text.trim()) return;
-    segmentsRef.current += 1;
-    segmentQueueRef.current = segmentQueueRef.current
-      .then(() => useStore.getState().ingestSegment(text))
-      .catch(() => null);
+    });
+    return commitChainRef.current;
   }
 
   async function finishSession() {
     if (finishOnceRef.current) return;
     finishOnceRef.current = true;
-    await segmentQueueRef.current;
-    await useStore.getState().commitStream();
     recordingRef.current = false;
+    stoppingRef.current = true; // 保持到 commit 完成：期间 startMic/startMock 会被拒，避免两轮录音状态机重叠
+    clearKeepAlive();
+    if (reconnectTimerRef.current) {
+      window.clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+    if (stopFallbackTimerRef.current) {
+      window.clearTimeout(stopFallbackTimerRef.current);
+      stopFallbackTimerRef.current = null;
+    }
+    await commitSerialized();
     stoppingRef.current = false;
     setRec(false);
+  }
+
+  /** stopRec 2.5s 兜底 commit 之后才到的 final：只补新尾句 + 再 commit，不回退 UI 状态 */
+  function commitLateFinal() {
+    void commitSerialized();
   }
 
   function connectWS(mock: boolean) {
     const proto = location.protocol === "https:" ? "wss" : "ws";
     const ws = new WebSocket(`${proto}://${location.host}/ws/asr`);
     wsRef.current = ws;
+    let wsEverOpened = false;
     ws.onopen = () => {
       if (wsRef.current !== ws) return;
+      wsEverOpened = true;
+      // F2：录音会话真正建立后才置 true —— keepalive / onclose 自动重连 / onerror 提示都以它为准
+      recordingRef.current = true;
+      asrErrorCountRef.current = 0;
       const hotwords = nodes.map((n) => n.name).filter(Boolean).slice(0, 80);
       ws.send(JSON.stringify({ type: mock ? "mock" : "start", hotwords }));
       // 立即发一点静音，避免 ASR 在等第一包音频时超时
@@ -241,7 +286,7 @@ export default function InputBar() {
       // 补发 WS ready 之前的早期音频
       const queued = pendingAudioRef.current.splice(0);
       for (const chunk of queued) ws.send(JSON.stringify({ type: "audio", chunk }));
-      if (keepAliveRef.current) window.clearInterval(keepAliveRef.current);
+      clearKeepAlive();
       keepAliveRef.current = window.setInterval(() => {
         if (wsRef.current?.readyState !== WebSocket.OPEN || !recordingRef.current) return;
         if (Date.now() - lastAudioAtRef.current < 1500) return;
@@ -256,6 +301,7 @@ export default function InputBar() {
       if (wsRef.current !== ws) return;
       const msg = JSON.parse(ev.data);
       if (msg.type === "partial") {
+        if (finishOnceRef.current) return; // 收尾后迟到的 partial 不覆盖已完成状态
         setPartial(msg.text);
         setStage("detecting");
         const ids = matchMentions(msg.text);
@@ -265,20 +311,32 @@ export default function InputBar() {
       } else if (msg.type === "segment") {
         setStreamTextFinal(msg.text);
         setPartial("");
+        const added = ingestNewText(msg.text);
+        if (finishOnceRef.current) {
+          // 收尾后迟到的 segment：只补 ingest 新句（必要时补 commit），不回退 UI 状态
+          if (added > 0) commitLateFinal();
+          return;
+        }
         setStage("confirming");
         setState("本句已确认 · 继续说话，或再点一次结束");
-        enqueueSegment(msg.text);
       } else if (msg.type === "final") {
         setPartial("");
         setStreamTextFinal(msg.text);
+        const added = ingestNewText(msg.text, true);
+        if (finishOnceRef.current) {
+          // stopRec 2.5s 兜底已经 commit 过：不回退 UI，只补 ingest 新尾句再 commit 一次
+          if (added > 0) commitLateFinal();
+          try {
+            ws.close();
+          } catch {}
+          return;
+        }
         setStage("confirming");
         if (stoppingRef.current || mock) {
-          enqueueSegment(msg.text);
           setState("整段已确认 · 正在落图");
           void finishSession();
         } else {
-          // ASR 认为当前 utterance 结束：只结算这一句，然后继续录音
-          enqueueSegment(msg.text);
+          // ASR 认为当前 utterance 结束：只结算这一句，然后重连继续录音（不留重复音频）
           setState("本句已确认 · 继续说话，或再点一次结束");
           try {
             ws.close();
@@ -305,10 +363,7 @@ export default function InputBar() {
     };
     ws.onclose = () => {
       if (wsRef.current !== ws) return;
-      if (keepAliveRef.current) {
-        window.clearInterval(keepAliveRef.current);
-        keepAliveRef.current = null;
-      }
+      clearKeepAlive();
       if (recordingRef.current && !stoppingRef.current) {
         // ASR 在句末关闭：保持录音，重连继续
         if (reconnectTimerRef.current) window.clearTimeout(reconnectTimerRef.current);
@@ -316,6 +371,14 @@ export default function InputBar() {
           reconnectTimerRef.current = null;
           if (recordingRef.current && !stoppingRef.current) connectWS(mock);
         }, 250);
+        return;
+      }
+      // 从未连上就断开（服务端未起/网络失败）：给用户可见提示，不要静默卡住
+      if (!wsEverOpened && !stoppingRef.current && !finishOnceRef.current) {
+        setMicError("语音连接失败，请重试");
+        setState("语音连接失败");
+        setRec(false);
+        stopTracks();
       }
     };
     ws.onerror = () => {
@@ -331,6 +394,8 @@ export default function InputBar() {
 
   async function startMic() {
     if (!worldId) return;
+    // 上一轮还在收尾（等 final / commit）时不重复开新会话，避免两轮状态机互相踩
+    if (recordingRef.current || stoppingRef.current) return;
     setMicError("");
     setState("请求麦克风…");
     let stream: MediaStream;
@@ -428,7 +493,15 @@ export default function InputBar() {
   }
 
   function stopRec() {
+    if (stoppingRef.current) return;
     stoppingRef.current = true;
+    // F2：停止采集即退出“录音中”，keepalive / 自动重连立即失效；收尾统一由 finishSession 负责
+    recordingRef.current = false;
+    clearKeepAlive();
+    if (reconnectTimerRef.current) {
+      window.clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
     setState("正在等待最终结果…");
     setStage("confirming");
     flushTailRef.current?.();
@@ -448,12 +521,24 @@ export default function InputBar() {
       void finishSession();
     }
     setRec(false);
-    window.setTimeout(() => {
-      if (stoppingRef.current) void finishSession();
-    }, 2500);
+    // final 迟迟不来时的兜底 commit；迟到的 final 由 finishOnceRef 分支补尾句 + 再 commit
+    if (!finishOnceRef.current) {
+      if (stopFallbackTimerRef.current) window.clearTimeout(stopFallbackTimerRef.current);
+      stopFallbackTimerRef.current = window.setTimeout(() => {
+        stopFallbackTimerRef.current = null;
+        if (stoppingRef.current) {
+          void finishSession().then(() => {
+            try {
+              wsRef.current?.close();
+            } catch {}
+          });
+        }
+      }, 2500);
+    }
   }
 
   function startMock() {
+    if (recordingRef.current || stoppingRef.current) return;
     setMicError("");
     clearStream();
     resetStream();

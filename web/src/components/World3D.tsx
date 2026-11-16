@@ -1,4 +1,4 @@
-﻿import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Html, Line, OrbitControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
@@ -68,7 +68,9 @@ function Island({
   const seed = hash(node.id);
   const accent = ACCENTS[seed % ACCENTS.length];
   const tier = node.tier ?? 0;
-  const pulse = Boolean(appearing || mentioned);
+  // provisional 与 committed 是同一套地图坐标，只在标签/脉冲上弱化区分（commit 后 status 变 committed 即恢复）
+  const provisional = node.status === "provisional";
+  const pulse = Boolean(appearing || mentioned || provisional);
   const deltaX = spawnFrom ? spawnFrom[0] - position[0] : 0;
   const deltaZ = spawnFrom ? spawnFrom[2] - position[2] : 0;
 
@@ -99,7 +101,9 @@ function Island({
       const k = 1 + Math.sin(state.clock.elapsedTime * 3.2) * 0.05;
       ringRef.current.scale.setScalar(k);
       const mat = ringRef.current.material as THREE.MeshBasicMaterial;
-      mat.opacity = 0.35 + 0.25 * (0.5 + 0.5 * Math.sin(state.clock.elapsedTime * 3.2));
+      // 纯候选（未在入场动画中）的脉冲环更弱
+      const strength = provisional && !appearing ? 0.55 : 1;
+      mat.opacity = (0.35 + 0.25 * (0.5 + 0.5 * Math.sin(state.clock.elapsedTime * 3.2))) * strength;
     }
   });
 
@@ -134,13 +138,26 @@ function Island({
           {pulse && (
             <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 4, 0]}>
               <torusGeometry args={[68, 2.4, 8, 48]} />
-              <meshBasicMaterial color={appearing ? "#e0a458" : "#d8b46a"} transparent opacity={0.55} depthWrite={false} />
+              <meshBasicMaterial
+                color={appearing ? "#e0a458" : provisional ? "#c2ac8d" : "#d8b46a"}
+                transparent
+                opacity={0.55}
+                depthWrite={false}
+              />
             </mesh>
           )}
         </group>
         <Html center position={[0, 92, 0]} zIndexRange={[30, 0]} style={{ pointerEvents: "none" }}>
-          <div className={"n3d-label" + (appearing ? " new" : "") + (mentioned ? " mentioned" : "")}>
+          <div
+            className={
+              "n3d-label" +
+              (provisional ? " provisional" : "") +
+              (appearing ? " new" : "") +
+              (mentioned ? " mentioned" : "")
+            }
+          >
             <span className="dot" style={{ background: accent }} />
+            {provisional ? <span className="tag">候选 ·</span> : null}
             {node.name}
             {appearing ? <span className="spark">＋</span> : null}
           </div>
@@ -370,16 +387,34 @@ function Edge({
   );
 }
 
-/** 进入世界时自动把全部节点 + 副本框进视野 */
-function CameraFit({ points }: { points: [number, number, number][] }) {
+/** 进入世界时自动把全部节点 + 副本框进视野；只在世界切换（worldId 变化）时 fit 一次，之后新增节点不改相机 */
+function CameraFit({
+  worldId,
+  points,
+}: {
+  worldId: string | null;
+  points: [number, number, number][];
+}) {
   const camera = useThree((s) => s.camera);
   const controls = useThree((s) => s.controls) as any;
-  const signature = points.length;
+  // 始终读到最新节点坐标，但 effect 不因 points 变化重跑（否则每新增一个节点 1s 后相机就被重置）
+  const pointsRef = useRef(points);
+  pointsRef.current = points;
   useEffect(() => {
-    if (!points.length) return;
-    const timer = window.setTimeout(() => {
+    if (!worldId) return;
+    let cancelled = false;
+    let tries = 0;
+    let timer = 0;
+    const fit = () => {
+      if (cancelled) return;
+      const pts = pointsRef.current;
+      if (!pts.length) {
+        // openWorld 里 world 与 nodes 同一次 set 写入；万一节点还没就位，短暂重试，绝不用空数据改相机
+        if (tries++ < 10) timer = window.setTimeout(fit, 200);
+        return;
+      }
       let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-      for (const [x, , z] of points) {
+      for (const [x, , z] of pts) {
         minX = Math.min(minX, x);
         maxX = Math.max(maxX, x);
         minZ = Math.min(minZ, z);
@@ -396,13 +431,18 @@ function CameraFit({ points }: { points: [number, number, number][] }) {
         controls.target.set(cx, 0, cz);
         controls.update?.();
       }
-    }, 1000);
-    return () => window.clearTimeout(timer);
-  }, [signature, camera, controls]);
+    };
+    timer = window.setTimeout(fit, 1000);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [worldId, camera, controls]);
   return null;
 }
 
 export default function World3D() {
+  const worldId = useStore((s) => s.world?.id ?? null);
   const nodes = useStore((s) => s.nodes);
   const edges = useStore((s) => s.edges);
   const buildings = useStore((s) => s.buildings);
@@ -581,15 +621,16 @@ export default function World3D() {
             />
           );
         })}
+        {/* 不要给 OrbitControls 传 target：[0,0,0]：R3F 每次重渲染都会把 props apply 一遍，
+            target 数组会重新 .set 回原点，等于在新增节点时把相机拽回原点（相机只在 CameraFit 里定一次）。 */}
         <OrbitControls
           makeDefault
           enablePan
           minDistance={300}
           maxDistance={2600}
           maxPolarAngle={Math.PI / 2.15}
-          target={[0, 0, 0]}
         />
-        <CameraFit points={worldPoints} />
+        <CameraFit worldId={worldId} points={worldPoints} />
       </Canvas>
       <div className="hud3d">
         <div className="badge">3D · 拖拽旋转 · 滚轮缩放 · 点岛查看</div>
