@@ -401,12 +401,37 @@ export default function InputBar() {
         }
       }
     }
+    flushTailRef.current = () => {
+      if (pendingLen > 0) {
+        const tail = new Int16Array(pendingLen);
+        let filled = 0;
+        while (pending.length) {
+          const head = pending.shift()!;
+          tail.set(head.subarray(0, head.length), filled);
+          filled += head.length;
+        }
+        pendingLen = 0;
+        const chunk = toBase64(tail.buffer);
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: "audio", chunk }));
+          lastAudioAtRef.current = Date.now();
+        } else if (pendingAudioRef.current.length < 100) {
+          pendingAudioRef.current.push(chunk);
+        }
+      }
+      for (const chunk of pendingAudioRef.current.splice(0)) {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: "audio", chunk }));
+        }
+      }
+    };
   }
 
   function stopRec() {
     stoppingRef.current = true;
     setState("正在等待最终结果…");
     setStage("confirming");
+    flushTailRef.current?.();
     try {
       nodeRef.current?.disconnect();
     } catch {}

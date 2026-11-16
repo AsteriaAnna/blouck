@@ -46,7 +46,7 @@
 
 已实现：
 
-- 候选集 + 证据方向 + commit `suggest→formal`；
+- 候选集解析 source/target + commit `suggest→formal`；方向仍以 LLM 输出为主；
 - 9.4 核心场景已验证。
 
 未实现，不要写成已有：

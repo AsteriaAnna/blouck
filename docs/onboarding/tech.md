@@ -18,7 +18,7 @@ InputBar
 → getUserMedia
 → AudioContext（浏览器原生采样率，通常 48k）
 → AudioWorklet PCMWorklet：连续相位重采样 48k→16k，输出 Int16
-→ 3200 字节一块（100ms）通过 /ws/asr 发送
+→ 3200 samples 一块（PCM16 = 6400 字节，约 200ms）通过 /ws/asr 发送
 → 服务端 doubao.ts 转豆包二进制 WebSocket 协议
 → partial / segment / final 回推
 → segment 调 /stream/segment

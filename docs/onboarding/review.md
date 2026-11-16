@@ -60,7 +60,7 @@ http://localhost:5173/mic-test.html
 ```bash
 pnpm --filter @blouck/server eval
 pnpm --filter @blouck/server eval:dungeons
-npx tsx server/eval/stream-voice-binding.ts
+cd server && npx tsx eval/stream-voice-binding.ts
 ```
 
 注意：
@@ -71,6 +71,6 @@ npx tsx server/eval/stream-voice-binding.ts
 
 ## 5. 当前审核结论的边界
 
-- 已自动验证：typecheck、web build、stream API 的 provisional/commit、focus 多分支、关系 9.4 场景；
+- 已用脚本/接口验证：typecheck、web build、stream API 的 provisional/commit、focus 多分支、关系 9.4 场景；
 - 已人工验证：真实麦克风能出 partial/final（本机浏览器）；
 - 未自动验证：真实麦克风连续说话、长停顿重连、48k/16k 音频质量、下游方向/题目/副本。

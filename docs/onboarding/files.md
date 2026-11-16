@@ -38,6 +38,8 @@
 | 文件 | 内容 |
 | --- | --- |
 | `env.ts` | 环境变量、provider 选择 |
+| `server/.env.example` | 环境变量模板 |
+| `server/package.json` / `tsconfig.json` | 服务端依赖与 TS 配置 |
 | `db.ts` | schema、迁移、节点/关系/建筑/题目/方向/focus_stack 查询 |
 | `index.ts` | Express REST + `/ws/asr`；文字 `/extract` 与语音 `/stream/*` |
 | `stream/session.ts` | **语音建图核心**：provisional、focus、parent、关系、commit |
@@ -93,6 +95,7 @@
 | --- | --- |
 | `index.html` | Vite HTML 壳 |
 | `vite.config.ts` | 5173 端口、`/api` `/ws` 代理 |
+| `web/tsconfig.json` / `web/package.json` | 前端 TS/依赖配置 |
 | `package.json` / `tsconfig.json` | 前端依赖与 TS 配置 |
 | `public/mic-test.html` | **独立麦克风/ASR 自检页**，不走图谱/LLM |
 | `public/assets3d/manifest.json` | GLB 岛屿 ID/层级/文件映射 |

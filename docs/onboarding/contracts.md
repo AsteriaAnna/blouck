@@ -147,6 +147,6 @@ updated_at INTEGER
 2. commit 不改节点 ID、不改坐标；
 3. 关系不能默认 `source=focus`，要用候选集和证据；
 4. `partOf` 方向目前依赖 LLM 输出；没有强制归一，不要写成已实现；
-5. 已有 formal 关系不能被新关系静默覆盖；
+5. 目标是“已有 formal 关系不被静默覆盖”；**当前代码没有冲突检测/覆盖保护，这条不是已实现能力**；
 6. 前端不要强制 `AudioContext({sampleRate:16000})`，也不要对 worklet 的 16k Int16 再重采样；
 7. 不要把 `segment` 当成整段结束。
