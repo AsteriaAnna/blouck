@@ -113,6 +113,8 @@ type State = {
   openEdge: (id: string) => void;
   closeDrawer: () => void;
   extract: (text: string, exploreEdgeId?: string) => Promise<void>;
+  /** 沿方向线落图：直接创建方向生成时计划好的延伸节点 */
+  exploreDirection: (edgeId: string) => Promise<void>;
   ingestSegment: (text: string) => Promise<void>;
   commitStream: () => Promise<void>;
   saveMd: (id: string, md: string) => Promise<void>;
@@ -231,7 +233,7 @@ export const useStore = create<State>((set, getState) => ({
 
   setFocus: (id) => set({ focusId: id }),
 
-  async extract(text, exploreEdgeId) {
+  async extract(text) {
     if (!getState().world) return;
     const before = new Set(getState().nodes.map((n) => n.id));
     const ghostsBefore = getState().ghosts;
@@ -240,7 +242,6 @@ export const useStore = create<State>((set, getState) => ({
       const p = await send<any>(`/api/worlds/${getState().world!.id}/extract`, "POST", {
         text,
         fromNodeId: getState().focusId,
-        ...(exploreEdgeId ? { exploreEdgeId } : {}),
       });
       const newIds = (p.nodes ?? []).filter((n: any) => !before.has(n.id)).map((n: any) => n.id);
       set({
@@ -261,11 +262,49 @@ export const useStore = create<State>((set, getState) => ({
       window.setTimeout(() => set({ spawnGhosts: [] }), 3400);
       const n = p.createdNodes?.length ?? newIds.length;
       getState().showToast(
-        n ? `已落图 ${n} 个新节点 · ${p.provider === "mock" ? "mock 抽取" : "DeepSeek 抽取"}` : "已记录，没有新实体",
+        n ? `已落图 ${n} 个新节点 · ${p.provider === "mock" ? "mock 抽取" : "DeepSeek 抽取"}` : "这段没有可落图的新实体",
       );
     } catch (e: any) {
       set({ busy: false });
       getState().showToast(e.message ?? "抽取失败");
+    }
+  },
+
+  async exploreDirection(edgeId) {
+    if (!getState().world) return;
+    const before = new Set(getState().nodes.map((n) => n.id));
+    const ghostsBefore = getState().ghosts;
+    set({ busy: true, stage: "generating", newNodeIds: [], spawnGhosts: ghostsBefore });
+    try {
+      const p = await send<any>(`/api/worlds/${getState().world!.id}/explore`, "POST", { edgeId });
+      const newIds = (p.nodes ?? []).filter((n: any) => !before.has(n.id)).map((n: any) => n.id);
+      set({
+        nodes: p.nodes,
+        edges: p.edges,
+        buildings: p.buildings,
+        directions: p.directions ?? getState().directions,
+        newNodeIds: newIds,
+        ghosts: [],
+        spawnGhosts: ghostsBefore,
+        stage: "done",
+        busy: false,
+      });
+      window.setTimeout(() => {
+        if (getState().stage === "done") set({ stage: "idle" });
+      }, 2400);
+      window.setTimeout(() => set({ newNodeIds: [] }), 3800);
+      window.setTimeout(() => set({ spawnGhosts: [] }), 3400);
+      const created = p.createdNodes?.[0];
+      getState().showToast(
+        typeof p.warning === "string" && p.warning
+          ? p.warning
+          : created
+            ? `沿方向生成「${created.name}」`
+            : "这条方向暂时没有生成新节点",
+      );
+    } catch (e: any) {
+      set({ busy: false });
+      getState().showToast(e.message ?? "探索失败");
     }
   },
 

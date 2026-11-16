@@ -69,6 +69,13 @@ export type EdgeRow = {
   origin?: string;
   claim_status?: string;
   revision?: number;
+  /** 方向线生成时预先计划好的延伸节点 */
+  target_name?: string | null;
+  target_type?: string | null;
+  target_definition?: string | null;
+  target_aliases?: string | null;
+  target_predicate?: string | null;
+  target_label?: string | null;
 };
 
 export type BuildingRow = {

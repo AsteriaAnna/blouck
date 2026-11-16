@@ -50,7 +50,24 @@ export type EdgeRow = {
   origin: string;
   claim_status: string;
   revision: number;
+  /** 方向线在生成时预先计划好的“延伸节点” */
+  target_name: string | null;
+  target_type: string | null;
+  target_definition: string | null;
+  target_aliases: string | null;
+  target_predicate: string | null;
+  target_label: string | null;
   created_at: number;
+};
+
+/** 方向的延伸计划：探索时直接落这个节点，而不是拿问题去抽取 */
+export type DirectionTargetPlan = {
+  name: string;
+  type?: string;
+  definition?: string;
+  aliases?: string[];
+  predicate?: string | null;
+  label?: string;
 };
 
 export type BuildingRow = {
@@ -165,8 +182,26 @@ for (const [col, ddl] of [
   ["origin", "TEXT NOT NULL DEFAULT 'auto'"],
   ["claim_status", "TEXT NOT NULL DEFAULT 'normal'"],
   ["revision", "INTEGER NOT NULL DEFAULT 1"],
+  // 方向线预先计划好的延伸节点
+  ["target_name", "TEXT"],
+  ["target_type", "TEXT"],
+  ["target_definition", "TEXT"],
+  ["target_aliases", "TEXT"],
+  ["target_predicate", "TEXT"],
+  ["target_label", "TEXT"],
 ] as const) {
   if (!columnNames("edges").includes(col)) db.exec(`ALTER TABLE edges ADD COLUMN ${col} ${ddl}`);
+}
+// 方向表：生成方向时就把延伸节点计划好（名称/类型/定义/关系）
+for (const [col, ddl] of [
+  ["target_name", "TEXT"],
+  ["target_type", "TEXT"],
+  ["target_definition", "TEXT"],
+  ["target_aliases", "TEXT"],
+  ["target_predicate", "TEXT"],
+  ["target_label", "TEXT"],
+] as const) {
+  if (!columnNames("directions").includes(col)) db.exec(`ALTER TABLE directions ADD COLUMN ${col} ${ddl}`);
 }
 // 副本 v2：版本/依据/指纹
 for (const [col, ddl] of [
@@ -452,11 +487,18 @@ export function addEdge(
     evidence?: string;
     confidence?: number;
     origin?: string;
+    /** 方向线：预先计划好的延伸节点 */
+    target_name?: string | null;
+    target_type?: string | null;
+    target_definition?: string | null;
+    target_aliases?: string | null;
+    target_predicate?: string | null;
+    target_label?: string | null;
   } = {},
 ): EdgeRow {
   const id = uid();
   db.prepare(
-    "INSERT INTO edges(id,world_id,src,dst,kind,label,md,question,predicate,evidence,confidence,origin,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+    "INSERT INTO edges(id,world_id,src,dst,kind,label,md,question,predicate,evidence,confidence,origin,target_name,target_type,target_definition,target_aliases,target_predicate,target_label,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
   ).run(
     id,
     worldId,
@@ -470,6 +512,12 @@ export function addEdge(
     meta.evidence ?? "",
     meta.confidence ?? 1,
     meta.origin ?? "auto",
+    meta.target_name ?? null,
+    meta.target_type ?? null,
+    meta.target_definition ?? null,
+    meta.target_aliases ?? null,
+    meta.target_predicate ?? null,
+    meta.target_label ?? null,
     now(),
   );
   return db.prepare("SELECT * FROM edges WHERE id=?").get(id) as EdgeRow;
@@ -502,6 +550,12 @@ export type DirectionRow = {
   question: string;
   reason: string;
   target_hint: string | null;
+  target_name: string | null;
+  target_type: string | null;
+  target_definition: string | null;
+  target_aliases: string | null;
+  target_predicate: string | null;
+  target_label: string | null;
   status: "open" | "consumed" | "archived";
   consumed_span_id: string | null;
   created_at: number;
@@ -512,12 +566,29 @@ export function addDirection(
   nodeId: string,
   question: string,
   reason = "",
-  targetHint: string | null = null,
+  plan?: DirectionTargetPlan | string | null,
 ): DirectionRow {
   const id = uid();
+  const p = plan && typeof plan === "object" ? plan : null;
+  const legacyHint = typeof plan === "string" ? plan : p?.name ?? null;
   db.prepare(
-    "INSERT INTO directions(id,world_id,node_id,question,reason,target_hint,status,created_at) VALUES(?,?,?,?,?,?,'open',?)",
-  ).run(id, worldId, nodeId, question, reason, targetHint, now());
+    `INSERT INTO directions(id,world_id,node_id,question,reason,target_hint,target_name,target_type,target_definition,target_aliases,target_predicate,target_label,status,created_at)
+     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,'open',?)`,
+  ).run(
+    id,
+    worldId,
+    nodeId,
+    question,
+    reason,
+    legacyHint,
+    p?.name ?? legacyHint,
+    p?.type ?? null,
+    p?.definition ?? null,
+    p?.aliases ? JSON.stringify(p.aliases) : null,
+    p?.predicate ?? null,
+    p?.label ?? null,
+    now(),
+  );
   return db.prepare("SELECT * FROM directions WHERE id=?").get(id) as DirectionRow;
 }
 

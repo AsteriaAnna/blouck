@@ -59,6 +59,15 @@ export type DirectionSuggestion = {
   node: string;
   question: string;
   reason: string;
+  /** 生成方向时就计划好的延伸节点（探索时直接落它，不再抽取问题文本） */
+  target?: {
+    name: string;
+    type?: NodeType;
+    definition?: string;
+    aliases?: string[];
+  };
+  predicate?: RelationPredicate;
+  label?: string;
 };
 
 export type DungeonFlowSuggestion = {
@@ -109,9 +118,10 @@ export type LLMProvider = {
     b: { name: string; definition?: string; md?: string };
     evidence?: string;
   }): Promise<RelationSuggestion>;
-  /** 为一批节点生成下一步方向问题 */
+  /** 为一批节点生成下一步方向问题 + 预先计划好延伸节点 */
   suggestDirections(input: {
     nodes: { name: string; definition?: string; evidence?: string; neighbors: string[] }[];
+    existing: string[];
   }): Promise<DirectionSuggestion[]>;
   /** 基于当前图提出流程/领域副本候选（程序再做硬校验） */
   detectDungeons(input: {

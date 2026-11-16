@@ -44,7 +44,7 @@ export default function RelationDrawer() {
   const edges = useStore((s) => s.edges);
   const nodes = useStore((s) => s.nodes);
   const acceptEdge = useStore((s) => s.acceptEdge);
-  const extract = useStore((s) => s.extract);
+  const exploreDirection = useStore((s) => s.exploreDirection);
   const closeDrawer = useStore((s) => s.closeDrawer);
 
   const edge = edges.find((e) => e.id === (drawer?.kind === "edge" ? drawer.id : ""));
@@ -52,8 +52,13 @@ export default function RelationDrawer() {
   const from = nodes.find((n) => n.id === edge.src)?.name ?? "?";
   const to = nodes.find((n) => n.id === edge.dst)?.name ?? "?";
   const isDirection = edge.kind === "direction";
+  const plannedName = edge.target_name?.trim() || "";
+  const plannedDef = edge.target_definition?.trim() || "";
   const sentence = isDirection
-    ? `探索方向：「${from}」的下一个问题是：${edge.question || edge.label || "还可以往哪里深入？"}`
+    ? `探索方向：「${from}」的下一个问题是：${edge.question || edge.label || "还可以往哪里深入？"}` +
+      (plannedName
+        ? `\n\n点「去探索」会直接生成预先规划好的节点：**${plannedName}**${plannedDef ? `——${plannedDef}` : ""}`
+        : `\n\n这条方向是旧数据，点「去探索」时会先规划延伸节点，再落图。`)
     : relationSentence(edge.kind, edge.predicate ?? null, from, to);
 
   return (
@@ -87,14 +92,11 @@ export default function RelationDrawer() {
             <button
               className="primary"
               onClick={async () => {
-                await fetch(`/api/edges/${edge.id}/consume`, { method: "POST" }).catch(() => null);
-                // 从这条方向线的起点探索，而不是当前焦点
-                useStore.getState().setFocus(edge.src);
                 closeDrawer();
-                await extract(edge.question || "继续探索这个方向", edge.id);
+                await exploreDirection(edge.id);
               }}
             >
-              去探索
+              {plannedName ? `生成「${plannedName}」` : "去探索"}
             </button>
           </div>
         ) : null}

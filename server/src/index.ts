@@ -38,6 +38,7 @@ import {
   updateNodeMeta,
   type BuildingRow,
   type EdgeKind,
+  type EdgeRow,
   type NodeRow,
 } from "./db.js";
 import { deepseekLLM } from "./providers/deepseek.js";
@@ -96,10 +97,16 @@ function materializeDirectionEdges(worldId: string) {
       count.set(node.id, used + 1);
       continue;
     }
-    addEdge(worldId, node.id, node.id, "direction", "", d.question, "", {
+    addEdge(worldId, node.id, node.id, "direction", d.target_name ?? "", d.question, "", {
       evidence: d.reason,
       confidence: 0.6,
       origin: "direction",
+      target_name: d.target_name,
+      target_type: d.target_type,
+      target_definition: d.target_definition,
+      target_aliases: d.target_aliases,
+      target_predicate: d.target_predicate,
+      target_label: d.target_label,
     });
     existing.add(key);
     count.set(node.id, used + 1);
@@ -170,6 +177,191 @@ function normalizeConceptName(raw: string): { name: string; aliases: string[] } 
   return { name: raw.trim(), aliases: [] };
 }
 
+/** 从“探索方向”落图：方向生成时已经计划好延伸节点，这里直接创建它（不再拿问题当文本抽取） */
+app.post("/api/worlds/:id/explore", async (req, res) => {
+  const world = getWorld(req.params.id);
+  if (!world) return res.status(404).json({ error: "world not found" });
+  const edgeId = String(req.body?.edgeId ?? "");
+  if (!edgeId) return res.status(400).json({ error: "edgeId required" });
+  const edge = db.prepare("SELECT * FROM edges WHERE id=? AND world_id=?").get(edgeId, world.id) as
+    | EdgeRow
+    | undefined;
+  if (!edge || edge.kind !== "direction") return res.status(404).json({ error: "direction edge not found" });
+  if (edge.consumed) return res.status(409).json({ error: "这个方向已经探索过了" });
+  const src = getNode(edge.src);
+  if (!src) return res.status(404).json({ error: "source node not found" });
+
+  let graph = getGraph(world.id);
+  let directionRow = listDirections(world.id).find(
+    (d) => d.node_id === edge.src && d.question === (edge.question ?? "") && d.status === "open",
+  );
+  const readPlan = () => {
+    const name = edge.target_name ?? directionRow?.target_name ?? null;
+    if (!name) return null;
+    return {
+      name,
+      type: edge.target_type ?? directionRow?.target_type ?? "概念",
+      definition: edge.target_definition ?? directionRow?.target_definition ?? "",
+      aliasesRaw: edge.target_aliases ?? directionRow?.target_aliases ?? "[]",
+      predicate: edge.target_predicate ?? directionRow?.target_predicate ?? "related",
+      label: edge.target_label ?? directionRow?.target_label ?? "延伸",
+    };
+  };
+
+  // 老方向没有计划：现场规划一次并写回，之后直接落图
+  let plan = readPlan();
+  if (!plan) {
+    const existing = graph.nodes.map((n) => n.name);
+    const neighbors = graph.edges
+      .filter((e) => e.src === src.id || e.dst === src.id)
+      .map((e) => graph.nodes.find((x) => x.id === (e.src === src.id ? e.dst : e.src))?.name ?? "")
+      .filter(Boolean)
+      .slice(0, 6);
+    try {
+      const suggestions = await llm.suggestDirections({
+        nodes: [{ name: src.name, definition: src.definition, neighbors }],
+        existing,
+      });
+      const sug = suggestions[0];
+      if (sug?.target?.name) {
+        plan = {
+          name: sug.target.name,
+          type: sug.target.type ?? "概念",
+          definition: sug.target.definition ?? "",
+          aliasesRaw: JSON.stringify(sug.target.aliases ?? []),
+          predicate: sug.predicate ?? "related",
+          label: sug.label ?? "延伸",
+        };
+        const aliases = plan.aliasesRaw;
+        if (directionRow) {
+          db.prepare(
+            "UPDATE directions SET target_name=?, target_type=?, target_definition=?, target_aliases=?, target_predicate=?, target_label=? WHERE id=?",
+          ).run(plan.name, plan.type, plan.definition, aliases, plan.predicate, plan.label, directionRow.id);
+        }
+        db.prepare(
+          "UPDATE edges SET target_name=?, target_type=?, target_definition=?, target_aliases=?, target_predicate=?, target_label=? WHERE id=?",
+        ).run(plan.name, plan.type, plan.definition, aliases, plan.predicate, plan.label, edgeId);
+      }
+    } catch (err) {
+      console.warn("[explore] 方向规划失败：", err);
+    }
+  }
+
+  if (!plan) {
+    const payload = getGraph(world.id);
+    return res.json({
+      nodes: payload.nodes,
+      edges: payload.edges,
+      buildings: listBuildings(world.id),
+      directions: listDirections(world.id),
+      createdNodes: [],
+      warning: "这个方向还没有规划出延伸节点，方向已保留；请稍后重试或换一个方向。",
+    });
+  }
+
+  let aliases: string[] = [];
+  try {
+    aliases = JSON.parse(plan.aliasesRaw || "[]");
+  } catch {
+    aliases = [];
+  }
+  const norm = (s: string) => s.toLowerCase().replace(/[\s\-_·、，。,.；;：:（）()【】\[\]《》"'“”]/g, "").trim();
+  const existingNode = graph.nodes.find(
+    (n) => norm(n.name) === norm(plan!.name) || (() => {
+      try {
+        return (JSON.parse(n.aliases || "[]") as string[]).some((a) => norm(a) === norm(plan!.name));
+      } catch {
+        return false;
+      }
+    })(),
+  );
+
+  const fx = edge.frontier_x ?? src.x + 312;
+  const fy = edge.frontier_y ?? src.y;
+  const angle = Math.atan2(fy - src.y, fx - src.x);
+  const placed = graph.nodes.map((n) => ({ id: n.id, x: n.x, y: n.y }));
+  const createdNodes: NodeRow[] = [];
+  const createdEdges: unknown[] = [];
+
+  if (existingNode) {
+    // 计划节点已经存在：只建立关系并消费方向
+    if (!graph.edges.some((e) => e.src === src.id && e.dst === existingNode.id && e.kind === "formal")) {
+      createdEdges.push(
+        addEdge(world.id, src.id, existingNode.id, "formal", plan.label, null, "", {
+          predicate: plan.predicate,
+          evidence: edge.question ?? "",
+          confidence: 0.75,
+          origin: "direction",
+        }),
+      );
+    }
+  } else {
+    const pos = placeAround(placed, { id: "__explore_anchor", x: fx, y: fy }, { preferAngle: angle });
+    const span = createSourceSpan(world.id, edge.question || plan.definition || plan.name);
+    const node = addNode(world.id, plan.name, pos.x, pos.y, "", {
+      type: plan.type,
+      definition: plan.definition,
+      aliases,
+      sourceSpanId: span.id,
+    });
+    createdNodes.push(node);
+    createdEdges.push(
+      addEdge(world.id, src.id, node.id, "source", "本轮探索来源", null, "", {
+        evidence: edge.question ?? "",
+        confidence: 0.9,
+        origin: "direction",
+      }),
+    );
+    createdEdges.push(
+      addEdge(world.id, src.id, node.id, "formal", plan.label || "延伸", null, "", {
+        predicate: plan.predicate || "related",
+        evidence: edge.question ?? "",
+        confidence: 0.75,
+        origin: "direction",
+      }),
+    );
+
+    // 新节点也要有下一步方向（保持探索链不断）
+    try {
+      const existing = [...graph.nodes, node].map((n) => n.name);
+      const sugg = await llm.suggestDirections({
+        nodes: [{ name: node.name, definition: node.definition, neighbors: [src.name] }],
+        existing,
+      });
+      const s = sugg[0];
+      if (s?.target?.name) {
+        addDirection(world.id, node.id, s.question, s.reason, {
+          name: s.target.name,
+          type: s.target.type,
+          definition: s.target.definition,
+          aliases: s.target.aliases,
+          predicate: s.predicate ?? null,
+          label: s.label,
+        });
+      } else {
+        addDirection(world.id, node.id, `「${node.name}」还可以往哪一步深入？`, `围绕「${node.name}」的下一步`, null);
+      }
+    } catch {
+      addDirection(world.id, node.id, `「${node.name}」还可以往哪一步深入？`, `围绕「${node.name}」的下一步`, null);
+    }
+  }
+
+  consumeDirection(edgeId);
+  if (directionRow) db.prepare("UPDATE directions SET status='consumed' WHERE id=?").run(directionRow.id);
+  computeFrontier(world.id);
+  materializeDirectionEdges(world.id);
+  const payload = getGraph(world.id);
+  const warning = createdNodes.length ? undefined : "这个方向的目标节点已经存在，已只建立关系。";
+  res.json({
+    nodes: payload.nodes,
+    edges: payload.edges,
+    buildings: listBuildings(world.id),
+    directions: listDirections(world.id),
+    createdNodes,
+    warning,
+  });
+});
+
 /** 语音/文字 → 概念/关系/方向 → 落图（关系与节点 v2） */
 app.post("/api/worlds/:id/extract", async (req, res) => {
   const world = getWorld(req.params.id);
@@ -177,28 +369,8 @@ app.post("/api/worlds/:id/extract", async (req, res) => {
   const text = String(req.body?.text ?? "").trim();
   const fromNodeId = String(req.body?.fromNodeId ?? world.root_node_id);
   if (!text) return res.status(400).json({ error: "text required" });
-  let focus = getNode(fromNodeId) ?? getNode(world.root_node_id);
+  const focus = getNode(fromNodeId) ?? getNode(world.root_node_id);
   if (!focus) return res.status(400).json({ error: "focus node missing" });
-
-  // 从“探索方向”点进来的：新节点必须落在这个方向延伸出去的位置，而不是 focus 周围
-  let exploreAnchor: { x: number; y: number } | null = null;
-  let exploreAngle: number | null = null;
-  const exploreEdgeId = String(req.body?.exploreEdgeId ?? "");
-  if (exploreEdgeId) {
-    const edge = db.prepare("SELECT * FROM edges WHERE id=?").get(exploreEdgeId) as
-      | { src: string; kind: string; frontier_x: number | null; frontier_y: number | null }
-      | undefined;
-    if (edge && edge.kind === "direction") {
-      const src = getNode(edge.src);
-      if (src) {
-        focus = src;
-        const fx = edge.frontier_x ?? src.x + 312;
-        const fy = edge.frontier_y ?? src.y;
-        exploreAnchor = { x: fx, y: fy };
-        exploreAngle = Math.atan2(fy - src.y, fx - src.x);
-      }
-    }
-  }
 
   const span = createSourceSpan(world.id, text);
   const graph = getGraph(world.id);
@@ -271,14 +443,10 @@ app.post("/api/worlds/:id/extract", async (req, res) => {
       continue;
     }
 
-    const anchor = exploreAnchor ?? { x: focus.x, y: focus.y };
-    const baseAngle = exploreAngle ?? (placed.length * 1.7) % (Math.PI * 2);
-    // 同一轮多个新节点沿探索方向小角度扇形展开，避免叠在一起
-    const preferAngle = baseAngle + (createdNodes.length % 3) * 0.24 - 0.24;
     const pos = placeAround(
       placed,
-      { id: "__explore_anchor", x: anchor.x, y: anchor.y },
-      { preferAngle },
+      { id: focus.id, x: focus.x, y: focus.y },
+      { preferAngle: (placed.length * 1.7) % (Math.PI * 2) },
     );
     const node = addNode(world.id, name, pos.x, pos.y, "", {
       type,
@@ -331,11 +499,30 @@ app.post("/api/worlds/:id/extract", async (req, res) => {
     if (rel.type === "direction" || rel.question) {
       const question = rel.question?.trim() || `「${target.name}」的下一步还可以探索什么？`;
       if (question.length < 8) continue;
-      addDirection(world.id, source.id, question, evidence, target.name);
-      const e = addEdge(world.id, source.id, source.id, "direction", "", question, "", {
+      let targetAliases: string[] = [];
+      try {
+        targetAliases = JSON.parse(target.aliases || "[]");
+      } catch {
+        targetAliases = [];
+      }
+      addDirection(world.id, source.id, question, evidence, {
+        name: target.name,
+        type: target.type,
+        definition: target.definition,
+        aliases: targetAliases,
+        predicate: rel.predicate ?? null,
+        label: rel.label,
+      });
+      const e = addEdge(world.id, source.id, source.id, "direction", target.name, question, "", {
         evidence,
         confidence,
         origin: "auto",
+        target_name: target.name,
+        target_type: target.type,
+        target_definition: target.definition,
+        target_aliases: target.aliases,
+        target_predicate: rel.predicate ?? null,
+        target_label: rel.label,
       });
       createdEdges.push(e);
       graph.edges.push(e);
@@ -464,11 +651,21 @@ app.post("/api/worlds/:id/extract", async (req, res) => {
             .filter(Boolean)
             .slice(0, 6),
         })),
+        existing: graph.nodes.map((n) => n.name),
       });
       for (const sug of suggestions) {
         const n = pending.find((x) => x.name === sug.node);
         if (!n || haveDirection.has(n.id)) continue;
-        addDirection(world.id, n.id, sug.question, sug.reason, null);
+        addDirection(world.id, n.id, sug.question, sug.reason, sug.target
+          ? {
+              name: sug.target.name,
+              type: sug.target.type,
+              definition: sug.target.definition,
+              aliases: sug.target.aliases,
+              predicate: sug.predicate ?? null,
+              label: sug.label,
+            }
+          : null);
         haveDirection.add(n.id);
       }
     } catch (err) {

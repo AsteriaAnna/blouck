@@ -153,18 +153,46 @@ export const deepseekLLM: LLMProvider = {
     }
   },
 
-  async suggestDirections({ nodes }) {
-    const system = `你是学习探索引导器。只输出 JSON：{"items":[{"node":"节点名","question":"下一步问题（8-60字，必须提到该节点）","reason":"为什么问这个"}]}。
-每个节点给 1 条，问题要具体、可探索，不要泛泛而问。`;
-    const user = nodes
+  async suggestDirections({ nodes, existing }) {
+    const system = `你是学习探索规划器。先为每个节点想好“下一步要延伸出的新节点”，再围绕它提问。
+只输出 JSON：{"items":[{"node":"源节点名","question":"下一步问题（8-60字，必须提到目标概念）","reason":"为什么问这个","target":{"name":"新节点名（2-12字，具体概念，不能是已有节点/别名）","type":"概念|方法|组件|指标|工具","definition":"一句话定义（20-120字）","aliases":[]},"predicate":"kindOf|partOf|prerequisite|contrast|alternative|related","label":"关系名（2-8字）"}]}
+规则：
+- target 必须是当前图里还没有的新概念，不能拿已有概念当 target；
+- question 必须指向 target，用户点击探索后就直接生成这个 target 节点；
+- predicate 用“源节点 → target”的方向：kindOf 具体→上位、partOf 部分→整体、prerequisite 前置→后续、contrast/related 无方向、alternative 旧→新；
+- 每个节点给 1 条，不要泛泛而问。`;
+    const user = `已有节点（不能作为 target）：${existing.join("、") || "（无）"}\n\n${nodes
       .map((n) => `节点：${n.name}\n定义：${n.definition ?? ""}\n邻居：${n.neighbors.join("、")}`)
-      .join("\n---\n");
+      .join("\n---\n")}`;
     try {
       const raw = await chat(system, user);
-      const parsed = JSON.parse(raw) as { items?: { node?: string; question?: string; reason?: string }[] };
+      const parsed = JSON.parse(raw) as {
+        items?: {
+          node?: string;
+          question?: string;
+          reason?: string;
+          target?: { name?: string; type?: string; definition?: string; aliases?: string[] };
+          predicate?: string;
+          label?: string;
+        }[];
+      };
+      const types = new Set(["概念", "方法", "组件", "指标", "工具"]);
+      const preds = new Set(["kindOf", "partOf", "prerequisite", "contrast", "alternative", "related"]);
       return (parsed.items ?? [])
-        .filter((x) => x.node && x.question && x.question.length >= 8)
-        .map((x) => ({ node: x.node!, question: x.question!, reason: x.reason ?? "" }));
+        .filter((x) => x.node && x.question && x.question.length >= 8 && x.target?.name)
+        .map((x) => ({
+          node: x.node!,
+          question: x.question!,
+          reason: x.reason ?? "",
+          target: {
+            name: x.target!.name!.trim(),
+            type: (types.has(x.target!.type ?? "") ? x.target!.type : "概念") as any,
+            definition: x.target!.definition ?? "",
+            aliases: Array.isArray(x.target!.aliases) ? x.target!.aliases.slice(0, 4) : [],
+          },
+          predicate: (preds.has(x.predicate ?? "") ? x.predicate : "related") as any,
+          label: x.label?.slice(0, 12) || "相关",
+        }));
     } catch (err) {
       console.warn("[llm] deepseek 方向生成失败：", err);
       return [];

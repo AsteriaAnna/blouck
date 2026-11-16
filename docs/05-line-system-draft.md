@@ -397,3 +397,5 @@ POST /api/worlds/:id/explore/commit    { directionId, selected[] } → { nodes, 
 | 答题暂不展示 | 前端隐藏题目区与 tier（后端接口保留） | MVP 取舍，不影响 §2 的 D14 |
 
 未实施（仍待设计决策）：4 方向生成与刷新、关系 meaningfulness 校验、线型生命周期/删除修正、MD 结构化（frontmatter/版本）、关系题。
+
+> 2026-11-16 修正：方向不再“点击后拿问题抽取”，而是方向生成时预先计划延伸节点（名称/类型/定义/关系），点击直接落该节点；详见 `03` §8。

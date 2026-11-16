@@ -174,12 +174,21 @@ export const mockLLM: LLMProvider = {
     };
   },
 
-  async suggestDirections({ nodes }) {
-    return nodes.slice(0, 3).map((n) => ({
-      node: n.name,
-      question: `「${n.name}」和${n.neighbors[0] ?? "相邻概念"}的区别是什么？`,
-      reason: "mock：围绕定义与邻居生成",
-    }));
+  async suggestDirections({ nodes, existing }) {
+    const pool = ["上下文压缩", "查询改写", "语义缓存", "评测集", "幻觉检测", "多路召回", "重排模型", "文档分块策略"];
+    const used = new Set(existing.map((x) => x.trim()));
+    return nodes.slice(0, 3).map((n, i) => {
+      const name = pool.find((x) => !used.has(x)) ?? `${n.name}的延伸${i + 1}`;
+      used.add(name);
+      return {
+        node: n.name,
+        question: `「${n.name}」往「${name}」延伸时，关键机制是什么？`,
+        reason: "mock：预先计划一个延伸节点",
+        target: { name, type: "概念" as const, definition: `mock 为「${n.name}」规划的延伸概念「${name}」。`, aliases: [] },
+        predicate: "related" as const,
+        label: "延伸",
+      };
+    });
   },
 
   async detectDungeons() {
