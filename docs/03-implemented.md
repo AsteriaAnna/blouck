@@ -231,6 +231,7 @@ parent 选择顺序（新节点挂到谁）：
 - `web/src/components/InputBar.tsx`：麦克风、Worklet、WS、keepalive、重连、按句去重、segment/commit、失败 toast、停止后兜底 commit；“试听”按钮走 mock ASR。
 - `web/src/store.ts`：`splitCumulativeText` / `sentenceKey` / `pickNewSentences` 纯函数（累计文本切句与去重）；`ingestSegment` / `commitStream` 更新 nodes/edges/focus，失败 toast，`warning` 防御式读取后 toast。
 - `web/src/components/World3D.tsx`：节点、关系、建筑、方向线。四种线按类型分美术：正式关系=深色 3D 管状实线（半径约 2.8）、探索来源=蓝灰管状实线 + 起点圆点（半径约 2.0）、待确认建议=统一色虚线 + 中点圆珠、方向=点线 + 末端「旧版木柱路牌 + 地面方向箭头」。所有线都带透明命中管，点击可打开关系/方向文档。
+- 世界页顶栏只保留「← 世界列表 + 世界名」；示例数据标记、节点/关系/副本统计、LLM/ASR、3D 视图、重排、撤回隐藏、导出、操作提示均已从 UI 移除（后端对应接口仍在，MVP 无入口）。
 - 点节点显示**节点文档**：标题（节点名）、正文（`definition` + `free_md`，ReactMarkdown 渲染）、来源 blockquote（来自 `source_text/source_at`）、以及「编辑」自由区；MVP 暂不展示答题/档位/关系列表/手动关联/继续探索/隐藏面板。
 - 点线显示**一句话文档**（按语义类型）：正式/来源/建议线用 predicate 关系类型（归类/组成/前置/对比/替代/相关；来源线为“探索来源”）；建议线额外提供「接受为正式关系」，方向线提供「去探索」。MVP 不再展示证据/置信度/关系 MD 编辑器。
 - 题目/答题：后端 quizzes 接口仍在，但 MVP 前端不展示题目区，也不展示节点 tier。
