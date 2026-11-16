@@ -263,3 +263,48 @@
 ```
 
 如果两条都挂 RAG，说明关系绑定没做。
+
+
+---
+
+## 11. 中/低置信项补强（2026-11-16 第二轮）
+
+第一轮里有些结论只是推断。第二轮按"机制"而不是"产品"搜索，找到以下更贴的资料。
+
+### 11.1 新找到的关键资料
+
+| 资料 | 直接回答什么 | 对我们的用法 |
+| --- | --- | --- |
+| [GraphWOZ: Dialogue Management with Conversational Knowledge Graphs（arXiv 2211.12852）](https://ar5iv.labs.arxiv.org/html/2211.12852) | 对话状态本身就是图；每个 utterance/mention 是图的一部分；mention 到实体的链接用**字符串 + 图距离/近因 + coref** 特征；允许一个 mention 连多个实体；包含 ASR 错误 | 升级"本地匹配/身份/焦点"：不要只用字符串包含，用 exact + edit distance + 图距离/近因 + coref；允许多个候选/underspecified |
+| [Entity Pair-guided Relation Summarization and Retrieval（NAACL 2025）](https://aclanthology.org/2025.findings-naacl.224/) | DocRE 先做**实体对级候选关系过滤**，再让 LLM 抽事实；解决 NA 不平衡 | 升级"关系候选"：先筛实体对，再判关系；代码开源 |
+| [Whisper-Streaming（IJCNLP 2023 demo）](https://aclanthology.org/2023.ijcnlp-demo.3.pdf) / LocalAgreement-2 | 流式 ASR 用"多次假设一致的前缀"做 committed prefix，减少反复改写 | 升级"稳定片段"：不要每个 partial 都建图，等 committed prefix |
+| [OntoEditor: Real-Time Collaboration via Distributed Version Control](https://dl.acm.org/doi/10.1007/978-3-031-60626-7_18) | 实时协同本体编辑用分布式版本控制 | 仅生产期：多端/并发再参考 |
+| [Concept map scoring rubric（BMC Med Educ 2022）](https://www.cell.com/action/showFullTableHTML?isHtml=true&tableId=tbl2&pii=S2405-8440%2822%2900534-5) | 概念图可按层级/交叉连接/例子等维度评分 | 评测可用 rubric/场景，不必造通用 benchmark |
+
+### 11.2 置信度变化
+
+| 项 | 之前 | 现在 | 为什么 |
+| --- | --- | --- | --- |
+| 本地 mention→已有节点 | 中 | 中高 | GraphWOZ 给了 string+graph+recency+coref 的具体做法；不是纯字符串 |
+| 实体身份/多候选 | 中 | 中高 | GraphWOZ 明确允许 mention 连多个实体、underspecified |
+| 关系候选剪枝 | 中 | 中高 | EP-RSR/DocRE 的实体对级过滤可直接借 |
+| ASR 稳定片段 | 中 | 中高 | LocalAgreement committed prefix 是工程验证过的模式 |
+| 焦点持久/回退 | 中 | 中 | GraphWOZ 的图状态支持近因，但不等于教学多分支 |
+| 并发/多端 | 低 | 中 | OntoEditor/OT/CRDT 有路线，但仍是生产期 |
+| 通用教学图评测 | 低 | 低 | 没有 benchmark；只能用 rubric/场景 |
+| 全自动多焦点随机跳转 | 低 | 中低 | 有图状态/近因/实体链接，但多分支教学语义仍需自研 |
+
+### 11.3 仍然不能升级的
+
+1. **通用教学图 benchmark**：仍然没有，不要承诺；
+2. **每个 mention 自动挂对父节点**：GraphWOZ 是实体链接，不是教学父链；
+3. **中文口语/术语**：GraphWOZ 是英文，中文 ASR + 领域词仍需自测；
+4. **完全自动多分支**：GraphWOZ 是任务型对话（接待员），不是开放学习；
+5. **实时协同一致性**：OntoEditor 是本体编辑，不是教学图生成。
+
+### 11.4 结论
+
+- 中置信项里，**本地匹配、身份、关系候选、ASR 稳定片段**可以升到中高；
+- 低置信项里，**并发/评测**只能升到"有路线"，不能升到"已验证"；
+- **通用教学图 benchmark** 仍然给不出，继续用场景验收；
+- 这些资料让方案更可靠，但没有改变"教学关系绑定要自研"的事实。
