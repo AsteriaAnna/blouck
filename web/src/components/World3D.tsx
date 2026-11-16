@@ -224,7 +224,7 @@ function Building({
       <Suspense fallback={null}>
         <Model url={buildingModelUrl(building.kind)} target={150} />
       </Suspense>
-      <Html center position={[0, 118, 0]} style={{ pointerEvents: "none" }}>
+      <Html center position={[0, 118, 0]} zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
         <div className="b3d-label">{building.kind === "flow" ? "流程副本" : "领域副本"}</div>
       </Html>
     </group>
