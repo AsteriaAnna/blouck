@@ -142,6 +142,8 @@ app.get("/api/worlds/:id", (req, res) => {
   const world = getWorld(req.params.id);
   if (!world) return res.status(404).json({ error: "world not found" });
   ensureBuildingPositions(world.id);
+  // frontier 是派生数据；老世界（如种子示例）可能从未算过，导致方向线全部不渲染
+  computeFrontier(world.id);
   ensureDirectionFrontiers(world.id);
   const graph = getGraph(world.id);
   const buildings = listBuildings(world.id);

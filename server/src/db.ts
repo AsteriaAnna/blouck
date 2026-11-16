@@ -771,4 +771,5 @@ export function seedDemoIfEmpty() {
     "## 流程副本\n\n把打乱的步骤按正确顺序连接。",
     ["文档解析", "Chunking", "Embedding", "向量数据库", "检索", "生成"],
   );
+  computeFrontier(wid);
 }
