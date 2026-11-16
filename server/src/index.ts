@@ -1,4 +1,4 @@
-﻿import express from "express";
+import express from "express";
 import { createServer } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
 import { env, providers } from "./env.js";
@@ -1446,11 +1446,15 @@ wss.on("connection", (ws: WebSocket) => {
       const provider = msg.type === "mock" ? mockASR : asr;
       session = provider.open({
         onPartial: (text) => ws.send(JSON.stringify({ type: "partial", text })),
+        onSegment: (text) => ws.send(JSON.stringify({ type: "segment", text })),
         onFinal: (text) => {
           ws.send(JSON.stringify({ type: "final", text }));
           session = null;
         },
         onError: (message) => ws.send(JSON.stringify({ type: "error", message })),
+      }, {
+        hotwords: Array.isArray(msg.hotwords) ? msg.hotwords.map(String) : [],
+        context: Array.isArray(msg.context) ? msg.context.map(String) : [],
       });
       ws.send(JSON.stringify({ type: "ready", provider: provider.name }));
     } else if (msg.type === "stop") {

@@ -120,8 +120,14 @@ export type LLMProvider = {
 
 export type ASREvents = {
   onPartial: (text: string) => void;
+  onSegment?: (text: string) => void;
   onFinal: (text: string) => void;
   onError: (message: string) => void;
+};
+
+export type ASROptions = {
+  hotwords?: string[];
+  context?: string[];
 };
 
 export type ASRSession = {
@@ -131,5 +137,5 @@ export type ASRSession = {
 
 export type ASRProvider = {
   name: string;
-  open(events: ASREvents): ASRSession;
+  open(events: ASREvents, options?: ASROptions): ASRSession;
 };

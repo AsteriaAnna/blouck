@@ -1,9 +1,9 @@
-﻿import WebSocket from "ws";
+import WebSocket from "ws";
 import zlib from "node:zlib";
 import { randomUUID } from "node:crypto";
 import { env } from "../env.js";
 import { mockASR } from "./mock.js";
-import type { ASRProvider, ASREvents, ASRSession } from "./types.js";
+import type { ASRProvider, ASREvents, ASRSession, ASROptions } from "./types.js";
 
 /**
  * 豆包（火山引擎）Seed ASR Streaming 2.0 实时语音识别。
@@ -28,7 +28,7 @@ function makeFrame(type: number, flags: number, seq: number, payload: Buffer) {
   return Buffer.concat([head, seqBuf, sizeBuf, payload]);
 }
 
-function firstFrame(uid: string) {
+function firstFrame(uid: string, options?: ASROptions) {
   const body = {
     user: { uid },
     audio: { format: "pcm", codec: "raw", rate: 16000, bits: 16, channel: 1 },
@@ -40,6 +40,13 @@ function firstFrame(uid: string) {
       show_utterances: true,
       enable_nonstream: false,
       result_type: "full",
+      corpus: {
+        context: JSON.stringify({
+          hotwords: (options?.hotwords ?? []).filter(Boolean).slice(0, 80).map((word) => ({ word })),
+          context_type: "dialog_ctx",
+          context_data: (options?.context ?? []).filter(Boolean).slice(0, 6).map((text) => ({ text })),
+        }),
+      },
     },
   };
   return makeFrame(1, 1, 1, zlib.gzipSync(Buffer.from(JSON.stringify(body))));
@@ -87,7 +94,7 @@ function parseServerFrame(data: Buffer) {
 
 export const doubaoASR: ASRProvider = {
   name: "doubao",
-  open(events: ASREvents): ASRSession {
+  open(events: ASREvents, options?: ASROptions): ASRSession {
     if (!env.doubaoToken) {
       console.warn("[asr] 未配置豆包 token，使用 mock");
       return mockASR.open(events);
@@ -148,7 +155,7 @@ export const doubaoASR: ASRProvider = {
     ws.on("open", () => {
       ready = true;
       try {
-        ws!.send(firstFrame(uid));
+        ws!.send(firstFrame(uid, options));
         for (const c of queue.splice(0)) sendAudio(c, false);
       } catch (err: any) {
         fallback(err?.message ?? "send first frame failed");
@@ -183,7 +190,10 @@ export const doubaoASR: ASRProvider = {
       }
       const utterances: any[] = obj?.result?.utterances ?? [];
       const definite = utterances.filter((u) => u.definite).map((u) => String(u.text ?? "")).join("");
-      if (definite) lastDefinite = definite;
+      if (definite && definite !== lastDefinite) {
+        lastDefinite = definite;
+        events.onSegment?.(definite);
+      }
       // 注意：utterance 的 definite / flags&2 只表示“这一句结束”，
       // 不代表整段录音结束；整段 final 由客户端 stop/end 统一发出。
     });

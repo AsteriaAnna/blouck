@@ -1,4 +1,4 @@
-﻿import fs from "fs";
+import fs from "fs";
 import WebSocket from "ws";
 import { env } from "../src/env.js";
 
@@ -153,11 +153,17 @@ async function processSentence(graph: Graph, sentence: string) {
     if (!from || !to) continue;
     const predicate = r.predicate ?? "related";
     const evidence = r.evidence ?? "";
-    graph.edges.push({ from: from.name, to: to.name, predicate, evidence });
-    console.log(`[relation] ${from.name} --${predicate}--> ${to.name}`);
-    const newSide = created.find((n) => n.id === from.id) ?? created.find((n) => n.id === to.id);
+    let subj = from;
+    let obj = to;
+    // partOf 方向归一：部分 → 整体；“A 由/组合 B 而成”要换成 B partOf A
+    if (predicate === "partOf" && /(由|组成|组合|包含)/.test(evidence)) {
+      [subj, obj] = [to, from];
+    }
+    graph.edges.push({ from: subj.name, to: obj.name, predicate, evidence });
+    console.log(`[relation] ${subj.name} --${predicate}--> ${obj.name}`);
+    const newSide = created.find((n) => n.id === subj.id) ?? created.find((n) => n.id === obj.id);
     if (newSide && !newSide.parent) {
-      const other = newSide.id === from.id ? to : from;
+      const other = newSide.id === subj.id ? obj : subj;
       newSide.parent = other.id;
     }
   }
@@ -187,11 +193,9 @@ async function main() {
   let processed = "";
   let queue = Promise.resolve();
 
-  const processNew = (text: string, final = false) => {
-    const sentences = splitSentences(text);
-    const complete = final ? sentences : sentences.slice(0, -1);
-    for (const s of complete) {
-      if (processed.includes(s)) continue;
+  const processNew = (text: string) => {
+    for (const s of splitSentences(text)) {
+      if (!s || processed.includes(s)) continue;
       processed += s;
       queue = queue.then(() => processSentence(graph, s));
     }
@@ -199,7 +203,10 @@ async function main() {
 
   await new Promise<void>((resolve, reject) => {
     ws.on("open", () => {
-      ws.send(JSON.stringify({ type: "start" }));
+      ws.send(JSON.stringify({
+        type: "start",
+        hotwords: ["RAG", "检索", "增强生成", "混合检索", "语义检索", "向量检索", "召回率", "Re-ranking", "Top K"],
+      }));
       let i = 0;
       const timer = setInterval(() => {
         if (i >= pcm.length) {
@@ -217,11 +224,13 @@ async function main() {
       if (msg.type === "partial") {
         buffer = msg.text;
         console.log(`[partial] ${buffer}`);
-        processNew(buffer);
+      } else if (msg.type === "segment") {
+        console.log(`\n[segment final] ${msg.text}`);
+        processNew(msg.text);
       } else if (msg.type === "final") {
         buffer = msg.text;
         console.log(`\n[final] ${buffer}`);
-        processNew(buffer, true);
+        processNew(buffer);
         queue.then(() => {
           graph.show();
           ws.close();

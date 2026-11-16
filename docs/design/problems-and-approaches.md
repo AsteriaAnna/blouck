@@ -1,4 +1,4 @@
-# 问题与处理
+﻿# 问题与处理
 
 最后更新：2026-11-16
 
@@ -471,7 +471,56 @@ RAG 包括检索和增强生成
 
 ---
 
-## 7. 接回主链路可能出现的问题（2026-11-16）
+## 7. 流式语音问题与处理（2026-11-16）
+
+### 7.1 ASR 识别质量差
+
+真实测试现象：
+
+- 语气词、没说清楚的地方识别不稳；
+- "语义检索" → "羽翼检索"，"向量检索" → "项梁检索"（同音/近音）；
+- "召回率" 被粘成 "检索召回率"；
+- 对比微信输入法，明显更差。
+
+根因：
+
+1. 首帧请求没有传 `hotwords` / `context_data`；
+2. 只使用 partial，没有用 final 修正；
+3. 没有领域词纠错；
+4. 微信输入法是"大模型 + 上下文/词库 + 录音后/离线"路线，不是同一条低延迟 streaming。
+
+### 7.2 ASR 自动结束 / 正式结果不对
+
+现象：用户还没按停止，识别就结束，正式图不完整。
+
+根因：provider 把 `utterances[].definite` 和 `frame.flags & 2` 当成"整段结束"，直接 `onFinal` 并关闭连接。  
+实际上它们只是"当前这一句结束"。
+
+### 7.3 处理方案（已实现/已验证）
+
+1. **首帧加 hotwords + context**：
+   ```json
+   request.corpus.context = {
+     hotwords: [{word:"语义检索"}, ...],
+     context_type: "dialog_ctx",
+     context_data: [{text:"最近一轮用户话"}]
+   }
+   ```
+2. **区分 utterance final 和整段 final**：
+   - `definite` → `onSegment`；
+   - 客户端 stop/end → `onFinal`；
+   - 不再因为一句结束就关连接。
+3. **partial 只做 UI**；segment final 用于建图/修正。
+4. **前端开始录音时**把当前图谱节点名作为 hotwords 传给 ASR。
+
+真实语音验证（4 句）：
+
+- hotwords 后"语义检索/向量检索"识别正确（之前是羽翼/项梁）；
+- 多句 final 能收全（之前只回第一句）；
+- 关系绑定：混合检索 kindOf 检索；语义/向量 partOf 混合检索；
+- 仍有一个问题：句子间停顿不够时，ASR 可能把"检索 + 召回率"粘成"检索召回率"，导致关系端点错。需要 VAD/句末停顿或前端纠错。
+
+### 7.4 其他接入问题
 
 最小测试只在"单会话、内存图、干净分句、无下游"成立。接主链路会出现：
 
@@ -651,105 +700,3 @@ status: candidate | suggest | formal
 - 换支持热词的 ASR 接口，或加领域词纠错；
 - 修多句 final 累积；
 - 再用同一脚本复测。
-
-
-### 8.7 ASR 使用逻辑的根因（2026-11-16）
-
-#### 现象
-
-- 单句基本正确；
-- "语义检索/向量检索"被识别成"羽翼检索/项梁检索"；
-- 多句连续语音 final 只回第一句；
-- 我们却在 partial 阶段就开始建图。
-
-#### 第一性拆分
-
-流式 ASR 输出不是"一条真理流"，而是：
-
-```text
-partial（低延迟、会改）
-  → 当前 utterance 的 final（带上下文修正）
-  → 整段结束的 final
-```
-
-当前系统的问题是：
-
-1. **把 partial 当事实**：partial 一出现就建 provisional/commit；
-2. **final 没有用于修正已建节点**：final 来了也不会改前面的名字/父节点；
-3. **多 utterance final 没有累积**：provider 只保留 lastPartial/lastDefinite，后面的句子丢失；
-4. **没有热词/领域纠错**：语义/向量是领域词，ASR 语言模型会选同音常用词。
-
-所以"豆包识别烂"至少有一部分是**我们消费了它的不稳定中间结果，又没有用最终修正**。
-
-#### 换 ASR 能解决哪层？
-
-| 层 | 换更强模型 | 换支持热词的模型 | 改我们的接入 |
-| --- | --- | --- | --- |
-| 声学/同音词 | 有帮助 | 帮助更大 | 可加领域纠错 |
-| 语言模型/术语 | 有帮助 | 直接支持热词 | 可加别名纠错 |
-| partial 不稳定 | 改善有限 | 改善有限 | **必须**：等稳定前缀 |
-| 多句 final 丢失 | 不一定 | 不一定 | **必须**：按 utterance 累积 |
-| 已建节点修正 | 不解决 | 不解决 | **必须**：final 驱动 revision |
-
-**结论：换模型只能解决一部分；不修接入，换了也会出现同样问题。**
-
-#### 正确接入契约
-
-ASR adapter 应输出：
-
-```text
-partialText
-stablePrefix
-finals: [{ utteranceId, text, start, end, confidence }]
-revision: 与上一版 final 的 diff（可选）
-```
-
-下游：
-
-- provisional 用 `stablePrefix`；
-- commit 用 final utterance；
-- final 与 provisional 不同 → 同一 ID 修正，不新建；
-- 领域纠错：优先 ASR 热词，其次图谱别名/拼音纠错。
-
-#### 已确认的配置缺口（2026-11-16）
-
-当前首帧请求只有：
-
-```text
-enable_itn / enable_punc / show_utterances / result_type=full
-```
-
-**没有传豆包的 hotwords / context_data。**
-
-豆包流式 ASR 支持：
-
-```text
-corpus.context = JSON({
-  hotwords: [{word: "语义检索"}, {word: "向量检索"}, {word: "混合检索"}, {word: "召回率"}],
-  context_type: "dialog_ctx",
-  context_data: [{text: "最近一轮用户话"}, {text: "最近一轮回答"}]
-})
-```
-
-双向流式热词上限约 100 tokens；非流式/二遍更多。  
-这正好能解释：
-
-- 语义检索 → 羽翼检索；
-- 向量检索 → 项梁检索；
-- “检索召回率”粘连。
-
-**领域纠词首先应该用 ASR 热词/上下文，而不是先换模型。**
-
-#### 已修的接入问题
-
-- `definite` / `flags&2` 之前被当成“整段结束”，导致用户没按停止就 final；
-- 现已改为：utterance final 只记录，整段 final 由客户端 stop/end 统一发出；
-- 多句 final 现在能累计到整段（测试四句已回全）。
-
-#### 当前建议
-
-
-1. 不改 ASR 前，先修 partial/final 消费逻辑；
-2. 用真人麦克风重测（TTS 可能放大同音错误）；
-3. 若术语仍错，再比较支持热词的 ASR；
-4. 不要用"换模型"掩盖接入问题。
