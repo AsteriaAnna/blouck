@@ -174,3 +174,29 @@
 - 多轮实体身份/指代：可做，但需要实体链接/别名/回指处理；
 - 真实"随机跳转 + 回退"：可做，但需要明确的焦点规则和评测集；
 - 端到端实时：可做，但首次反应必须走本地快路径，不能等 LLM。
+
+
+---
+
+## 8. 这些资料分别解决"问题 6"的哪个环节
+
+问题 6 = 言出法随 + 多焦点/父链。资料不是笼统参考，按环节对应如下：
+
+| 问题 6 的环节 | 资料 | 具体解决什么 |
+| --- | --- | --- |
+| 6.1 实时反应/延迟 | [IJCAI 2020 Speech-to-KG](https://ijcai.org/Proceedings/2020/777) | 证明"边听边画"可行；只能做到关键词节点，不能作为完整方案 |
+| 6.1 流式图演化 | [LiveGraph 2025](https://dl.acm.org/doi/10.1145/3786335.3813169) | 流式数据持续建/演化图的状态架构；不是对话焦点 |
+| 6.2 多焦点/回退 | [Centering in Dialog（ACL 1998）](https://aclanthology.org/P98-2241/) + Centering Theory | 局部焦点、焦点栈、回退；解决"现在在讲哪个分支" |
+| 6.2 话题推进/回退 | SDRT / QUD | 话语关系与话题结构；解决"什么时候回到旧分支" |
+| 6.2 指代/回指 | [Alexa discourse coreference](https://nlp.ucsc.edu/files/2022/03/Amazon-Alexa-Prize-Discourse-Model-Coreference-Resolution.pdf) | 代词/回指决定新 mention 接谁；解决父节点解析 |
+| 6.2 实体身份 | [Entity Linking survey（ACM CSUR）](https://dl.acm.org/doi/10.1145/3795134) | 同一实体跨轮/跨别名保持同一 ID；解决 ghost→节点身份 |
+| 6.2 对话状态 | Dialogue State Tracking 综述 | 对话状态要显式跟踪，不能只看最后一句；解决多轮上下文 |
+| 6.2 对话建图难点 | [RPI dialogue KG project](https://tw.rpi.edu/project/towards-automatic-knowledge-graph-construction-dialogue) | 系统列出回指、话题切换、跨轮上下文难点；证明这是公认问题 |
+| 6.3 增量更新 | LiveGraph + Graphiti | 增量写入/provenance；解决"边生成边修订"的存储层 |
+| 6.5 provisional/演出法 | optimistic UI / progressive disclosure（工程模式，非论文） | 先显示 provisional，后确认；解决"3 秒延迟如何不空等" |
+
+**结论：**
+
+- 这些资料覆盖了问题 6 的**组件**：焦点栈、指代、实体链接、DST、流式图、provisional UI；
+- 没有任何一份资料给出"教学图 + 多焦点 + 父子链 + provisional"的端到端实现；
+- 所以能做，但必须组合，不是找一个库接上。
