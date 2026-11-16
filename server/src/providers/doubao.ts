@@ -101,6 +101,7 @@ export const doubaoASR: ASRProvider = {
     let pending: Buffer | null = null;
     const queue: Buffer[] = [];
     let lastPartial = "";
+    let lastDefinite = "";
     let finalSent = false;
     let fellBack = false;
     let mockSession: ASRSession | null = null;
@@ -182,25 +183,15 @@ export const doubaoASR: ASRProvider = {
       }
       const utterances: any[] = obj?.result?.utterances ?? [];
       const definite = utterances.filter((u) => u.definite).map((u) => String(u.text ?? "")).join("");
-      if (definite) {
-        finalSent = true;
-        events.onFinal(definite);
-      }
-      if (frame.flags & 2) {
-        if (!finalSent && lastPartial) {
-          finalSent = true;
-          events.onFinal(lastPartial);
-        }
-        try {
-          ws?.close();
-        } catch {}
-      }
+      if (definite) lastDefinite = definite;
+      // 注意：utterance 的 definite / flags&2 只表示“这一句结束”，
+      // 不代表整段录音结束；整段 final 由客户端 stop/end 统一发出。
     });
 
     ws.on("close", () => {
-      if (!finalSent && !fellBack && lastPartial) {
+      if (!finalSent && !fellBack && (lastPartial || lastDefinite)) {
         finalSent = true;
-        events.onFinal(lastPartial);
+        events.onFinal(lastPartial || lastDefinite);
       }
     });
 
@@ -232,9 +223,9 @@ export const doubaoASR: ASRProvider = {
           fallback(err?.message ?? "send last failed");
         }
         setTimeout(() => {
-          if (!finalSent && lastPartial) {
+          if (!finalSent && (lastPartial || lastDefinite)) {
             finalSent = true;
-            events.onFinal(lastPartial);
+            events.onFinal(lastPartial || lastDefinite);
           }
           try {
             ws?.close();

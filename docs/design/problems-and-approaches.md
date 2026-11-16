@@ -711,7 +711,43 @@ revision: 与上一版 final 的 diff（可选）
 - final 与 provisional 不同 → 同一 ID 修正，不新建；
 - 领域纠错：优先 ASR 热词，其次图谱别名/拼音纠错。
 
+#### 已确认的配置缺口（2026-11-16）
+
+当前首帧请求只有：
+
+```text
+enable_itn / enable_punc / show_utterances / result_type=full
+```
+
+**没有传豆包的 hotwords / context_data。**
+
+豆包流式 ASR 支持：
+
+```text
+corpus.context = JSON({
+  hotwords: [{word: "语义检索"}, {word: "向量检索"}, {word: "混合检索"}, {word: "召回率"}],
+  context_type: "dialog_ctx",
+  context_data: [{text: "最近一轮用户话"}, {text: "最近一轮回答"}]
+})
+```
+
+双向流式热词上限约 100 tokens；非流式/二遍更多。  
+这正好能解释：
+
+- 语义检索 → 羽翼检索；
+- 向量检索 → 项梁检索；
+- “检索召回率”粘连。
+
+**领域纠词首先应该用 ASR 热词/上下文，而不是先换模型。**
+
+#### 已修的接入问题
+
+- `definite` / `flags&2` 之前被当成“整段结束”，导致用户没按停止就 final；
+- 现已改为：utterance final 只记录，整段 final 由客户端 stop/end 统一发出；
+- 多句 final 现在能累计到整段（测试四句已回全）。
+
 #### 当前建议
+
 
 1. 不改 ASR 前，先修 partial/final 消费逻辑；
 2. 用真人麦克风重测（TTS 可能放大同音错误）；
