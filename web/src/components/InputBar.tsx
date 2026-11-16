@@ -233,7 +233,7 @@ export default function InputBar() {
         setPartial("");
         setStreamTextFinal(msg.text);
         setStage("confirming");
-        if (stoppingRef.current) {
+        if (stoppingRef.current || mock) {
           enqueueSegment(msg.text);
           setState("整段已确认 · 正在落图");
           void finishSession();
