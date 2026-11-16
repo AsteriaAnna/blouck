@@ -32,6 +32,8 @@ pnpm dev
 
 ## 1. 两条输入链路
 
+两条链路各自独立，不要混改。
+
 ### 语音链路（当前正式链路）
 
 ```text
@@ -41,7 +43,7 @@ InputBar
 → AudioWorklet PCMWorklet：连续相位重采样到 16k，输出 Int16
 → /ws/asr 发送 PCM
 → 豆包 ASR：partial / segment / final
-→ segment 调 /api/worlds/:id/stream/segment
+→ 前端按句去重后，segment 调 /api/worlds/:id/stream/segment
 → provisional 节点/suggest 关系
 → 用户停止 → /api/worlds/:id/stream/commit
 → committed 节点 + formal 关系
@@ -54,7 +56,7 @@ InputBar
 → 直接建 committed 节点/关系 + 规则方向/副本候选
 ```
 
-两条链路不要混改。语音链路核心在 `server/src/stream/session.ts`，文字链路在 `server/src/index.ts`。
+语音链路核心在 `server/src/stream/session.ts`，文字链路在 `server/src/index.ts`。
 
 ## 2. 音频采集事实
 
@@ -64,9 +66,12 @@ InputBar
 - 主线程只接收 Int16，不再做 Float32 重采样。
 - 每块 3200 samples（PCM16 = 6400 字节，约 200ms）发送。
 - 停止时先 flush 尾部不足 3200 的 PCM，再发 300ms 静音，再发 `stop`。
-- WS 打开时先发 100ms 静音，避免豆包等第一包超时。
-- 1.5 秒没有音频时补 100ms 静音 keepalive。
-- 豆包返回 `45000081`（等待下一包音频超时）时，服务端按会话结束处理并发 final；前端 `final` 后如果仍在录音则自动重连。
+- WS 打开时先发 100ms 静音，避免豆包等第一包音频超时。
+- 录音中 1.5 秒没有音频时补 100ms 静音 keepalive（前端以 `recordingRef` 判定是否在录音）。
+- 豆包返回 `45000081`（等待下一包音频超时）时，服务端按会话结束处理并发 final；前端收到 `final` 且仍在录音时关闭当前 WS，250ms 后自动重连继续录音。
+- ASR 出错时前端最多自动重连 2 次；仍失败则提示「识别失败」并停止录音。
+- 点停止后 2.5 秒内还没收到 final，前端先 commit 当前 provisional；之后迟到的 final 只补 ingest 新尾句并再 commit 一次，不回退 UI 状态。
+- 组件卸载时清理 keepalive、重连、兜底 commit 定时器与 WS；dev 下 React StrictMode 会 mount→cleanup→mount，挂载 effect 开始时复位录音状态机（否则按钮 guard 会一直拦住）。
 
 ## 3. WebSocket `/ws/asr`
 
@@ -74,9 +79,12 @@ InputBar
 
 ```json
 { "type": "start", "hotwords": ["检索", "增强生成"] }
+{ "type": "mock", "hotwords": ["..."] }
 { "type": "audio", "chunk": "<base64 PCM16LE 16k mono>" }
 { "type": "stop" }
 ```
+
+`mock` 是前端「试听」按钮用的：服务端直接走 mock ASR 脚本，不连接豆包。
 
 服务端：
 
@@ -91,8 +99,11 @@ InputBar
 语义：
 
 - `partial`：当前不稳定文本；
-- `segment`：这一句确认，**不结束录音**；
-- `final`：当前 ASR 会话结束；录音页据此 commit 或重连。
+- `segment`：这一句确认，**不结束录音**；文本是当前 ASR 会话里“已确定文本的累计值”（豆包把全部 definite utterance 拼接后返回，不是增量）；
+- `final`：当前 ASR 会话结束；文本是当前会话的累计全文（可能为空）。
+- 未配置豆包 App ID/token 时服务端直接用 mock ASR；已配置但豆包连接/鉴权失败时，服务端会发 `error` 并在内部降级到 mock ASR（此时 `ready.provider` 仍显示 `doubao`）。
+
+前端落图规则：把 segment/final 文本按句切分（`。！？!?；;` 与换行），只把本次录音内**还没送过**的句子串行 POST 到 `/stream/segment`；`final` 里没有句末标点的尾句也会送；ASR 重连后新会话重新累积的旧句子不会重复送。
 
 ## 4. 语音建图接口
 
@@ -107,16 +118,18 @@ InputBar
 处理：
 
 1. 读取 `focus_stack`；
-2. 本地匹配文本提到的已有节点；
+2. 本地匹配文本提到的已有节点（按节点名/别名在文本中最后一次出现的位置排序）；
 3. 解析“它/这个/前者/后者/它们”；
-4. 调 DeepSeek 抽取实体/关系；
-5. 新节点写 `status=provisional`；
-6. parent 按关系端点、本句已有节点、focus 栈选择；
-7. 关系写 `kind=suggest`；
+4. 调 DeepSeek 抽取实体/关系（单次调用 20s 超时）；
+5. 新节点写 `status=provisional`；实体必须有原文证据（精确或忽略空白/标点后匹配），问句/代词/纯疑问词名会被过滤；
+6. parent 按关系端点、本句提到的已有节点、focus 栈选择；
+7. 关系写 `kind=suggest`；同一 `(src,dst,kind,predicate)` 只写一条（suggest 与 formal 视为同一条关系的两个阶段，重复 segment/final 或模型重复输出不会再叠边），source 边同样幂等；
 8. 写 source 边；
 9. 更新 `focus_stack`。
 
-返回 `focusId, focusStack, createdNodes, nodes, edges`。
+DeepSeek 抽取失败/超时时：本段不落图，返回空结果并在响应里带 `warning`（前端 toast 提示），**不降级 mock**（mock 的正则兜底会把“这个/然后”等写进图里）。
+
+返回 `focusId, focusStack, createdNodes, nodes, edges`，失败时另有可选 `warning`。
 
 ### POST `/api/worlds/:id/stream/commit`
 
@@ -124,7 +137,7 @@ InputBar
 
 处理：
 
-- 目标 provisional 节点 → `committed`；
+- 目标 provisional 节点（默认全世界的 provisional，可用 ids 限定）→ `committed`；
 - `origin='stream'` 且 `kind='suggest'` 且 evidence 非空的关系 → `formal`；
 - `computeFrontier`；
 - 不重建节点、不改坐标。
@@ -165,47 +178,64 @@ formal | source | suggest | direction
 ### focus_stack
 
 ```text
-world_id, stack(JSON 节点 ID 数组，最多 12), updated_at
+world_id, stack(JSON 节点 ID 数组), updated_at
 ```
+
+db 层最多保留 12 个 ID；语音 session 写入时最多保留 8 个。
+
+### 删除世界
+
+`DELETE /api/worlds/:id` 会清理该世界的 nodes/edges/buildings/quizzes（连同 attempts）/source_spans/focus_stack/directions/domain_questions/hide_batches/daily_domain，不留孤儿子表行（不改表结构）。
 
 ## 6. focus / parent 当前算法
 
-候选顺序：
+focus 选择顺序（`ingestSegment` 实际行为）：
 
 ```text
-显式关系（属于/包括/分为/由…组成）
-> 指代（它/这个/前者/后者/它们）
-> 文本提到的已有节点
+文本中最后提到的已有节点（按最后一次出现位置）
+> 指代（前者→栈第二、后者→栈顶、它们→栈第二）
+> 客户端传入的 focusId
+> focus 栈顶
+```
+
+parent 选择顺序（新节点挂到谁）：
+
+```text
+本句 LLM 关系里的另一端（显式关系）
+> 本句最后提到的已有节点
 > 当前 focus
-> 上一句 focus
 ```
 
 行为：
 
 - 栈顶是当前主题；
-- 一个句子创建多个兄弟节点时，兄弟也入栈；
+- 一个句子创建多个兄弟节点时，兄弟也入栈（最后创建的兄弟在栈顶）；
 - 前者 → 栈第二，后者 → 栈顶；
-- 文本重新提到已有节点时，focus 跟过去；
+- 文本重新提到已有节点时，focus 跟到文本里最后提到的那个（不是图里创建最晚的那个）；
 - parent 不再默认全部挂同一个 focus。
 
 ## 7. 关系当前范围
 
 已实现：
 
-- 新 → 已有节点、新 → 新节点；
+- 新 → 已有节点、新 → 新节点、已有 → 已有节点；
 - source/target 从 focus 栈、本句已有节点、新节点解析；
-- commit 时 `suggest → formal`；
-- 关系方向主要来自 LLM 输出；`partOf` 没有强制归一。
+- stream 关系以 `kind=suggest` 落库，evidence 为空时用 target 名兜底，因此 commit 时这些 suggest 都会升级成 formal；
+- 关系幂等：同 `(src,dst,kind,predicate)` 只保留一条；suggest 与 formal 视为同一条关系的两个阶段；
+- 关系方向主要来自 LLM 输出（kindOf 具体→上位、partOf 部分→整体、prerequisite 前置→后续……）；**语音链路**不做 partOf 的额外方向归一；文字链路见 §9。
 
 没有进代码的关系能力，不要按 01/02 的设想假设存在。
 
 ## 8. 前端事实
 
-- `web/src/components/InputBar.tsx`：麦克风、Worklet、WS、keepalive、重连、segment/commit。
-- `web/src/store.ts`：`ingestSegment` / `commitStream` 更新 nodes/edges/focus。
-- `web/src/components/World3D.tsx`：节点、关系、建筑、方向线、provisional “候选 ·”标签。
-- provisional 节点直接作为地图节点渲染，不用另一套 ghost 坐标。
+- `web/src/components/InputBar.tsx`：麦克风、Worklet、WS、keepalive、重连、按句去重、segment/commit、失败 toast、停止后兜底 commit；“试听”按钮走 mock ASR。
+- `web/src/store.ts`：`splitCumulativeText` / `sentenceKey` / `pickNewSentences` 纯函数（累计文本切句与去重）；`ingestSegment` / `commitStream` 更新 nodes/edges/focus，失败 toast，`warning` 防御式读取后 toast。
+- `web/src/components/World3D.tsx`：节点、关系、建筑、方向线。
+- provisional 节点直接作为地图节点渲染，与 committed 同一套坐标（不用另一套 ghost 坐标）；标签显示「候选 · 名字」、虚线弱化样式与脉冲环，commit 后恢复普通标签样式。
+- 相机只在进入世界（world id 变化）时自动 fit 一次，把全部节点+副本框进视野；之后新增节点不重设相机，也不给 OrbitControls 传会随每次重渲染重设的 `target` prop。
+- 节点坐标到世界坐标的映射用“当前节点包围盒质心”居中（`World3D.tsx` 的 `posOf` 用 `cx/cy`），所以节点集合变化时整张地图会按新包围盒重新居中；这是既有布局行为，不是相机移动。
 - `direction` 边只有 frontier 节点渲染。
+- `/api/worlds/:id/stream/detect` 路由仍存在，但前端不再调用；`ghosts` 现在恒为空（`GhostIsland` 渲染代码仍在，但不会出现）。
 - 3D 资产在 `web/public/assets3d/`：21 个岛屿 + 2 个副本门，`manifest.json` 映射。
 
 ## 9. 文字链路与下游
@@ -215,7 +245,8 @@ world_id, stack(JSON 节点 ID 数组，最多 12), updated_at
 - DeepSeek 抽取节点/关系；
 - 直接建 committed 节点；
 - 规则检测流程/领域副本；
-- 生成题目/方向等下游。
+- 生成题目/方向等下游；
+- 关系方向做了归一：`prerequisite` 按证据中两端出现先后交换；`partOf` 且 label 含“组成/包含/由”但不含“属于”时交换成“部分→整体”。
 
 语音 `/stream/segment` + `/stream/commit` 当前**不会**触发出题、副本、方向；这是当前实际行为，不要假设它会自动发生。
 
@@ -226,26 +257,34 @@ pnpm typecheck
 pnpm build
 ```
 
-已实际验证：
+已实际验证（2026-11-16 本轮）：
 
-- typecheck、build 通过；
-- stream API 的 provisional → committed、坐标不变、suggest → formal；
-- focus 多分支、前者/后者；
-- 主页面用 48k 假麦克风端到端：partial 出现、provisional 创建、停止后 commit；
-- 真实麦克风本机能出 partial/final（人工）。
+- `typecheck`、`build` 通过；
+- stream API（真实豆包 ASR + 真实 DeepSeek，`server/eval/voice-test.wav`）：
+  - 模拟旧前端把 segment 累计文本 + final 全文各 ingest 一次：修复前 11 条边、3 对重复关系；修复后 11 条边、重复关系=0（服务端幂等兜底）；
+  - 按句去重（新前端语义）：8 条边、4 条非 source 关系、重复=0；
+  - 独立语音链路断言：3 个 provisional 全部 committed、commit 前后逐节点坐标差=[]、suggest→formal（commit 后 suggest=0/formal=3）、边唯一键数=边数（6/6）；
+- focus/parent：文本里最后提到的已有节点成为 focus 与 parent（脚本复现通过）；
+- DeepSeek 20s 超时、失败不落图（返回 warning）、关系幂等、删除世界无孤儿行；
+- 浏览器（Chrome headless + 假麦克风 `voice-test.wav`，CDP 驱动）：
+  - 真实麦克风路径：provisional 节点标签「候选 ·」出现（`n3d-label provisional`），停止后 6/6 committed、commit 前后坐标差=[]、重复边=0、重复节点=0；final 后自动重连继续录音生效（13.2s 本句确认 → 13.7s 继续识别；22.8s → 23.3s）；
+  - mock 试听：一次走完 4/4 committed、0 重复；文字链路 textarea + Ctrl/⌘+Enter：3 个新节点 committed、0 重复、输入框清空；
+  - console 无未捕获异常（只有 THREE 版本警告/favicon/HMR 噪音）；
+  - 相机矩阵实测：三条链路新增节点/commit 期间 viewMatrix 不变；用户拖拽视角后再新增节点，旧代码 1.6s 后被 CameraFit 重置（view 差 0.986），现在保持（0.001）；
+- 验收期间还发现并修复两处 dev 环境问题：React StrictMode 下 InputBar 挂载 effect 双调用导致 `.mic`/`.mock-btn` 无响应（挂载 effect 复位状态机 ref）；OrbitControls 收到的 `target` prop 会在每次重渲染时把 target 设回原点（已移除该 prop，世界中心只由 CameraFit 设置）。
 
-没有 CI、没有自动化单元测试框架。
+没有 CI、没有自动化单元测试框架；以上验证用的是临时复现/验收脚本（不在本仓库内），没有引入测试框架。LLM 失败时的前端 warning/toast 本轮只做了代码级确认，未在真实失败场景下动态验证。
 
 ## 11. 代码地图
 
 ```text
 server/src/
   env.ts                 环境变量/provider
-  db.ts                  schema/迁移/查询
+  db.ts                  schema/迁移/查询/删除世界清理
   index.ts               REST + /ws/asr + 文字 extract
-  stream/session.ts      语音 provisional/focus/commit
-  providers/types.ts     LLM/ASR 接口
-  providers/deepseek.ts  DeepSeek
+  stream/session.ts      语音 provisional/focus/关系幂等/commit
+  providers/types.ts     LLM/ASR 接口（ExtractResult 可带 warning）
+  providers/deepseek.ts  DeepSeek（20s 超时；抽取失败不降级 mock）
   providers/doubao.ts    豆包 ASR
   providers/mock.ts      mock
   placement.ts           placeAround
@@ -258,7 +297,7 @@ server/src/
 web/src/
   App.tsx / main.tsx
   api.ts                 REST 类型/客户端
-  store.ts               Zustand
+  store.ts               Zustand（含按句去重纯函数）
   components/InputBar.tsx
   components/World3D.tsx
   components/Home.tsx
