@@ -37,6 +37,9 @@
       <button id="download" disabled>下载原始录音</button>
       <button id="download-wav" disabled>下载 PCM WAV</button>
     </div>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:10px;color:#7b7162;font-size:14px">
+      <input type="checkbox" id="raw" /> 关闭回声消除 / 降噪 / 自动增益，测原始麦克风
+    </label>
     <div class="kv" style="margin-top:12px">
       <b>麦克风</b><span id="device">-</span>
       <b>轨道参数</b><span id="settings">-</span>
@@ -173,8 +176,14 @@ async function start() {
   $("start").disabled = true;
   setStatus("请求麦克风…");
 
+  const raw = !!$("raw").checked;
   stream = await navigator.mediaDevices.getUserMedia({
-    audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    audio: {
+      channelCount: 1,
+      echoCancellation: !raw,
+      noiseSuppression: !raw,
+      autoGainControl: !raw,
+    },
   });
   const track = stream.getAudioTracks()[0];
   $("device").textContent = (track && track.label) || "未知";
