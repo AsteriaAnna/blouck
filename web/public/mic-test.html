@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>麦克风 / ASR 自检</title>
+<style>
+  :root { color-scheme: light; }
+  body { margin: 0; font: 15px/1.6 system-ui, "Microsoft YaHei", sans-serif; background: #f6f1e7; color: #2d2a24; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 20px 60px; }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  .hint { color: #7b7162; margin: 0 0 20px; }
+  .card { background: #fffdf8; border: 1px solid #e4dac8; border-radius: 14px; padding: 16px; margin: 14px 0; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  button { border: 1px solid #c9b99e; background: #fff; color: #3a3329; border-radius: 10px; padding: 10px 16px; font: inherit; cursor: pointer; }
+  button.primary { background: #b08d57; border-color: #b08d57; color: #fff; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .kv { display: grid; grid-template-columns: 120px 1fr; gap: 4px 12px; font-size: 14px; }
+  .kv b { color: #7b7162; font-weight: 500; }
+  #partial { min-height: 52px; font-size: 20px; color: #2f5d50; white-space: pre-wrap; }
+  #final { min-height: 40px; font-size: 18px; color: #6b4c2a; white-space: pre-wrap; }
+  #status { color: #7b7162; }
+  .err { color: #a33a2b; white-space: pre-wrap; }
+  audio { width: 100%; margin-top: 8px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>麦克风 / ASR 自检</h1>
+  <p class="hint">这个页面不经过图谱和 LLM，只把麦克风 PCM 直接发给 <code>/ws/asr</code>。先看采样率、字节数和回放，再看豆包识别。</p>
+
+  <div class="card">
+    <div class="row">
+      <button id="start" class="primary">开始录音</button>
+      <button id="stop" disabled>停止并识别</button>
+      <button id="play" disabled>回放我录到的声音</button>
+      <button id="download" disabled>下载 WAV</button>
+    </div>
+    <div class="kv" style="margin-top:12px">
+      <b>麦克风</b><span id="device">-</span>
+      <b>AudioContext</b><span id="rate">-</span>
+      <b>已发送</b><span id="sent">0 字节 / 0.0 秒</span>
+      <b>状态</b><span id="status">待开始</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="kv"><b>实时 partial</b><div id="partial"></div></div>
+    <div class="kv"><b>最终 final</b><div id="final"></div></div>
+  </div>
+
+  <div class="card">
+    <div id="error" class="err"></div>
+    <audio id="audio" controls></audio>
+  </div>
+</main>
+
+<script>
+const WORKLET = `
+class PCMWorklet extends AudioWorkletProcessor {
+  process(inputs) {
+    const ch = inputs[0] && inputs[0][0];
+    if (ch && ch.length) {
+      const pcm = new Int16Array(ch.length);
+      for (let i = 0; i < ch.length; i++) {
+        const s = Math.max(-1, Math.min(1, ch[i]));
+        pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+      }
+      this.port.postMessage(pcm.buffer, [pcm.buffer]);
+    }
+    return true;
+  }
+}
+registerProcessor('pcm-worklet', PCMWorklet);
+`;
+
+const $ = (id) => document.getElementById(id);
+const b64 = (buf) => {
+  const bytes = new Uint8Array(buf);
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+};
+
+let ws = null, ctx = null, stream = null, node = null;
+let chunks = [];
+let sentBytes = 0;
+let startedAt = 0;
+
+function setStatus(s) { $("status").textContent = s; }
+function fail(e) {
+  $("error").textContent = String(e && (e.stack || e.message) || e);
+  setStatus("出错");
+}
+
+function resample(samples, inRate) {
+  if (inRate === 16000) return samples;
+  const ratio = inRate / 16000;
+  const out = new Float32Array(Math.floor(samples.length / ratio));
+  for (let i = 0; i < out.length; i++) {
+    const pos = i * ratio;
+    const i0 = Math.floor(pos);
+    const frac = pos - i0;
+    out[i] = samples[i0] * (1 - frac) + (samples[i0 + 1] ?? samples[i0]) * frac;
+  }
+  return out;
+}
+
+function sendPcm(pcm) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ type: "audio", chunk: b64(pcm.buffer) }));
+  sentBytes += pcm.byteLength;
+  const sec = (sentBytes / 2 / 16000).toFixed(1);
+  $("sent").textContent = `${sentBytes} 字节 / ${sec} 秒`;
+}
+
+function flush(samples) {
+  for (let i = 0; i < samples.length; i += 1600) {
+    const part = samples.slice(i, i + 1600);
+    const pcm = new Int16Array(part.length);
+    for (let j = 0; j < part.length; j++) {
+      const s = Math.max(-1, Math.min(1, part[j]));
+      pcm[j] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    }
+    chunks.push(pcm);
+    sendPcm(pcm);
+  }
+}
+
+async function start() {
+  $("error").textContent = "";
+  $("partial").textContent = "";
+  $("final").textContent = "";
+  chunks = []; sentBytes = 0; startedAt = Date.now();
+  $("sent").textContent = "0 字节 / 0.0 秒";
+  $("start").disabled = true;
+  setStatus("请求麦克风…");
+  stream = await navigator.mediaDevices.getUserMedia({
+    audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+  });
+  $("device").textContent = stream.getAudioTracks().map(t => t.label).join(" / ") || "未知";
+
+  ctx = new AudioContext({ sampleRate: 16000 });
+  await ctx.resume();
+  $("rate").textContent = `${ctx.sampleRate} Hz, state=${ctx.state}`;
+
+  const blob = new Blob([WORKLET], { type: "application/javascript" });
+  const url = URL.createObjectURL(blob);
+  await ctx.audioWorklet.addModule(url);
+  URL.revokeObjectURL(url);
+
+  const source = ctx.createMediaStreamSource(stream);
+  node = new AudioWorkletNode(ctx, "pcm-worklet");
+  node.port.onmessage = (ev) => {
+    const f32 = new Float32Array(ev.data);
+    flush(resample(f32, ctx.sampleRate));
+  };
+  source.connect(node);
+
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(`${proto}://${location.host}/ws/asr`);
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ type: "start" }));
+    setStatus("录音中… 直接说话，自然停 1 秒，再点停止");
+    $("stop").disabled = false;
+  };
+  ws.onmessage = (ev) => {
+    const m = JSON.parse(ev.data);
+    if (m.type === "partial") $("partial").textContent = m.text;
+    if (m.type === "segment") $("partial").textContent = m.text;
+    if (m.type === "final") {
+      $("final").textContent = m.text;
+      setStatus("识别结束");
+    }
+    if (m.type === "error") fail(m.message);
+  };
+  ws.onerror = () => fail("WebSocket 错误");
+}
+
+async function stop() {
+  $("stop").disabled = true;
+  setStatus("等待 final…");
+  try { node?.disconnect(); } catch {}
+  try { stream?.getTracks().forEach(t => t.stop()); } catch {}
+  try { await ctx?.close(); } catch {}
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: "stop" }));
+    setTimeout(() => { setStatus("已停止（如果 final 为空，说明 ASR 没返回）"); ws.close(); }, 3500);
+  }
+  if (chunks.length) {
+    $("play").disabled = false;
+    $("download").disabled = false;
+  }
+}
+
+function wavBlob() {
+  let total = chunks.reduce((a, c) => a + c.length, 0);
+  const buf = new ArrayBuffer(44 + total * 2);
+  const v = new DataView(buf);
+  const writeStr = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  writeStr(0, "RIFF"); v.setUint32(4, 36 + total * 2, true); writeStr(8, "WAVE");
+  writeStr(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, 16000, true); v.setUint32(28, 32000, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  writeStr(36, "data"); v.setUint32(40, total * 2, true);
+  let off = 44;
+  for (const c of chunks) { for (let i = 0; i < c.length; i++) { v.setInt16(off, c[i], true); off += 2; } }
+  return new Blob([buf], { type: "audio/wav" });
+}
+
+function play() {
+  const url = URL.createObjectURL(wavBlob());
+  $("audio").src = url;
+  $("audio").play().catch(fail);
+}
+function download() {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(wavBlob());
+  a.download = "mic-test.wav";
+  a.click();
+}
+
+$("start").onclick = () => start().catch(fail);
+$("stop").onclick = () => stop().catch(fail);
+$("play").onclick = play;
+$("download").onclick = download;
+</script>
+</body>
+</html>
