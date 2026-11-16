@@ -651,3 +651,69 @@ status: candidate | suggest | formal
 - 换支持热词的 ASR 接口，或加领域词纠错；
 - 修多句 final 累积；
 - 再用同一脚本复测。
+
+
+### 8.7 ASR 使用逻辑的根因（2026-11-16）
+
+#### 现象
+
+- 单句基本正确；
+- "语义检索/向量检索"被识别成"羽翼检索/项梁检索"；
+- 多句连续语音 final 只回第一句；
+- 我们却在 partial 阶段就开始建图。
+
+#### 第一性拆分
+
+流式 ASR 输出不是"一条真理流"，而是：
+
+```text
+partial（低延迟、会改）
+  → 当前 utterance 的 final（带上下文修正）
+  → 整段结束的 final
+```
+
+当前系统的问题是：
+
+1. **把 partial 当事实**：partial 一出现就建 provisional/commit；
+2. **final 没有用于修正已建节点**：final 来了也不会改前面的名字/父节点；
+3. **多 utterance final 没有累积**：provider 只保留 lastPartial/lastDefinite，后面的句子丢失；
+4. **没有热词/领域纠错**：语义/向量是领域词，ASR 语言模型会选同音常用词。
+
+所以"豆包识别烂"至少有一部分是**我们消费了它的不稳定中间结果，又没有用最终修正**。
+
+#### 换 ASR 能解决哪层？
+
+| 层 | 换更强模型 | 换支持热词的模型 | 改我们的接入 |
+| --- | --- | --- | --- |
+| 声学/同音词 | 有帮助 | 帮助更大 | 可加领域纠错 |
+| 语言模型/术语 | 有帮助 | 直接支持热词 | 可加别名纠错 |
+| partial 不稳定 | 改善有限 | 改善有限 | **必须**：等稳定前缀 |
+| 多句 final 丢失 | 不一定 | 不一定 | **必须**：按 utterance 累积 |
+| 已建节点修正 | 不解决 | 不解决 | **必须**：final 驱动 revision |
+
+**结论：换模型只能解决一部分；不修接入，换了也会出现同样问题。**
+
+#### 正确接入契约
+
+ASR adapter 应输出：
+
+```text
+partialText
+stablePrefix
+finals: [{ utteranceId, text, start, end, confidence }]
+revision: 与上一版 final 的 diff（可选）
+```
+
+下游：
+
+- provisional 用 `stablePrefix`；
+- commit 用 final utterance；
+- final 与 provisional 不同 → 同一 ID 修正，不新建；
+- 领域纠错：优先 ASR 热词，其次图谱别名/拼音纠错。
+
+#### 当前建议
+
+1. 不改 ASR 前，先修 partial/final 消费逻辑；
+2. 用真人麦克风重测（TTS 可能放大同音错误）；
+3. 若术语仍错，再比较支持热词的 ASR；
+4. 不要用"换模型"掩盖接入问题。
