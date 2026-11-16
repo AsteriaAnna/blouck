@@ -119,3 +119,58 @@
 ### 6.3 结论
 
 用户要的"多焦点、多跳、随时切回"不是玄学，而是**话语图构建**问题；现有研究给出了组件（焦点栈、DST、流式建图），但没有给出完整教学图系统。我们需要自己设计状态模型，不能靠 prompt 或 Ghost 补。
+
+
+---
+
+## 7. 参考方式反思：焦点移动该查什么
+
+### 7.1 我之前的搜索角度偏了
+
+我之前主要用**系统/产品关键词**：
+
+- streaming knowledge graph
+- real-time knowledge graph
+- speech-to-knowledge-graph
+
+找到的是"实时语音→图"的系统演示（IJCAI 2020、LiveGraph），但这类工作关注**怎么流式建图**，不关注**一句话内部/多句话之间焦点怎么移动、父节点怎么选**。
+
+所以不是"完全没有参考"，而是**搜索角度偏系统层，漏了话语/对话层**。
+
+### 7.2 正确的关键词/角度
+
+焦点移动属于：
+
+- **Centering Theory / attentional state**：局部焦点、焦点栈、回退；
+- **Discourse structure（SDRT / QUD）**：话题如何推进、何时回退；
+- **Coreference / anaphora resolution**：代词、指代决定"接谁"；
+- **Conversational entity linking**：多轮里实体身份如何保持；
+- **Dialogue State Tracking**：对话状态需要显式跟踪；
+- **Incremental KG construction**：图状态如何增量更新。
+
+### 7.3 现在能找到的相关资料
+
+| 资料 | 用途 |
+| --- | --- |
+| [A Preliminary Model of Centering in Dialog（ACL 1998）](https://aclanthology.org/P98-2241/) | 对话中的 Centering：局部焦点、回退；直接对应"多焦点" |
+| Centering Theory（Grosz, Joshi & Weinstein 1995） | 焦点栈/显著性的理论基础 |
+| SDRT / QUD（Asher & Lascarides 等） | 话题推进/回退、话语关系；决定"现在在讲哪个分支" |
+| [Entity Linking with Wikidata: A Systematic Literature Review（ACM CSUR）](https://dl.acm.org/doi/10.1145/3795134) | 实体链接/消歧的工程方法；多轮实体身份 |
+| [Alexa Prize: Discourse Driven Coreference Resolution](https://nlp.ucsc.edu/files/2022/03/Amazon-Alexa-Prize-Discourse-Model-Coreference-Resolution.pdf) | 对话中指代/回指如何驱动实体解析 |
+| [RPI dialogue KG survey project](https://tw.rpi.edu/project/towards-automatic-knowledge-graph-construction-dialogue) | 对话建图难点：回指、话题切换、跨轮上下文 |
+| [IJCAI 2020 Speech-to-KG](https://ijcai.org/Proceedings/2020/777) | 实时语音→图可行，但只到关键词图 |
+| [LiveGraph 2025](https://dl.acm.org/doi/10.1145/3786335.3813169) | 流式图演化架构 |
+
+### 7.4 结论
+
+- **焦点移动不是一个算法，而是一组机制**：焦点栈 + 显著性 + 显式线索 + 指代解析 + 实体链接 + 关系验证；
+- 有充分的理论/组件参考，但**没有端到端教学图系统**；
+- 可以自研，但必须把它当"对话状态模型"来做，不是 prompt 工程；
+- 我之前没找到，是因为关键词偏系统层，不是因为它不存在。
+
+### 7.5 可做性判断
+
+- 焦点栈 + 父节点选择：可做；
+- 多轮实体身份/指代：可做，但需要实体链接/别名/回指处理；
+- 真实"随机跳转 + 回退"：可做，但需要明确的焦点规则和评测集；
+- 端到端实时：可做，但首次反应必须走本地快路径，不能等 LLM。

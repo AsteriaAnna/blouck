@@ -1,4 +1,4 @@
-# 当前状态
+﻿# 当前状态
 
 最后更新：2026-11-16
 
@@ -173,4 +173,4 @@ RAG → 检索 → 语义检索/向量检索/混合检索
 - 流式演化需要独立状态与修订机制（LiveGraph 方向）；
 - 没有现成"教学语义 + 多焦点 + provisional"系统。
 
-因此这不是 prompt 或 Ghost 能修的；需要换状态模型。详见 [problems-and-approaches.md](problems-and-approaches.md) 第 7 节。
+因此这不是 prompt 或 Ghost 能修的；需要换状态模型。详见 [problems-and-approaches.md](problems-and-approaches.md) 第 6 节。
