@@ -7,9 +7,10 @@
 - **实现事实（找 bug 只看这个）**：[docs/03-implemented.md](docs/03-implemented.md)
 - 之前讨论过的设想：[docs/01-ideas.md](docs/01-ideas.md)（历史，不是实现依据）
 - 之前尝试/推断过的措施：[docs/02-reasoning.md](docs/02-reasoning.md)（历史，不是实现依据）
+- 使用问题与探索记录：[docs/04-problems.md](docs/04-problems.md)（过程记录，不是实现依据）
 - 索引：[docs/00-index.md](docs/00-index.md)
 
-> `01/02` 是历史记录；代码里有没有某个能力，只以 `03-implemented.md` 和源码为准。
+> `01/02` 是历史记录，`04` 是问题/方案探索过程；代码里有没有某个能力，只以 `03-implemented.md` 和源码为准。
 
 ## 当前实际链路
 
