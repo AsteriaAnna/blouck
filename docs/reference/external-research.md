@@ -230,3 +230,36 @@
 - 参考只说明"方向存在"，不代表"现在必须做"；
 - 不要把生产期方案写进 MVP 验收；
 - 如果后续要做持久化/多端，再逐项引入。
+
+
+---
+
+## 10. 关系绑定：已有节点 + 新节点（2026-11-16）
+
+问题 8 的"关系绑定"不是单一任务，拆成三个子问题：
+
+| 子问题 | 参考 | 能借什么 | 不能解决什么 |
+| --- | --- | --- | --- |
+| mention → 已有节点 | [Entity Linking survey（ACM CSUR）](https://dl.acm.org/doi/10.1145/3795134) | 实体链接/消歧；别名/上下文 | 教学语义、parent |
+| 候选关系对剪枝 | [DocRE classifier+LLM](https://arxiv.org/abs/2408.13889) | 先筛可能有关系的实体对，再给 LLM | 不是教学图 |
+| 谓词/方向/传递 | SKOS / ISO 1087 / ConceptNet / OBO RO | kindOf/partOf/related 的方向与约束 | 不覆盖领域谓词 |
+| 虚假关系/无关 | [ACL 2024 Spurious Associations](https://aclanthology.org/2024.findings-acl.545/) | 必须允许 unrelated、证据校验 | 不提供绑定管线 |
+| 实体身份合并 | Graphiti | 增量 episode、实体消歧、时间有效性 | 不做关系方向 |
+| 关系分类 | GLiREL / REBEL | 零样本/生成式关系分类 | 中文/方向/许可证需验证 |
+
+### 10.1 结论
+
+- 关系绑定 = **mention→node、subject/object、edge 生命周期** 三件事；
+- 参考覆盖了每件小事的组件；
+- **没有现成的"已有教学图 + 新节点关系绑定"系统**；
+- 需要自研：候选生成覆盖已有节点、证据定 subject/object、edge ID/合并/撤回。
+
+### 10.2 最小验收
+
+```text
+已有：RAG、检索、增强生成
+输入：混合检索属于检索，召回率衡量增强生成。
+期望：混合检索 kindOf 检索；召回率 related(衡量) 增强生成。
+```
+
+如果两条都挂 RAG，说明关系绑定没做。

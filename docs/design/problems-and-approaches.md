@@ -467,3 +467,161 @@ RAG 包括检索和增强生成
 这 5 条不定，继续改 prompt 或 Ghost 都只是碰运气。
 
 
+
+
+---
+
+## 7. 接回主链路可能出现的问题（2026-11-16）
+
+最小测试只在"单会话、内存图、干净分句、无下游"成立。接主链路会出现：
+
+| 问题 | 具体表现 | 严重度 |
+| --- | --- | --- |
+| provisional 没地方存 | 节点表没有 provisional 状态；写进去会被当正式节点 | 高 |
+| final 重新建节点 | `/extract` 不认识 provisional ID，重复建/覆盖 | 高 |
+| 主 prompt 没有 parent | 测试的 `mentions.parent` 在主链路不存在，退回单 focus | 高 |
+| 下游污染 | provisional 被出题/副本/方向/frontier 使用 | 高 |
+| 前端整包替换 | `store.extract` 用返回覆盖 nodes/edges，冲掉 provisional | 高 |
+| ASR partial 重复 | 同一句反复抽，重复节点、父节点跳变 | 中 |
+| 本地匹配误配 | 短名/别名/多命中，父节点错 | 中 |
+| 父节点线索过拟合 | 只覆盖"分为/包括"，换说法就错 | 中 |
+| 焦点不持久 | extract 后 focusId 不推进，跨句/交互丢焦点 | 高 |
+| 位置/动画冲突 | provisional 先出现、final 换父/换布局，节点跳 | 中 |
+| 并发/乱序 | 旧 detect/extract 返回覆盖新焦点 | 中 |
+| 评测不兼容 | 旧 eval 只认 entities/relations | 中 |
+
+**接之前必须先定：**
+
+1. provisional 存哪（服务端会话 / DB 表 / 前端）；
+2. final 是否还调 `/extract`（调就必须按 provisional ID 合并，不能重建）；
+3. provisional 是否禁用下游（题目/副本/方向/正式统计）。
+
+---
+
+## 8. 真实场景：已有节点 + 新节点的关系绑定（2026-11-16）
+
+### 8.1 场景
+
+图谱里原本已有 3 个节点：
+
+```text
+A = RAG
+B = 检索
+C = 增强生成
+```
+
+用户继续说：
+
+```text
+混合检索属于检索，召回率衡量增强生成。
+```
+
+新节点：混合检索、召回率。
+
+期望：
+
+```text
+混合检索 --kindOf--> 检索        （新 → 已有）
+召回率   --related(衡量)--> 增强生成 （新 → 已有）
+来源父链：混合检索 ← 检索；召回率 ← 增强生成/Re-ranking
+```
+
+这里有三层绑定，之前只做了第一层：
+
+1. **mention → node**：这句话的"检索"是已有 B，不是新节点；
+2. **subject/object**：混合检索是 subject，检索是 object；不能默认 focus；
+3. **relation → edge**：谓词、方向、证据、状态，绑定成一条可追踪的关系。
+
+### 8.2 之前的方案够不够
+
+| 能力 | 之前方案 | 是否够 |
+| --- | --- | --- |
+| 新节点有稳定 provisional ID | 有 | ✅ |
+| 已有节点本地匹配 | 有 | ✅ |
+| 新节点父链/来源 | 有 | ✅ |
+| 关系目标覆盖已有节点 | 没有 | ❌ |
+| subject/object 角色判定 | 没有 | ❌ |
+| 关系 edge 的稳定 ID/生命周期 | 没有 | ❌ |
+| 多关系/多已有节点并存 | 没有 | ❌ |
+| 已有正式关系的修订规则 | 没有 | ❌ |
+
+**结论：之前方案能解决"节点从哪来"，不能解决"新节点和已有节点怎么绑关系"。**
+
+### 8.3 需要补的：关系绑定层
+
+#### 1. 关系候选不只对 focus
+
+每个新节点生成候选：
+
+```text
+候选对象 = 当前焦点
+         + 本句提到的已有节点
+         + 本句新节点
+         + 图谱邻居 / 语义 top-k 已有节点
+```
+
+不是"只看 focus"。
+
+#### 2. 用证据定 subject/object
+
+- 证据句里谁在前、谁在后；
+- 显式句式："A 属于 B" → A→B；"B 包含 A" → A→B；
+- 不能默认 `source=focus`；
+- 方向按谓词表归一。
+
+#### 3. 关系要有稳定 ID
+
+```text
+relationId, subjectProvisionalId, objectProvisionalId,
+predicate, evidence, confidence,
+status: candidate | suggest | formal
+```
+
+- provisional 节点合并 → relation 重新绑定；
+- provisional 节点失败 → 关系撤回；
+- 正式关系不可删除，只能 dispute/revise。
+
+#### 4. 多关系并存
+
+- 新节点可以同时有来源父链 + 多条知识关系；
+- 同一对节点最多 2 种谓词（产品规则）；
+- 不确定关系 → suggest，不静默丢。
+
+#### 5. 已有节点关系不能被新关系覆盖
+
+- 已有 formal 关系不可删；
+- 新证据冲突 → claim_status=disputed/revised；
+- 不能因为新节点生成，把旧关系替换掉。
+
+### 8.4 验收场景（新增）
+
+```text
+已有：A=RAG，B=检索，C=增强生成
+输入：混合检索属于检索，召回率衡量增强生成。
+期望：
+  混合检索 kindOf 检索
+  召回率 related(衡量) 增强生成
+  两条关系都有证据
+  不允许两条都挂 A/RAG
+```
+
+再补一条：
+
+```text
+输入：混合检索由语义检索和向量检索组合而成。
+期望：
+  混合检索 related(组合) 语义检索/向量检索
+  不把语义检索/向量检索挂到 RAG
+```
+
+### 8.5 参考
+
+| 环节 | 参考 | 能帮什么 |
+| --- | --- | --- |
+| mention → 已有节点 | [Entity Linking survey](https://dl.acm.org/doi/10.1145/3795134) | 实体链接/消歧 |
+| 先剪枝候选对 | [DocRE classifier+LLM](https://arxiv.org/abs/2408.13889) | 先筛可能关系对，再判关系 |
+| 实体去重/时效 | Graphiti | provisional→正式的身份合并 |
+| 谓词/方向 | SKOS / ISO 1087 / OBO RO | 方向、传递、逆关系 |
+| 虚假关系 | [ACL 2024 Spurious Associations](https://aclanthology.org/2024.findings-acl.545/) | 允许 unrelated、证据校验 |
+
+没有现成"教学图关系绑定"实现；这层必须自研。
