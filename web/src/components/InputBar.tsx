@@ -74,6 +74,13 @@ export default function InputBar() {
   const previewBusyRef = useRef(false);
   const mentionIdsRef = useRef<string[]>([]);
   const sessionRef = useRef(0);
+  const segmentsRef = useRef(0);
+  const segmentQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const recordingRef = useRef(false);
+  const stoppingRef = useRef(false);
+  const finishOnceRef = useRef(false);
+  const reconnectTimerRef = useRef<number | null>(null);
+  const pendingAudioRef = useRef<string[]>([]);
 
   useEffect(() => {
     return () => {
@@ -174,16 +181,40 @@ export default function InputBar() {
     }, 150);
   }
 
+  function enqueueSegment(text: string) {
+    if (!text.trim()) return;
+    segmentsRef.current += 1;
+    segmentQueueRef.current = segmentQueueRef.current
+      .then(() => useStore.getState().ingestSegment(text))
+      .catch(() => null);
+  }
+
+  async function finishSession() {
+    if (finishOnceRef.current) return;
+    finishOnceRef.current = true;
+    await segmentQueueRef.current;
+    await useStore.getState().commitStream();
+    recordingRef.current = false;
+    stoppingRef.current = false;
+    setRec(false);
+  }
+
   function connectWS(mock: boolean) {
     const proto = location.protocol === "https:" ? "wss" : "ws";
     const ws = new WebSocket(`${proto}://${location.host}/ws/asr`);
     wsRef.current = ws;
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: mock ? "mock" : "start" }));
+      if (wsRef.current !== ws) return;
+      const hotwords = nodes.map((n) => n.name).filter(Boolean).slice(0, 80);
+      ws.send(JSON.stringify({ type: mock ? "mock" : "start", hotwords }));
+      // 补发 WS ready 之前的早期音频
+      const queued = pendingAudioRef.current.splice(0);
+      for (const chunk of queued) ws.send(JSON.stringify({ type: "audio", chunk }));
       setRec(true);
-      setState(mock ? "模拟语音中…" : "录音中…");
+      setState(mock ? "模拟语音中…" : "录音中…（再点一次结束）");
     };
     ws.onmessage = async (ev) => {
+      if (wsRef.current !== ws) return;
       const msg = JSON.parse(ev.data);
       if (msg.type === "partial") {
         setPartial(msg.text);
@@ -191,43 +222,53 @@ export default function InputBar() {
         const ids = matchMentions(msg.text);
         mentionIdsRef.current = ids;
         setMentions(ids);
-        schedulePreview(msg.text);
         setState("识别中…");
+      } else if (msg.type === "segment") {
+        setStreamTextFinal(msg.text);
+        setPartial("");
+        setStage("confirming");
+        setState("本句已确认 · 继续说话，或再点一次结束");
+        enqueueSegment(msg.text);
       } else if (msg.type === "final") {
-        setRec(false);
         setPartial("");
         setStreamTextFinal(msg.text);
         setStage("confirming");
-        setState("已稳定 · 正在确认");
-        ws.close();
-        if (previewTimer.current) window.clearTimeout(previewTimer.current);
-        previewTimer.current = null;
-        const ids = matchMentions(msg.text);
-        mentionIdsRef.current = ids;
-        setMentions(ids);
-        void (async () => {
-          await requestPreview(msg.text, true);
-          await extract(msg.text);
-        })();
-      } else if (msg.type === "segment") {
-        setStreamTextFinal(msg.text);
-        setStage("confirming");
-        setState("本句已确认 · 继续说话，或再点一次结束");
+        if (stoppingRef.current) {
+          enqueueSegment(msg.text);
+          setState("整段已确认 · 正在落图");
+          void finishSession();
+        } else {
+          // ASR 认为当前 utterance 结束：只结算这一句，然后继续录音
+          enqueueSegment(msg.text);
+          setState("本句已确认 · 继续说话，或再点一次结束");
+          try {
+            ws.close();
+          } catch {}
+        }
       } else if (msg.type === "error") {
-        setRec(false);
         setMicError(String(msg.message ?? "语音识别失败"));
         setState("识别失败");
         setStage("idle");
+        recordingRef.current = false;
         stopTracks();
       } else if (msg.type === "ready") {
         setState((prev) => (prev.includes("录音中") ? prev : `已连接（${msg.provider}）`));
       }
     };
+    ws.onclose = () => {
+      if (wsRef.current !== ws) return;
+      if (recordingRef.current && !stoppingRef.current) {
+        // ASR 在句末关闭：保持录音，重连继续
+        if (reconnectTimerRef.current) window.clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = window.setTimeout(() => {
+          reconnectTimerRef.current = null;
+          if (recordingRef.current && !stoppingRef.current) connectWS(mock);
+        }, 250);
+      }
+    };
     ws.onerror = () => {
-      setRec(false);
-      setState("语音连接失败");
-      setStage("idle");
-      stopTracks();
+      if (!recordingRef.current || stoppingRef.current) return;
+      setState("语音连接中断，正在重连…");
     };
     return ws;
   }

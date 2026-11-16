@@ -318,6 +318,12 @@ export function setNodesStatus(ids: string[], status: "provisional" | "committed
   for (const id of ids) setNodeStatus(id, status);
 }
 
+export function commitStreamEdges(worldId: string) {
+  db.prepare(
+    "UPDATE edges SET kind='formal' WHERE world_id=? AND origin='stream' AND kind='suggest' AND evidence<>''",
+  ).run(worldId);
+}
+
 export function updateNodeMeta(
   id: string,
   patch: { type?: string; definition?: string; aliases?: string[]; sourceSpanId?: string | null },

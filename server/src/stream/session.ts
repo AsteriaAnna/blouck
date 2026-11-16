@@ -6,6 +6,7 @@ import {
   getGraph,
   getNode,
   setNodesStatus,
+  commitStreamEdges,
   type NodeRow,
 } from "../db.js";
 import type { LLMProvider } from "../providers/types.js";
@@ -130,6 +131,7 @@ export function commitStream(worldId: string, ids?: string[]) {
     ? graph.nodes.filter((n) => ids.includes(n.id))
     : graph.nodes.filter((n) => n.status === "provisional");
   setNodesStatus(targets.map((n) => n.id), "committed");
+  commitStreamEdges(worldId);
   computeFrontier(worldId);
   const fresh = getGraph(worldId);
   return { committed: targets.map((n) => n.id), nodes: fresh.nodes, edges: fresh.edges };
