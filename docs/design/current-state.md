@@ -119,3 +119,29 @@
 - [算法](../reference/algorithms.md)
 - [需求](requirements.md)
 - [产品基线](../reference/product-baseline.md)
+
+
+---
+
+## 8. 真实代码核对（2026-11-16）
+
+针对"多跳节点全挂到同一节点"的问题，核对了 `server/src/index.ts` 与 `server/src/providers/deepseek.ts`：
+
+| 位置 | 实际行为 | 后果 |
+| --- | --- | --- |
+| `/extract` 入口 | `focus = fromNodeId ?? root` | 一次抽取只有一个全局焦点 |
+| LLM prompt | 只给"当前节点 + 已有概念 + 文本" | 没有"这句话里谁接谁/父节点链"字段 |
+| 关系解析 | `source = rel.source || focus` | 模型没写 source 时，所有关系默认挂当前节点 |
+| 节点位置 | `placeAround(..., focus)` | 新节点全部围绕该焦点摆放 |
+| 来源线 | 统一 `focus → new node`，并有孤岛禁令兜底 | 多跳节点也挂到初始节点 |
+| 前端 focusId | 抽取后只更新 nodes/edges，不随新节点推进 | 连续说话时焦点仍是初始节点 |
+| 流式 | detect 与 extract 两套结果，ghost 按名字匹配 | ghost 与最终节点没有同一 ID/父节点 |
+
+**结论：当前实现不是"多跳理解失败"，而是数据模型里没有"这段话的当前父节点"这个概念，程序只能用全局 focus 兜底。** 详细分析见 [problems-and-approaches.md](problems-and-approaches.md) 第 6 节。
+
+### 当前应优先验证的假设
+
+1. 引入"焦点栈/父节点"后，1→2→3 是否能正确挂到 2 而不是 1；
+2. 关系候选扩大到"同句新节点 + 已有节点"后，2/3 是否不再全部依赖 1；
+3. provisional 实体（同一 ID）是否能同时解决 ghost 速度与衔接；
+4. 本地 mention 检测 + 异步验证能否把首次可见反应压到 1s 内。
