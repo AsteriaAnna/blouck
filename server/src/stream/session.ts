@@ -9,6 +9,8 @@
   getNode,
   setFocusStack,
   setNodesStatus,
+  type EdgeKind,
+  type EdgeRow,
   type NodeRow,
 } from "../db.js";
 import type { LLMProvider } from "../providers/types.js";
@@ -18,6 +20,17 @@ const norm = (s: string) =>
   s
     .toLowerCase()
     .replace(/[\s\-_·、，。,.；;：:（）()【】\[\]《》"'“”]/g, "");
+
+/** 与 index.ts 文字链路一致的实体名校验：问句/代词/疑问词开头、问号结尾都不是概念 */
+const BAD_NAME = /^(这个|那个|它|我们|然后|可以|就是|什么|怎么|为什么|如何|是否)|[?？]$/;
+
+/** 原文包含判断：先精确匹配，再兜底忽略空白/标点的归一化匹配（LLM 复述证据时标点常不同） */
+function includesLoose(text: string, piece: string): boolean {
+  if (!piece) return false;
+  if (text.includes(piece)) return true;
+  const p = norm(piece);
+  return p.length > 0 && norm(text).includes(p);
+}
 
 function aliasesOf(n: NodeRow): string[] {
   try {
@@ -33,11 +46,30 @@ function findNode(nodes: NodeRow[], raw?: string) {
   return nodes.find((n) => norm(n.name) === key || aliasesOf(n).some((a) => norm(a) === key));
 }
 
+/**
+ * 文本提到的已有节点，按“最后一次出现位置”升序排列：
+ * 末位 = 文本中最后提到的节点（而不是 graph.nodes 里创建最晚的节点）。
+ */
 function mentionedNodes(nodes: NodeRow[], text: string) {
   const t = norm(text);
-  return nodes.filter((n) =>
-    [n.name, ...aliasesOf(n)].some((x) => norm(x).length >= 2 && t.includes(norm(x))),
-  );
+  return nodes
+    .map((node) => {
+      let at = -1;
+      for (const x of [node.name, ...aliasesOf(node)]) {
+        const key = norm(x);
+        if (key.length < 2) continue;
+        at = Math.max(at, t.lastIndexOf(key));
+      }
+      return { node, at };
+    })
+    .filter((x) => x.at >= 0)
+    .sort((a, b) => a.at - b.at)
+    .map((x) => x.node);
+}
+
+/** 关系边幂等键：同 (src,dst,kind,predicate) 视为同一条边 */
+function edgeKey(src: string, dst: string, kind: string, predicate: string | null): string {
+  return `${src}|${dst}|${kind}|${predicate ?? ""}`;
 }
 
 function uniqueNodes(nodes: NodeRow[]): NodeRow[] {
@@ -94,6 +126,37 @@ export async function ingestSegment(
   llm: LLMProvider,
 ) {
   const graph = getGraph(worldId);
+  // 关系边幂等：已存在的同 (src,dst,kind,predicate) 不再新增；本次调用内新增的也计入。
+  const edgeKeys = new Set(graph.edges.map((e) => edgeKey(e.src, e.dst, e.kind, e.predicate)));
+  /** 幂等写边：suggest 与 formal 是同一条知识关系的两个阶段（commit 时 suggest→formal），跨阶段也去重 */
+  const addEdgeOnce = (
+    src: string,
+    dst: string,
+    kind: EdgeKind,
+    label: string,
+    question: string | null,
+    md: string,
+    meta: {
+      predicate?: string | null;
+      evidence?: string;
+      confidence?: number;
+      origin?: string;
+    } = {},
+  ): EdgeRow | null => {
+    const predicate = meta.predicate ?? null;
+    const key = edgeKey(src, dst, kind, predicate);
+    if (edgeKeys.has(key)) return null;
+    if (
+      kind === "suggest" &&
+      edgeKeys.has(edgeKey(src, dst, "formal", predicate))
+    ) {
+      return null;
+    }
+    const edge = addEdge(worldId, src, dst, kind, label, question, md, meta);
+    edgeKeys.add(key);
+    graph.edges.push(edge);
+    return edge;
+  };
   const stackIds = getFocusStack(worldId);
   const stack = stackIds.map((id) => getNode(id)).filter(Boolean) as NodeRow[];
   let current =
@@ -124,16 +187,24 @@ export async function ingestSegment(
   const created: NodeRow[] = [];
   const placed = graph.nodes.map((n) => ({ id: n.id, x: n.x, y: n.y }));
 
+  const seenEntityNames = new Set<string>();
   const entities = result.entities.filter((e) => {
     const n = e.name?.trim();
-    return Boolean(n && n.length >= 2 && n.length <= 20 && !findNode(graph.nodes, n));
+    if (!n || n.length < 2 || n.length > 20) return false;
+    if (BAD_NAME.test(n)) return false;
+    const key = norm(n);
+    // 同一批 LLM 输出里的重名实体也只建一个节点
+    if (seenEntityNames.has(key)) return false;
+    if (findNode(graph.nodes, n)) return false;
+    seenEntityNames.add(key);
+    return true;
   });
   for (let ei = 0; ei < entities.length; ei++) {
     const ent = entities[ei];
     const name = ent.name.trim();
     const evidence = ent.evidence?.trim() ?? "";
-    if (evidence && !typed.includes(evidence)) continue;
-    if (!evidence) continue;
+    // 原文没有证据就不落图；证据匹配忽略空白/标点差异
+    if (!evidence || !includesLoose(typed, evidence)) continue;
     const confidence = typeof ent.confidence === "number" ? ent.confidence : 0.7;
     if (confidence < 0.6) continue;
 
@@ -159,7 +230,7 @@ export async function ingestSegment(
     created.push(node);
     graph.nodes.push(node);
     placed.push({ id: node.id, x: node.x, y: node.y });
-    addEdge(worldId, parent.id, node.id, "source", "本轮探索来源", null, "", {
+    addEdgeOnce(parent.id, node.id, "source", "本轮探索来源", null, "", {
       evidence,
       confidence: 0.9,
       origin: "stream",
@@ -176,9 +247,9 @@ export async function ingestSegment(
       (activeStack[0] ?? current);
     if (!source || source.id === target.id) continue;
     let evidence = rel.evidence?.trim() ?? "";
-    if (evidence && !typed.includes(evidence)) evidence = "";
+    if (evidence && !includesLoose(typed, evidence)) evidence = "";
     if (!evidence) evidence = target.name;
-    addEdge(worldId, source.id, target.id, "suggest", rel.label || rel.predicate || "相关", null, "", {
+    addEdgeOnce(source.id, target.id, "suggest", rel.label || rel.predicate || "相关", null, "", {
       predicate: rel.predicate ?? "related",
       evidence,
       confidence: rel.confidence ?? 0.6,
@@ -200,6 +271,8 @@ export async function ingestSegment(
     createdNodes: created,
     nodes: fresh.nodes,
     edges: fresh.edges,
+    // 抽取失败/超时时把 warning 透传给前端（无 warning 时响应里不出现该字段）
+    ...(result.warning ? { warning: result.warning } : {}),
   };
 }
 

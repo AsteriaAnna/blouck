@@ -2,33 +2,52 @@ import { env } from "../env.js";
 import { mockLLM } from "./mock.js";
 import type { ExtractResult, LLMProvider, QuizItem } from "./types.js";
 
+/** 单次 DeepSeek 调用超时：挂起会卡住前端串行 segment 队列与 commit，必须有上限 */
+const CHAT_TIMEOUT_MS = 20_000;
+
 /**
  * DeepSeek 语言能力预留位。
  * 未配置 DEEPSEEK_API_KEY 时自动降级到 mock；配置后走真实调用。
  * 注意：抽取/出题/判题都应让模型返回严格 JSON，并在服务端做 schema 校验。
  */
 async function chat(system: string, user: string): Promise<string> {
-  const res = await fetch(`${env.deepseekBaseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${env.deepseekApiKey}`,
-    },
-    body: JSON.stringify({
-      model: env.deepseekModel,
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-    }),
-  });
-  if (!res.ok) throw new Error(`DeepSeek ${res.status}: ${await res.text()}`);
-  const data = (await res.json()) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  return data.choices?.[0]?.message?.content ?? "";
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${env.deepseekBaseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.deepseekApiKey}`,
+      },
+      body: JSON.stringify({
+        model: env.deepseekModel,
+        temperature: 0.2,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`DeepSeek ${res.status}: ${await res.text()}`);
+    const data = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    return data.choices?.[0]?.message?.content ?? "";
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new Error(`DeepSeek 请求超时（${CHAT_TIMEOUT_MS / 1000}s）`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 export const deepseekLLM: LLMProvider = {
@@ -71,8 +90,15 @@ export const deepseekLLM: LLMProvider = {
         }));
       return { entities, relations, processes };
     } catch (err) {
-      console.warn("[llm] deepseek extract 失败，降级 mock：", err);
-      return mockLLM.extract({ text, focus, existing });
+      // 抽取失败/超时不再降级 mock：mock 的正则切词会把“这个/然后”等写进用户的图。
+      // 本段不落图，返回空结果 + warning，由 /stream/segment 响应回传给前端提示。
+      console.warn("[llm] deepseek extract 失败，本段不落图：", err);
+      return {
+        entities: [],
+        relations: [],
+        processes: [],
+        warning: `本句知识抽取失败（${errorMessage(err)}），未落图，可再说一次或稍后重试。`,
+      };
     }
   },
 

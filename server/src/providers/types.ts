@@ -45,6 +45,8 @@ export type ExtractResult = {
   entities: ExtractEntity[];
   relations: ExtractRelation[];
   processes?: ExtractProcess[];
+  /** 抽取失败/超时等非致命问题：本段不落图，前端可据此提示（toast） */
+  warning?: string;
 };
 
 export type RelationSuggestion = {
