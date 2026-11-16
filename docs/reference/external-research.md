@@ -85,3 +85,37 @@
 4. LLM 关系判断的虚假关联需要自建证据/标签校验。
 
 这些缺口对应 [problems-and-approaches.md](../design/problems-and-approaches.md) 里的待解问题。
+
+
+---
+
+## 6. 流式/对话图构建参考（2026-11-16 补充）
+
+针对"多焦点、多跳、边说边生成"查过一轮，结论是：**有相邻研究，但没有现成可复用的完整系统。**
+
+| 资料 | 能说明什么 | 不能解决什么 |
+| --- | --- | --- |
+| [A Speech-to-Knowledge-Graph Construction System（IJCAI 2020）](https://ijcai.org/Proceedings/2020/777) | 已经有人做"实时语音 → 知识图谱"演示：把关键短语作为节点/边，边听边画 | 节点是关键词级，没有教学语义、多焦点父链、证据/修订 |
+| [LiveGraph: A Compound AI System for Evolving Knowledge Graph Construction from Streaming Data（2025）](https://dl.acm.org/doi/10.1145/3786335.3813169) | 流式数据持续建/演化 KG 的系统架构 | 面向流式数据，不是对话焦点/教学图；无公开可复用代码 |
+| [Towards automatic knowledge graph construction from dialogue（RPI 项目）](https://tw.rpi.edu/project/towards-automatic-knowledge-graph-construction-dialogue) | 系统梳理对话建 KG 的难点：代词/回指、话题切换、跨轮上下文；并指出没有现成综述 | 是综述/方向，不是实现 |
+| Centering Theory / attentional state（Grosz & Sidner 1986；Grosz, Joshi & Weinstein 1995） | "局部焦点 + 焦点栈 + 回退"是经典话语模型，正好对应多焦点 | 理论模型，不提供工程流水线 |
+| Dialogue State Tracking（DST）综述 | 对话状态需要显式跟踪，不能只靠最后一次输入 | 传统 DST 是 slot-value，不是开放知识图 |
+
+### 6.1 这些参考共同说明
+
+1. **实时语音 → 图** 本身可行（IJCAI 2020 已演示），但现有演示停留在关键词图；
+2. **对话建图** 的核心难点是回指、话题切换、跨轮上下文（RPI 综述）；
+3. **多焦点** 需要话语焦点栈/注意力状态（Centering Theory），不是单一 focus；
+4. **流式演化** 需要独立的状态/修订机制（LiveGraph 方向）；
+5. 没有找到"教学语义 + 多焦点父链 + provisional + 证据"的现成系统。
+
+### 6.2 对我们意味着什么
+
+- 不能直接抄某个开源项目；
+- 但可以确定方向：**对话状态模型（焦点栈）+ 增量图状态 + 关系验证**，而不是"一句话一次抽取"；
+- 实时语音→图的研究支持"边听边画"，但不支持"自动挂对父节点/教学关系"；
+- 这属于产品层自研，不是模型能力问题。
+
+### 6.3 结论
+
+用户要的"多焦点、多跳、随时切回"不是玄学，而是**话语图构建**问题；现有研究给出了组件（焦点栈、DST、流式建图），但没有给出完整教学图系统。我们需要自己设计状态模型，不能靠 prompt 或 Ghost 补。
