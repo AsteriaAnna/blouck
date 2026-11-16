@@ -347,8 +347,10 @@ export default function InputBar() {
     clearStream();
     resetStream();
 
-    const ctx = new AudioContext({ sampleRate: 16000 });
+    // 不强制 16k：原生采样率采集，AudioWorklet 内部重采样到 16k
+    const ctx = new AudioContext();
     ctxRef.current = ctx;
+    await ctx.resume();
     try {
       const blob = new Blob([WORKLET_SRC], { type: "application/javascript" });
       const url = URL.createObjectURL(blob);
@@ -361,48 +363,16 @@ export default function InputBar() {
     }
 
     const source = ctx.createMediaStreamSource(stream);
-    const node = new AudioWorkletNode(ctx, "pcm-worklet");
+    const node = new AudioWorkletNode(ctx, "pcm-worklet", {
+      processorOptions: { sampleRate: ctx.sampleRate },
+    });
     nodeRef.current = node;
     source.connect(node);
 
-    const ws = connectWS(false);
-    const inRate = ctx.sampleRate;
-    const ratio = inRate / 16000;
-    let carry = new Float32Array(0);
-    let carryPos = 0;
+    connectWS(false);
 
     node.port.onmessage = (ev) => {
-      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-      const block = new Float32Array(ev.data);
-      if (ratio === 1) {
-        const pcm = new Int16Array(block.length);
-        for (let i = 0; i < block.length; i++) {
-          const s = Math.max(-1, Math.min(1, block[i]));
-          pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-        }
-        flush(pcm);
-        return;
-      }
-      const merged = new Float32Array(carry.length + block.length);
-      merged.set(carry, 0);
-      merged.set(block, carry.length);
-      carry = merged;
-      const res: number[] = [];
-      let idx = carryPos;
-      while (idx + 1 < carry.length) {
-        const i0 = Math.floor(idx);
-        const frac = idx - i0;
-        const s = carry[i0] * (1 - frac) + carry[i0 + 1] * frac;
-        res.push(Math.max(-32768, Math.min(32767, s * 32767)));
-        idx += ratio;
-      }
-      carryPos = idx;
-      const drop = Math.floor(carryPos);
-      if (drop > 0) {
-        carry = carry.slice(drop);
-        carryPos -= drop;
-      }
-      if (res.length) flush(new Int16Array(res));
+      flush(new Int16Array(ev.data));
     };
 
     let pending: Int16Array[] = [];
@@ -422,20 +392,40 @@ export default function InputBar() {
           else pending[0] = head.subarray(take);
         }
         pendingLen -= 3200;
-        ws.send(JSON.stringify({ type: "audio", chunk: toBase64(buf.buffer) }));
+        const chunk = toBase64(buf.buffer);
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: "audio", chunk }));
+          lastAudioAtRef.current = Date.now();
+        } else if (pendingAudioRef.current.length < 100) {
+          pendingAudioRef.current.push(chunk);
+        }
       }
     }
   }
 
   function stopRec() {
+    stoppingRef.current = true;
     setState("正在等待最终结果…");
     setStage("confirming");
     try {
       nodeRef.current?.disconnect();
     } catch {}
+    // 停止前补 300ms 静音，给 ASR 收尾时间
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({ type: "audio", chunk: toBase64(new Int16Array(4800).buffer) }),
+      );
+    }
     stopTracks();
-    wsRef.current?.send(JSON.stringify({ type: "stop" }));
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "stop" }));
+    } else {
+      void finishSession();
+    }
     setRec(false);
+    window.setTimeout(() => {
+      if (stoppingRef.current) void finishSession();
+    }, 2500);
   }
 
   function startMock() {
