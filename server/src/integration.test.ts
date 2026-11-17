@@ -194,6 +194,13 @@ test("方向计划可直接探索（directionId，不依赖地图投影边）", 
   assert.ok(explored.createdNodes.length >= 1 || explored.warning);
   const graph = await api(`/api/worlds/${world.id}`);
   assert.ok(graph.directions.find((d: any) => d.id === dir.id)?.status === "consumed");
+  const createdNode = explored.createdNodes?.[0];
+  if (createdNode) {
+    const nextPlans = graph.directions.filter(
+      (d: any) => d.node_id === createdNode.id && d.status === "open",
+    );
+    assert.ok(nextPlans.length >= 4, `explored node should get 4 next directions, got ${nextPlans.length}`);
+  }
   await fetch(`${base}/api/worlds/${world.id}`, { method: "DELETE" });
 });
 

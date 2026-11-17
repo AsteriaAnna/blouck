@@ -10,7 +10,7 @@ pnpm build       # web build（shared/server 只 typecheck）
 
 CI：`.github/workflows/ci.yml`，push main / PR 跑 install → typecheck → test → build。
 
-## 当前覆盖（P1 起步，当前 25 个测试）
+## 当前覆盖（P1 起步，当前 26 个测试）
 
 | 测试 | 文件 | 覆盖 |
 |---|---|---|
@@ -18,13 +18,13 @@ CI：`.github/workflows/ci.yml`，push main / PR 跑 install → typecheck → t
 | 副本校验 | `server/src/dungeons.test.ts` | 线性扩展计数、流程校验、领域共同上位 |
 | DB 基础 | `server/src/db.test.ts` | frontier 只看 formal、commitStreamEdges 只提升 stream suggest、directions 状态、canonical line 映射、双写 trigger/view |
 | 方向物化/消费 | `server/src/directions.test.ts` | 每节点最多 2 条、重复执行幂等、非 frontier 删除、consume 以 directions 为源 |
-| 方向计划 4 条 | `server/src/integration.test.ts` | 新节点 `directions` 至少 4 条 open；地图仍只 materialize 1–2；directionId 可直接探索 |
+| 方向计划 4 条 | `server/src/integration.test.ts` | 新节点 `directions` 至少 4 条 open；地图仍只 materialize 1–2；directionId 可直接探索，探索生成的新节点也有 4 条 |
 | DB 迁移 Stage A | `server/src/db/canonical-migrate.test.ts` | 旧 schema 临时库：kind→line_type 回填、consumed 回填、重复执行幂等 |
 | 旧库启动迁移 | `server/src/legacy-boot.test.ts` | 旧 edges schema 起真实 server：自动加列/trigger、旧行回填、canonical API 正常 |
 | V3 理解卡 | `server/src/contentDocs.test.ts` | 节点卡位置/来源、关系卡证据、备注不覆盖、方向/来源不生成 MD |
 | V3 生成 worker | `server/src/generationWorker.test.ts` | 幂等入队、node_doc/relation_doc 串行执行、空队列返回 |
 | V3 软准入 | `server/src/integration.test.ts` | 无语义关系实体只进 `createdCandidates`，不新建可见节点；候选列表/确认后建节点+formal 边 |
-| 副本解锁 | `server/src/buildings.test.ts` | tier>=1 后 domain/flow 从 detected → playable |
+| 副本解锁 | `server/src/buildings.test.ts` | tier>=1 后 domain/flow 从 detected → playable；short+judge 正确 → tier=1 → playable |
 | V3 提示池 | `server/src/hints.test.ts` | 置信度/新近/热度排序、top-k display、旧边回退 |
 | mock 集成 | `server/src/integration.test.ts` | 起临时 server + 临时 DB：世界创建、extract、stream segment/commit、重复抽取不重复建边、方向物化只给 frontier/≤2、seed demo 方向投影 |
 

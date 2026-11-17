@@ -32,6 +32,7 @@ import { placeAround } from "../placement.js";
 import { materializeDirectionEdges } from "../services/directions.js";
 import { enqueueGenerationJob } from "../db/docs.js";
 import { refreshHintDisplay } from "../services/hints.js";
+import { ensureDirectionPlans } from "../services/directionPlans.js";
 import { addNodeCandidate } from "../db/docs.js";
 import { detectBuildingsLLM, detectBuildingsV2, refreshAllBuildingStatus, refreshStaleBuildings } from "../services/buildings.js";
 import {
@@ -226,29 +227,8 @@ graphRouter.post("/api/worlds/:id/explore", async (req, res) => {
       }),
     );
 
-    // 新节点也要有下一步方向（保持探索链不断）
-    try {
-      const existing = [...graph.nodes, node].map((n) => n.name);
-      const sugg = await llm.suggestDirections({
-        nodes: [{ name: node.name, definition: node.definition, neighbors: [src.name] }],
-        existing,
-      });
-      const s = sugg[0];
-      if (s?.target?.name) {
-        addDirection(world.id, node.id, s.question, s.reason, {
-          name: s.target.name,
-          type: s.target.type,
-          definition: s.target.definition,
-          aliases: s.target.aliases,
-          predicate: s.predicate ?? null,
-          label: s.label,
-        });
-      } else {
-        addDirection(world.id, node.id, `「${node.name}」还可以往哪一步深入？`, `围绕「${node.name}」的下一步`, null);
-      }
-    } catch {
-      addDirection(world.id, node.id, `「${node.name}」还可以往哪一步深入？`, `围绕「${node.name}」的下一步`, null);
-    }
+    // 新节点也要有下一步方向（保持探索链不断，统一补到 4 条）
+    await ensureDirectionPlans(world.id, node, llm, 4);
   }
 
   if (edgeId) db.prepare("UPDATE edges SET consumed=1 WHERE id=?").run(edgeId);

@@ -33,7 +33,7 @@ curl http://localhost:8787/api/health
 | 命令 | 耗时 | 结果 |
 |---|---|---|
 | `pnpm typecheck` | 3.6s | shared/server/web 全通过 |
-| `pnpm test` | 3.0s | **25 pass / 0 fail** |
+| `pnpm test` | 3.0s | **26 pass / 0 fail** |
 | `pnpm build` | 5.6s | web build 成功 |
 
 测试覆盖见 [testing.md](testing.md)。
@@ -75,7 +75,7 @@ hit node label=概念
 | 1 小时跑通 | ✅ 当前机器约 12 秒跑完 install 后门禁；文档路径 [onboarding.md](onboarding.md) | §1–§3 |
 | 半天说出主链路/表用途 | ✅ 文档：onboarding §2/§3 + [architecture.md](architecture.md) + [glossary.md](glossary.md) | 13 表、双链路、direction 源/投影 |
 | 1 天定位关系/方向/副本改动 | ✅ onboarding §4 改动定位表 | `routes/graph.ts`、`services/directions.ts`、`services/buildings.ts` |
-| 2–3 天完成带测试小 PR | ✅ 有测试/CI/小 PR 先例 | 25 tests + CI workflow |
+| 2–3 天完成带测试小 PR | ✅ 有测试/CI/小 PR 先例 | 26 tests + CI workflow |
 | 1 周独立改非核心功能 | 🟡 结构已支持，但无真人计时样本 | 前端已拆 hooks/slices/scene；后端 routes/services/db |
 | 2–4 周安全改核心逻辑 | 🟡 canonical/单源已就绪，DB 重命名未执行 | 见 [canonical-state.md](canonical-state.md) Phase 3 |
 
