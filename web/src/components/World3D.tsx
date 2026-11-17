@@ -102,7 +102,7 @@ export default function World3D() {
             .slice(0, 2);
     const allowed = new Set(hints.map((e) => e.id));
     const directions = edges
-      .filter((e) => e.kind === "direction")
+      .filter((e) => e.kind === "direction" && !e.consumed)
       .slice(0, near ? 4 : 2);
     for (const d of directions) allowed.add(d.id);
     return edges.filter(
@@ -156,7 +156,7 @@ export default function World3D() {
           if (e.kind === "direction") {
             if (e.consumed) return null;
             const srcNode = nodes.find((n) => n.id === e.src);
-            if (!srcNode?.frontier) return null; // 只有边缘节点在地图上画方向
+            if (!srcNode) return null;
             const a = nodePos.get(e.src);
             const f =
               e.frontier_x != null && e.frontier_y != null

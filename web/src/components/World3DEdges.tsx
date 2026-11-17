@@ -278,6 +278,9 @@ function TravelingSpark({ curve, color }: { curve: THREE.Curve<THREE.Vector3>; c
     ref.current.position.set(p.x, p.y + 7 + Math.sin(clock.elapsedTime * 3) * 2, p.z);
     const s = 1 + Math.sin(clock.elapsedTime * 4) * 0.18;
     ref.current.scale.setScalar(s);
+    if ((import.meta as any).env?.DEV) {
+      (window as any).__spark = { t, x: p.x, y: p.y, z: p.z, s, at: performance.now() };
+    }
   });
   return (
     <mesh ref={ref}>
