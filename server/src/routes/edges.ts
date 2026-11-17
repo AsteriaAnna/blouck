@@ -12,6 +12,7 @@ import { consumeDirection } from "../assetops.js";
 import { llm } from "../providers/active.js";
 import { consumeDirectionEdge, materializeDirectionEdges } from "../services/directions.js";
 import { enqueueGenerationJob } from "../db/docs.js";
+import { refreshHintDisplay } from "../services/hints.js";
 
 /** /api/edges/*、/api/worlds/:id/relations：关系接受/手动连线/编辑/方向消费 */
 export const edgesRouter = Router();
@@ -41,6 +42,7 @@ edgesRouter.post("/api/edges/:id/accept", async (req, res) => {
   } else {
     updateEdgeKind(edge.id, "formal");
   }
+  if (a) refreshHintDisplay(a.world_id);
   res.json({ ok: true, edge: db.prepare("SELECT * FROM edges WHERE id=?").get(edge.id) });
 });
 
@@ -81,6 +83,7 @@ edgesRouter.post("/api/worlds/:id/relations", async (req, res) => {
   });
   computeFrontier(world.id);
   materializeDirectionEdges(world.id);
+  refreshHintDisplay(world.id);
   enqueueGenerationJob(world.id, "relation_doc", edge.id);
   res.json({ ok: true, edge });
 });

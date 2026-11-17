@@ -14,6 +14,7 @@ import {
 } from "../db.js";
 import { ensureBuildingPositions, ensureDirectionFrontiers } from "../assetops.js";
 import { materializeDirectionEdges } from "../services/directions.js";
+import { refreshHintDisplay } from "../services/hints.js";
 
 /** 世界列表/创建/读取/删除（读取时补齐 source_quote 与 frontier） */
 export const worldsRouter = Router();
@@ -44,6 +45,7 @@ worldsRouter.get("/api/worlds/:id", (req, res) => {
   computeFrontier(world.id);
   ensureDirectionFrontiers(world.id);
   materializeDirectionEdges(world.id);
+  refreshHintDisplay(world.id);
   const graph = getGraph(world.id);
   const buildings = listBuildings(world.id);
   // 节点 MD 的“来源”引用：把来源片段文本/时间一起下发（只读，供节点文档展示）

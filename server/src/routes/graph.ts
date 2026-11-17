@@ -31,6 +31,7 @@ import { llm } from "../providers/active.js";
 import { placeAround } from "../placement.js";
 import { materializeDirectionEdges } from "../services/directions.js";
 import { enqueueGenerationJob } from "../db/docs.js";
+import { refreshHintDisplay } from "../services/hints.js";
 import { addNodeCandidate } from "../db/docs.js";
 import { detectBuildingsLLM, detectBuildingsV2, refreshAllBuildingStatus, refreshStaleBuildings } from "../services/buildings.js";
 import {
@@ -228,6 +229,7 @@ graphRouter.post("/api/worlds/:id/explore", async (req, res) => {
   if (directionRow) db.prepare("UPDATE directions SET status='consumed' WHERE id=?").run(directionRow.id);
   computeFrontier(world.id);
   materializeDirectionEdges(world.id);
+  refreshHintDisplay(world.id);
   const payload = getGraph(world.id);
   for (const n of createdNodes.slice(0, 4)) enqueueGenerationJob(world.id, "node_doc", n.id);
   for (const e of (createdEdges as any[])
@@ -590,6 +592,7 @@ graphRouter.post("/api/worlds/:id/extract", async (req, res) => {
   refreshStaleBuildings(world.id);
   await detectBuildingsLLM(world.id, focus);
   materializeDirectionEdges(world.id);
+  refreshHintDisplay(world.id);
   detectBuildingsV2(world.id, focus, graph.nodes);
   ensureDirectionFrontiers(world.id);
   const fresh = getGraph(world.id);

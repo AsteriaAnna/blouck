@@ -79,13 +79,17 @@ export default function World3D() {
     return pts;
   }, [nodes, buildings, cx, cy]);
 
-  // 地图克制：提示线最多 2 条（按置信度/新近），其余留在关系池
+  // 地图克制：提示线由后端 hint_display 给出 top-k；旧数据回退到置信度前 2
   const displayEdges = useMemo(() => {
-    const hints = edges
-      .filter((e) => e.kind === "suggest")
-      .slice()
-      .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
-      .slice(0, 2);
+    const marked = edges.filter((e) => e.kind === "suggest" && e.hint_display === 1);
+    const hints =
+      marked.length > 0
+        ? marked
+        : edges
+            .filter((e) => e.kind === "suggest")
+            .slice()
+            .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
+            .slice(0, 2);
     const allowed = new Set(hints.map((e) => e.id));
     return edges.filter((e) => e.kind !== "suggest" || allowed.has(e.id));
   }, [edges]);

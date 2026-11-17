@@ -35,6 +35,9 @@ export type EdgeRow = {
   /** canonical 派生字段（迁移期可选；由 getGraph 附加） */
   line_type?: LineType;
   line_state?: LineState;
+  /** V3 提示池评分/显示位 */
+  hint_score?: number;
+  hint_display?: number;
   created_at: number;
 };
 

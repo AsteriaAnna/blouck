@@ -10,7 +10,7 @@ pnpm build       # web build（shared/server 只 typecheck）
 
 CI：`.github/workflows/ci.yml`，push main / PR 跑 install → typecheck → test → build。
 
-## 当前覆盖（P1 起步，当前 23 个测试）
+## 当前覆盖（P1 起步，当前 24 个测试）
 
 | 测试 | 文件 | 覆盖 |
 |---|---|---|
@@ -24,6 +24,7 @@ CI：`.github/workflows/ci.yml`，push main / PR 跑 install → typecheck → t
 | V3 生成 worker | `server/src/generationWorker.test.ts` | 幂等入队、node_doc/relation_doc 串行执行、空队列返回 |
 | V3 软准入 | `server/src/integration.test.ts` | 无语义关系实体只进 `createdCandidates`，不新建可见节点；候选列表/确认后建节点+formal 边 |
 | 副本解锁 | `server/src/buildings.test.ts` | tier>=1 后 domain/flow 从 detected → playable |
+| V3 提示池 | `server/src/hints.test.ts` | 置信度/新近/热度排序、top-k display、旧边回退 |
 | mock 集成 | `server/src/integration.test.ts` | 起临时 server + 临时 DB：世界创建、extract、stream segment/commit、重复抽取不重复建边、方向物化只给 frontier/≤2、seed demo 方向投影 |
 
 ## 已知缺口

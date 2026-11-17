@@ -6,7 +6,7 @@
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/placement.test.ts src/dungeons.test.ts src/buildings.test.ts src/db.test.ts src/db/canonical-migrate.test.ts src/contentDocs.test.ts src/generationWorker.test.ts src/directions.test.ts src/legacy-boot.test.ts src/integration.test.ts",
+    "test": "node --import tsx --test src/placement.test.ts src/dungeons.test.ts src/buildings.test.ts src/db.test.ts src/db/canonical-migrate.test.ts src/contentDocs.test.ts src/generationWorker.test.ts src/hints.test.ts src/directions.test.ts src/legacy-boot.test.ts src/integration.test.ts",
     "migrate:canonical": "tsx scripts/migrate-canonical.ts",
     "eval": "tsx eval/run.ts",
     "eval:api": "tsx eval/run.ts --api",

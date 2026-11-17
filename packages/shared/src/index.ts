@@ -145,6 +145,9 @@ export type EdgeDTO = {
   /** canonical 产品线型/状态（由 kind/consumed 派生，迁移期附加） */
   line_type?: LineType;
   line_state?: LineState;
+  /** V3 提示池：后端评分与地图显示位（suggest 才有意义） */
+  hint_score?: number;
+  hint_display?: number;
   /** 方向线生成时预先计划好的延伸节点 */
   target_name?: string | null;
   target_type?: string | null;

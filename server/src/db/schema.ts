@@ -108,6 +108,10 @@ for (const [col, ddl] of [
 ] as const) {
   if (!columnNames("directions").includes(col)) db.exec(`ALTER TABLE directions ADD COLUMN ${col} ${ddl}`);
 }
+// V3 提示池：score/display 由 services/hints.ts 刷新
+if (!columnNames("edges").includes("hint_score")) db.exec("ALTER TABLE edges ADD COLUMN hint_score REAL NOT NULL DEFAULT 0");
+if (!columnNames("edges").includes("hint_display")) db.exec("ALTER TABLE edges ADD COLUMN hint_display INTEGER NOT NULL DEFAULT 0");
+
 // P2 Stage A/B：canonical 双写列 + 回填。旧代码继续读 kind，canonical 视图读 kind_v2。
 if (!columnNames("edges").includes("kind_v2")) db.exec("ALTER TABLE edges ADD COLUMN kind_v2 TEXT");
 if (!columnNames("edges").includes("consumed_v2")) db.exec("ALTER TABLE edges ADD COLUMN consumed_v2 INTEGER");

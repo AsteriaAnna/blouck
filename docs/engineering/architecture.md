@@ -119,7 +119,7 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 |---|---|---|---|---|
 | `worlds` | 世界 | name/root_node_id/is_demo | 创建/删除世界 | 列表/世界页 |
 | `nodes` | 节点 | name/type/definition/aliases/source_span_id/status/frontier/hidden/tier/x/y/free_md | extract/segment/explore/hide/quiz | 世界读取/渲染/副本 |
-| `edges` | 线 | kind/label/question/predicate/evidence/confidence/origin/consumed/claim_status/revision/md/frontier_x/y/target_* | extract/segment/explore/manual/accept/materialize | 渲染/副本/导出 |
+| `edges` | 线 | kind/label/question/predicate/evidence/confidence/origin/consumed/claim_status/revision/md/frontier_x/y/target_*/hint_score/hint_display | extract/segment/explore/manual/accept/materialize/hints | 渲染/副本/导出 |
 | `directions` | 方向计划 | node_id/question/reason/status/target_*/consumed_span_id | suggestDirections/extract/explore | 节点 MD/方向物化 |
 | `buildings` | 副本 | kind/anchor/title/sub/md/steps/status/version/basis | detectDungeons/manual patch/refresh | 地图/副本抽屉/挑战 |
 | `quizzes` | 节点题 | node_id/kind/prompt/answer/aliases | generateQuiz | 节点题/判题/三档 |
