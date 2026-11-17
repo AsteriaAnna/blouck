@@ -79,6 +79,8 @@ edges(kind=direction)：自环 + frontier_x/y + consumed  ← 地图投影
 
 ## 4. DB / 命名迁移（分阶段，暂不做）
 
+> 可执行步骤/回滚见 [migrations.md](migrations.md)。已加只读兼容视图 `edges_canonical` / `dungeons`，旧表和旧值不变。
+
 建议步骤，每步单独 PR + 测试：
 
 1. **代码别名层**（现在）：新代码只用 `line_type/line_state`；旧 `kind` 只在 DB/repo 层出现。

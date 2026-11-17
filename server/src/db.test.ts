@@ -34,6 +34,16 @@ test("computeFrontier: 只看 formal 出边", () => {
   const sourceEdge = edges.find((e) => e.kind === "source");
   assert.equal(sourceEdge?.line_type, "sequence");
   assert.equal(sourceEdge?.line_state, "provenance");
+
+  // P2 兼容视图：旧 kind 不迁移，也能直接读 canonical
+  const viewFormal = db
+    .prepare("SELECT line_type, line_state FROM edges_canonical WHERE id=?")
+    .get(formalEdge!.id) as { line_type: string; line_state: string };
+  assert.equal(viewFormal.line_type, "relation");
+  assert.equal(viewFormal.line_state, "confirmed");
+  const viewDungeons = db.prepare("SELECT COUNT(*) AS c FROM dungeons").get() as { c: number };
+  const viewBuildings = db.prepare("SELECT COUNT(*) AS c FROM buildings").get() as { c: number };
+  assert.equal(viewDungeons.c, viewBuildings.c);
 });
 
 test("commitStreamEdges: 只提升 stream suggest，source 不动", () => {

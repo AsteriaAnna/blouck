@@ -153,3 +153,34 @@ CREATE TABLE IF NOT EXISTS daily_domain(
   PRIMARY KEY(world_id, building_id, date)
 );
 `);
+
+
+/*
+ * P2 兼容层：不改旧表/旧查询，先提供 canonical 只读视图。
+ * - edges_canonical：DB kind → 产品 line_type/line_state；新代码/报表可直接读。
+ * - dungeons：产品名视图；底层仍是 buildings，迁移期保持双向兼容。
+ * 每次启动重建，保证视图定义随代码更新。
+ */
+db.exec(`
+DROP VIEW IF EXISTS edges_canonical;
+CREATE VIEW edges_canonical AS
+SELECT *,
+  CASE kind
+    WHEN 'formal' THEN 'relation'
+    WHEN 'source' THEN 'sequence'
+    WHEN 'suggest' THEN 'hint'
+    WHEN 'direction' THEN 'exploration'
+    ELSE kind
+  END AS line_type,
+  CASE kind
+    WHEN 'formal' THEN 'confirmed'
+    WHEN 'source' THEN 'provenance'
+    WHEN 'suggest' THEN 'proposed'
+    WHEN 'direction' THEN CASE WHEN consumed=1 THEN 'consumed' ELSE 'planned' END
+    ELSE 'unknown'
+  END AS line_state
+FROM edges;
+
+DROP VIEW IF EXISTS dungeons;
+CREATE VIEW dungeons AS SELECT * FROM buildings;
+`);

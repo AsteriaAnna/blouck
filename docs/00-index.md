@@ -22,6 +22,7 @@
 | [engineering/glossary.md](engineering/glossary.md) | 产品词 ↔ 代码词 ↔ 状态 ↔ 表 |
 | [engineering/states.md](engineering/states.md) | 节点/边/方向/副本状态机 |
 | [engineering/canonical-state.md](engineering/canonical-state.md) | P2 canonical 线型/状态模型、direction 单一来源、分阶段重命名 |
+| [engineering/migrations.md](engineering/migrations.md) | DB 重命名/迁移 runbook（兼容视图、Stage A–D、回滚、测试要求） |
 | [engineering/experimental.md](engineering/experimental.md) | anchorFirst/dev/ghost/WFC/hide/export 等实验/死代码/隐藏功能 |
 | [engineering/testing.md](engineering/testing.md) | 测试命令、覆盖范围、CI、已知缺口 |
 | [engineering/implemented.md](engineering/implemented.md) | **当前代码真正实现了什么；找 bug 以它和源码为准** |

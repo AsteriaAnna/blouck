@@ -81,7 +81,7 @@ hit node label=概念
 
 ## 7. 未完成/风险
 
-- P2 的 DB 值迁移（formal→relation 等、building→dungeon）**未执行**；目前是 API 派生 + 前端/文件 alias 的分阶段状态。
+- P2 的 DB 值迁移（formal→relation 等、building→dungeon）**未执行**；目前是 API 派生 + 兼容视图 + 前端/文件 alias 的分阶段状态，迁移方案见 [migrations.md](migrations.md)。
 - 没有前端自动化 E2E；本次是 CDP smoke，未纳入 CI。
 - 无鉴权/静态托管；验收不覆盖部署。
 - 真实 LLM 输出质量不在本次验收范围（mock 集成只保证链路）。
