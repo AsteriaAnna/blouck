@@ -29,6 +29,23 @@
 - 真实数据：对默认库 `server/data/mvp.db` 做只读查询，排除根节点后，存在 **16 个没有任何 `formal/suggest` 语义边的可见节点**（示例世界里如 `文档解析/Rerank/混合检索/BM25/向量召回/交叉编码器/权衡`），它们只有 `source` 来路或 `direction` 方向边。
 - 结论：需求里的“新节点必须在识别出语义关系后才生成/出现”目前**没有被代码强制**；如果要按需求落地，需要在“实体→节点”这一步增加关系校验/过滤，或把无关系节点降级为后台候选。这个差异会直接影响顺序线的意义（见 06 §3/Q1）。
 
+### 2.2 “本地快速判断/锚点优先”原型的历史与去向
+
+- **确实存在过**：`server/src/anchorFirst.ts`（锚点优先垂直切片）由 `efb321b`（2026-11-16 01:12）加入，`8125bfe`（01:22）补上三层链路与 `pairFastLLM`。
+- 它包含：
+  - 一层“快判”：`sentencePrefilter` 的**确定性句子规则**（“像/一样/如同”之后判喻体、之前判话题、附近线索判 possible，否则 defer）；
+  - 一层“慢判”：一次批量 DeepSeek 调用，输出 role / related / predicate / direction / evidence；
+  - 决策：existing / drop_metaphor / drop_unrelated / commit_relation / commit_topic_pending / candidate；
+  - apply：建节点/来源线/正式或建议关系/方向。
+- **但它没有进正式链路**：只挂在 dev 路由 `/api/dev/anchor-first` 和 `/api/worlds/:id/stream/preview`；前端从未调用 `stream/preview`（当前 `setGhosts` 只有清空调用），正式 `/extract` 与 `/stream/segment` 一直是“先 `llm.extract` 出 entities/relations → 建节点 → 写关系”，没有关系闸门。
+- **时间线**：01:12–01:41 是锚点优先 + ghost 原型；16:01 `c2ef366`、16:19 `555493f`、17:22 `af82ce0` 把正式流式链路重写为 provisional + 每句一次 LLM 抽取 + source/suggest + commit；锚点优先没有再被接回主链路，只作为 dev 代码保留。
+- **为什么没接回**（当时原型复盘结论，`dae8b8f`/`5d379ab` 等）：
+  1. 所谓“快判”其实是**句子模式规则**，只覆盖“像/一样”等少数结构，换个比喻就失效，不能回答“只给两个词有没有关系”；
+  2. 真正的 pair-only 判断用 LLM 做，稳定但**每个 pair 约 0.9–1.4s**，5 个候选就是 5–7s，不能叫快判；
+  3. LLM 的角色/谓词判定不稳定：比喻可能被判成 topic、类比会被标成 related=true、role=noise 仍可能 commit；
+  4. 结论是：真快判要用**本地 embedding/小模型 + 批量**，LLM 只能做批量慢判或候选粗筛；原型没有达到可上线质量。
+- 所以现状不是“这个能力被删了”，而是**需求（关系优先准入）没有落到正式生成链路**；如果现在要按 06 的关系优先规则做，需要重新选快判技术（本地/批量）并定义 defer/候选兜底，而不是直接复活旧的逐对 LLM 调用。
+
 ## 3. 手动联系关系线（入口现状）
 
 - **后端已有**：`POST /api/worlds/:id/relations`
