@@ -5,9 +5,9 @@ import * as THREE from "three";
 
 const EDGE_COLORS: Record<string, string> = {
   formal: "#6f6252",
-  source: "#7d9994",
-  suggest: "#b08a5f", // 待确认的线统一颜色（虚线）
-  direction: "#9a8f7a",
+  source: "#5f8f86",
+  suggest: "#b8823f", // 待确认的线统一颜色（虚线）
+  direction: "#8f8574",
 };
 
 function edgeCurve(a: THREE.Vector3, b: THREE.Vector3) {
@@ -207,10 +207,17 @@ function Edge({
   const mid = useMemo(() => curve.getPoint(0.5), [curve]);
   const color = EDGE_COLORS[kind] ?? EDGE_COLORS.formal;
   const solid = kind === "formal" || kind === "source";
+  const sourceArrow = useMemo(() => {
+    if (kind !== "source") return null;
+    const p = curve.getPoint(0.68);
+    const tangent = curve.getTangent(0.68).normalize();
+    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), tangent);
+    return { p, q };
+  }, [curve, kind]);
   const tubeGeo = useMemo(
     () =>
       solid
-        ? new THREE.TubeGeometry(curve, 28, kind === "source" ? 2.0 : 2.8, 6, false)
+        ? new THREE.TubeGeometry(curve, 28, kind === "source" ? 2.2 : 2.8, 6, false)
         : null,
     [curve, kind, solid],
   );
@@ -226,6 +233,16 @@ function Edge({
             <meshStandardMaterial color={color} roughness={0.8} flatShading />
           </mesh>
         ) : null}
+        {sourceArrow ? (
+          <mesh
+            position={[sourceArrow.p.x, 5, sourceArrow.p.z]}
+            quaternion={[sourceArrow.q.x, sourceArrow.q.y, sourceArrow.q.z, sourceArrow.q.w]}
+            castShadow
+          >
+            <coneGeometry args={[7, 18, 8]} />
+            <meshStandardMaterial color={color} roughness={0.8} flatShading />
+          </mesh>
+        ) : null}
         <HitTube curve={curve} onOpen={onOpen} radius={14} />
       </group>
     );
@@ -236,9 +253,9 @@ function Edge({
       <Line
         points={pts}
         color={color}
-        lineWidth={1.7}
+        lineWidth={kind === "suggest" ? 2.0 : 1.5}
         transparent
-        opacity={dotted ? 0.55 : 0.85}
+        opacity={dotted ? 0.55 : 0.9}
         dashed
         dashSize={dotted ? 2 : 9}
         gapSize={dotted ? 10 : 7}

@@ -179,6 +179,7 @@ node_docs, relation_docs, node_candidates, generation_jobs
 - 导航渐进披露：`MapControls` 显示四类线计数；默认只显示提示 `hint_display` top2 + 方向 2 条，点击「展开：显示全部关系」显示全部（含 15 条提示/9 条方向）。`mapExpand` 存在 store，打开世界时重置为 false。CDP 实测计数/展开按钮/状态切换正常，errors=[]。
 - 按缩放披露：`MapCameraProbe` 在相机高度跨过 720 时写 `mapZoom`；远看提示 top2/方向 2，拉近提示 top6/方向 4。CDP 用可信滚轮输入实测 far→near→far，`镜头拉近：提示 top6 / 方向 4` 文案生效，errors=[]。
 - 方向可探索感：`DirectionEdge` 增加 `TravelingSpark`（沿曲线流动的光点）和 `DirectionSign` 轻微呼吸浮动；headless Chrome 的 canvas 截图帧不更新，视觉动画只能人工/真机确认，代码已通过 typecheck/build。
+- 四类线视觉：关系=粗实线；序列=实线+中途箭头；提示=虚线+路牌；方向=点线+路牌+光点。图例明确写出四种线型；CDP 实测图例含“实线/箭头/虚线/点线”，errors=[]。
 - 学习指标：`GET /api/worlds/:id/learning/stats` 汇总任务总数/低质量题/题型、作答正确率与平均解释分、卡片打开、方向探索、副本 cleared/playable；低质量题最多返回 20 条。
 - 节点辨析：`GET /api/nodes/:id/understanding`，任务目标为体系位置/边界；节点无 `source_span_id` 时 `source_required`。节点卡与关系卡都使用 `UnderstandingTaskPanel`，关系卡不再维护内联任务状态。
 - 指标：`events` 表 + `web/src/telemetry.ts` fire-and-forget；已埋 node_card_open、relation_card_open、direction_explore、candidate_admit/reject、manual_relation_create、relation_practice_start/answer；`GET /api/worlds/:id/events/summary` 汇总。CDP 实测 demo 产生 2 条事件（node/relation card open）。
