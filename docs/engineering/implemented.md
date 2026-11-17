@@ -163,8 +163,8 @@ node_docs, relation_docs, node_candidates, generation_jobs
 - 生成入口：`services/contentDocs.ts`；provider 接口 `generateNodeDoc/generateRelationDoc`（DeepSeek + mock）。
 - 校验：节点卡 `position.node_id` 必须属于邻居；`source_quote` 必须来自 source span；关系卡 `evidence_quote` 必须来自 edge.evidence；失败用模板兜底，不 500。
 - API：`GET /api/nodes/:id/doc`、`POST .../doc/regenerate`、`PATCH .../doc/notes`；edge 同结构。
-- 前端：`NodeDrawer` 显示体系位置/边界/来源/下一步/备注；`RelationDrawer` 显示依据/辨析/反例/备注。
-- 生成仍是**同步懒生成**（点击时等待），异步 job 队列下一阶段接入。
+- 前端：`NodeDrawer` 显示体系位置/边界/来源/下一步/备注，并提供“关联到已有节点”；`RelationDrawer` 显示依据/辨析/反例/备注。
+- 生成：extract/explore/手动关系会入队 `generation_jobs`；`services/generationWorker.ts` 单进程串行预生成；点击时仍有同步懒生成兜底。
 
 
 ### nodes 关键字段
@@ -327,7 +327,7 @@ server/src/
   db/                    connection/schema/repo（nodes/edges/quizzes/sources/domain/directions/buildings/docs）
   index.ts               express/server/ws 装配 + health（约 71 行）
   routes/                graph/stream/nodes/edges/worlds/buildings/worldAdmin/dev/docs
-  services/              directions（物化/消费）、buildings（检测/刷新）、contentDocs（V3 卡片生成）
+  services/              directions（物化/消费）、buildings（检测/刷新）、contentDocs（V3 卡片生成）、generationWorker（队列）
   stream/session.ts      语音 provisional/focus/关系幂等/commit
   providers/types.ts     LLM/ASR 接口（ExtractResult 可带 warning）
   providers/deepseek.ts  DeepSeek（20s 超时；抽取失败不降级 mock）

@@ -95,6 +95,24 @@ test("mock 全链路：世界 → extract → stream segment/commit", async () =
   }
   for (const [src, count] of perSrc) assert.ok(count <= 2, `too many directions on ${src}: ${count}`);
 
+  // 手动关系：两个已有节点建立 formal，origin=manual
+  if (extract.nodes.length >= 2) {
+    const [a, b] = extract.nodes;
+    const manual = await api(`/api/worlds/${world.id}/relations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fromNodeId: a.id,
+        toNodeId: b.id,
+        predicate: "contrast",
+        label: "对比",
+        evidence: "集成测试手动关系",
+      }),
+    });
+    assert.equal(manual.edge.origin, "manual");
+    assert.equal(manual.edge.kind, "formal");
+  }
+
   const seg = await api(`/api/worlds/${world.id}/stream/segment`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

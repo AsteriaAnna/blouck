@@ -11,6 +11,7 @@ import {
 import { consumeDirection } from "../assetops.js";
 import { llm } from "../providers/active.js";
 import { consumeDirectionEdge, materializeDirectionEdges } from "../services/directions.js";
+import { enqueueGenerationJob } from "../db/docs.js";
 
 /** /api/edges/*、/api/worlds/:id/relations：关系接受/手动连线/编辑/方向消费 */
 export const edgesRouter = Router();
@@ -80,6 +81,7 @@ edgesRouter.post("/api/worlds/:id/relations", async (req, res) => {
   });
   computeFrontier(world.id);
   materializeDirectionEdges(world.id);
+  enqueueGenerationJob(world.id, "relation_doc", edge.id);
   res.json({ ok: true, edge });
 });
 

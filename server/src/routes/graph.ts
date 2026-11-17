@@ -30,6 +30,7 @@ import {
 import { llm } from "../providers/active.js";
 import { placeAround } from "../placement.js";
 import { materializeDirectionEdges } from "../services/directions.js";
+import { enqueueGenerationJob } from "../db/docs.js";
 import { detectBuildingsLLM, detectBuildingsV2, refreshAllBuildingStatus, refreshStaleBuildings } from "../services/buildings.js";
 import {
   detectDomainCandidates,
@@ -227,6 +228,12 @@ graphRouter.post("/api/worlds/:id/explore", async (req, res) => {
   computeFrontier(world.id);
   materializeDirectionEdges(world.id);
   const payload = getGraph(world.id);
+  for (const n of createdNodes.slice(0, 4)) enqueueGenerationJob(world.id, "node_doc", n.id);
+  for (const e of (createdEdges as any[])
+    .filter((x) => x?.id && (x.kind === "formal" || x.kind === "suggest"))
+    .slice(0, 8)) {
+    enqueueGenerationJob(world.id, "relation_doc", e.id);
+  }
   const warning = createdNodes.length ? undefined : "这个方向的目标节点已经存在，已只建立关系。";
   res.json({
     nodes: payload.nodes,
@@ -562,6 +569,12 @@ graphRouter.post("/api/worlds/:id/extract", async (req, res) => {
   ensureDirectionFrontiers(world.id);
   const fresh = getGraph(world.id);
   const buildings = listBuildings(world.id);
+  for (const n of createdNodes.slice(0, 4)) enqueueGenerationJob(world.id, "node_doc", n.id);
+  for (const e of (createdEdges as any[])
+    .filter((x) => x?.id && (x.kind === "formal" || x.kind === "suggest"))
+    .slice(0, 8)) {
+    enqueueGenerationJob(world.id, "relation_doc", e.id);
+  }
   res.json({
     createdNodes,
     createdEdges,

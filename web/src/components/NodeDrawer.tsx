@@ -7,6 +7,7 @@ import { useStore } from "../store";
 export default function NodeDrawer() {
   const drawer = useStore((s) => s.drawer);
   const nodes = useStore((s) => s.nodes);
+  const world = useStore((s) => s.world);
   const openNode = useStore((s) => s.openNode);
   const closeDrawer = useStore((s) => s.closeDrawer);
 
@@ -16,6 +17,10 @@ export default function NodeDrawer() {
   const [error, setError] = useState("");
   const [notes, setNotes] = useState("");
   const [saved, setSaved] = useState("");
+  const [targetId, setTargetId] = useState("");
+  const [predicate, setPredicate] = useState("related");
+  const [evidence, setEvidence] = useState("");
+  const [relMsg, setRelMsg] = useState("");
 
   useEffect(() => {
     if (!node) return;
@@ -82,6 +87,23 @@ export default function NodeDrawer() {
       setError(e.message ?? "重新生成失败");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function createRelation() {
+    if (!node || !world || !targetId) return;
+    setRelMsg("");
+    try {
+      await send(`/api/worlds/${world.id}/relations`, "POST", {
+        fromNodeId: node.id,
+        toNodeId: targetId,
+        predicate,
+        evidence,
+      });
+      setRelMsg("已建立关系线");
+      await useStore.getState().openWorld(world.id);
+    } catch (e: any) {
+      setRelMsg(e.message ?? "建立关系失败");
     }
   }
 
@@ -170,6 +192,41 @@ export default function NodeDrawer() {
               重新生成理解卡
             </button>
             <span className="hintline">{saved}</span>
+          </div>
+        </div>
+
+        <div className="section">
+          <h4>关联到已有节点</h4>
+          <select value={targetId} onChange={(e) => setTargetId(e.target.value)}>
+            <option value="">选择目标节点…</option>
+            {nodes
+              .filter((n) => n.id !== node.id)
+              .map((n) => (
+                <option key={n.id} value={n.id}>
+                  {n.name}
+                </option>
+              ))}
+          </select>
+          <select value={predicate} onChange={(e) => setPredicate(e.target.value)}>
+            <option value="related">相关</option>
+            <option value="kindOf">归类</option>
+            <option value="partOf">组成</option>
+            <option value="prerequisite">前置</option>
+            <option value="contrast">对比</option>
+            <option value="alternative">替代</option>
+          </select>
+          <input
+            className="md-edit"
+            style={{ minHeight: 36, marginTop: 6 }}
+            value={evidence}
+            onChange={(e) => setEvidence(e.target.value)}
+            placeholder="依据（可选）"
+          />
+          <div className="row" style={{ marginTop: 8 }}>
+            <button className="primary" onClick={createRelation} disabled={!targetId}>
+              建立关系线
+            </button>
+            <span className="hintline">{relMsg}</span>
           </div>
         </div>
       </div>

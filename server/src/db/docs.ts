@@ -1,7 +1,9 @@
 import type { NodeDoc, RelationDoc } from "@blouck/shared";
+import { randomUUID } from "node:crypto";
 import { db } from "./connection.js";
 
 const now = () => Date.now();
+const uid = () => randomUUID();
 
 export type NodeDocRow = {
   node_id: string;
@@ -95,4 +97,57 @@ export function setRelationDocNotes(edgeId: string, notesMd: string) {
      VALUES(?, '', '{}', ?, 1, '', 0, ?)
      ON CONFLICT(edge_id) DO UPDATE SET notes_md=excluded.notes_md, updated_at=excluded.updated_at`,
   ).run(edgeId, notesMd, now());
+}
+
+export type JobType = "node_doc" | "relation_doc" | "hint_pool" | "direction_plan" | "dungeon";
+export type JobRow = {
+  id: string;
+  world_id: string;
+  type: JobType;
+  target_id: string;
+  status: "pending" | "running" | "done" | "failed";
+  attempts: number;
+  error: string;
+  created_at: number;
+  updated_at: number;
+};
+
+/** 幂等入队：同 type+target 已有 pending/running 时不重复。 */
+export function enqueueGenerationJob(worldId: string, type: JobType, targetId: string): string | null {
+  const exists = db
+    .prepare(
+      "SELECT id FROM generation_jobs WHERE type=? AND target_id=? AND status IN ('pending','running')",
+    )
+    .get(type, targetId) as { id: string } | undefined;
+  if (exists) return exists.id;
+  const id = uid();
+  db.prepare(
+    "INSERT INTO generation_jobs(id,world_id,type,target_id,status,attempts,error,created_at,updated_at) VALUES(?,?,?,?, 'pending',0,'',?,?)",
+  ).run(id, worldId, type, targetId, now(), now());
+  return id;
+}
+
+/** 原子领取一条 pending；没有返回 undefined。 */
+export function claimNextGenerationJob(): JobRow | undefined {
+  const row = db
+    .prepare("SELECT * FROM generation_jobs WHERE status='pending' ORDER BY created_at LIMIT 1")
+    .get() as JobRow | undefined;
+  if (!row) return undefined;
+  db.prepare(
+    "UPDATE generation_jobs SET status='running', attempts=attempts+1, updated_at=? WHERE id=? AND status='pending'",
+  ).run(now(), row.id);
+  return { ...row, status: "running", attempts: row.attempts + 1 };
+}
+
+export function finishGenerationJob(id: string, error?: string) {
+  db.prepare("UPDATE generation_jobs SET status=?, error=?, updated_at=? WHERE id=?").run(
+    error ? "failed" : "done",
+    error ?? "",
+    now(),
+    id,
+  );
+}
+
+export function getGenerationJob(id: string): JobRow | undefined {
+  return db.prepare("SELECT * FROM generation_jobs WHERE id=?").get(id) as JobRow | undefined;
 }
