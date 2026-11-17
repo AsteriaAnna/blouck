@@ -74,10 +74,9 @@ UPDATE edges SET consumed_v2 = consumed;
 
 ## 3. Stage B：读切新列
 
-- 所有 `SELECT kind` 改为 `COALESCE(kind_v2, kind) AS kind`。
-- `WHERE kind='formal'` 等改成 `WHERE kind IN ('formal','relation')`（兼容窗口）。
-- 前端/API 已经用 `line_type`，不用等 DB。
-- 回滚：代码回滚；DB 新列保留即可。
+- ✅ `getGraph` 已改为 `SELECT * FROM edges_canonical`：API 的 `line_type/line_state` 直接来自 `kind_v2/consumed_v2`；旧算法仍读 `kind`。
+- 其余旧 SQL 仍读 `kind`（兼容窗口），逐步改为 `COALESCE(kind_v2, kind)` 或视图。
+- 回滚：代码回滚；DB 新列保留即可，旧数据未改。
 
 ## 4. Stage C：写切新列
 

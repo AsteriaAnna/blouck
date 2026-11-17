@@ -177,6 +177,7 @@ line_state  = confirmed|proposed|provenance|planned|consumed
 kind_v2, consumed_v2
 edges_canonical 只读视图 = kind_v2/consumed_v2 派生
 dungeons 只读视图 = buildings alias
+getGraph 从 edges_canonical 读，API canonical 字段来自 DB 双写列
 ```
 
 `kind` 只有：

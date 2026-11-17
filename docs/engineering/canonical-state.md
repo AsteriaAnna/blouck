@@ -51,8 +51,8 @@ type EdgeOrigin = "auto" | "manual" | "stream" | "direction";
 - ✅ Phase 1：shared 增加 canonical 类型/映射；`getGraph` 给每条 edge 附加 `line_type/line_state`；`RelationDrawer` 已改用 canonical 判断（不再直接 switch `edge.kind`）。
 - ✅ 测试：`db.test` 断言 formal→relation/confirmed、source→sequence/provenance；integration 断言 seed demo 方向线 `line_type=exploration`。
 - ✅ Phase 2：direction 写入/消费都收敛到 directions 表；方向边只由 materialize 投影生成。
-- ✅ Phase 3（Stage A/B）：启动时自动加 `kind_v2/consumed_v2` + 回填 + trigger 双写；`edges_canonical` 视图读新列。旧代码/旧查询不动。
-- ⬜ Phase 3 剩余：代码读取切 `kind_v2`（Stage B/C）、删旧列（Stage D）；见 migrations.md。
+- ✅ Phase 3（Stage A/B）：启动时自动加 `kind_v2/consumed_v2` + 回填 + trigger 双写；`edges_canonical` 视图读新列；`getGraph` 已从视图读，API 的 `line_type/line_state` 来自 DB 双写列。旧代码/旧查询不动。
+- ⬜ Phase 3 剩余：业务算法仍读旧 `kind`（保留兼容）；删旧列（Stage D）需单独排期；见 migrations.md。
 - ⬜ Phase 4 剩余：前端组件全面使用 canonical，后端内部逐步改名。
 
 ## 3. direction 的单一来源（待做）

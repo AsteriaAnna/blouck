@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { deriveLineFields, type EdgeKind as SharedEdgeKind } from "@blouck/shared";
+import type { EdgeKind as SharedEdgeKind } from "@blouck/shared";
 import { db } from "./db/connection.js";
 import "./db/schema.js";
 export { createSourceSpan, getFocusStack, setFocusStack } from "./db/sources.js";
@@ -109,10 +109,9 @@ export function getGraph(worldId: string) {
     .prepare("SELECT * FROM nodes WHERE world_id=? ORDER BY created_at")
     .all(worldId) as NodeRow[];
   const rows = db
-    .prepare("SELECT * FROM edges WHERE world_id=? ORDER BY created_at")
+    .prepare("SELECT * FROM edges_canonical WHERE world_id=? ORDER BY created_at")
     .all(worldId) as EdgeRow[];
-  const edges = rows.map((e) => ({ ...e, ...deriveLineFields(e) })) as EdgeRow[];
-  return { nodes, edges };
+  return { nodes, edges: rows };
 }
 
 export function listBuildings(worldId: string): BuildingRow[] {
