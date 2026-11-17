@@ -33,6 +33,7 @@ import { materializeDirectionEdges } from "../services/directions.js";
 import { enqueueGenerationJob } from "../db/docs.js";
 import { refreshHintDisplay } from "../services/hints.js";
 import { ensureDirectionPlans } from "../services/directionPlans.js";
+import { splitTextChunks, mergeExtractResults } from "../services/extraction.js";
 import { addNodeCandidate } from "../db/docs.js";
 import { detectBuildingsLLM, detectBuildingsV2, refreshAllBuildingStatus, refreshStaleBuildings } from "../services/buildings.js";
 import {
@@ -267,7 +268,17 @@ graphRouter.post("/api/worlds/:id/extract", async (req, res) => {
   const span = createSourceSpan(world.id, text);
   const graph = getGraph(world.id);
   const existing = graph.nodes.map((n) => n.name);
-  const result = await llm.extract({ text, focus, existing });
+  const chunks = splitTextChunks(text).slice(0, 6);
+  let result: Awaited<ReturnType<typeof llm.extract>>;
+  if (chunks.length <= 1) {
+    result = await llm.extract({ text, focus, existing });
+  } else {
+    const parts = [];
+    for (const chunk of chunks) {
+      parts.push(await llm.extract({ text: chunk, focus, existing }));
+    }
+    result = mergeExtractResults(parts);
+  }
 
   const norm = (v: string) =>
     v
