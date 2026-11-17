@@ -54,7 +54,7 @@ export function auditUnderstandingTask(taskId: string): QualityReport | null {
       !/的定义是|定义：|的定义是什么/.test(task.stem) &&
       !/^[^，。；：]{0,24}是什么[？?]\s*$/.test(task.stem.trim()),
     comparison:
-      /为什么|区别|不同|不是|边界|反例|迁移|换一个|哪一项|哪一种|哪一个|错在哪里|哪里错|错误|修正|改成|判断.*(错|不对)/.test(
+      /为什么|区别|不同|不是|边界|反例|迁移|换一个|换到|换成|比较|哪一项|哪一种|哪一个|错在哪里|哪里错|错误|修正|改成|怎么判断|如何判断|判断.*(错|不对)/.test(
         task.stem,
       ),
     explain: task.answer_type === "choice_explain",

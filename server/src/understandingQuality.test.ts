@@ -77,6 +77,30 @@ test("质量审计：有源/有误解/rubric 的好题高分；定义题/无源�
   const r2 = auditUnderstandingTask(realish.id)!;
   assert.equal(r2.checks.notDefinition, true, "‘是什么关系’不是定义题");
   assert.equal(r2.checks.comparison, true, "‘错在哪里’算辨析");
+
+  const transferish = createUnderstandingTask({
+    ...{
+      world_id: world.id,
+      edge_id: "z",
+      target_type: "edge",
+      node_id: null,
+      task_kind: "transfer",
+      learning_goal: "transfer",
+      misconception: "把迁移场景当原场景",
+      stem: "换到另一个场景：请比较两个关系是否相同，并说明理由。",
+      answer_type: "choice_explain",
+      choices_json: JSON.stringify([
+        { id: "a", text: "相同" },
+        { id: "b", text: "不同" },
+      ]),
+      correct_choice: "b",
+      rubric_json: JSON.stringify(["判断", "说明"]),
+      evidence_quote: "A 是一种 B 的实现",
+      source_span_id: null,
+      follow_up: "",
+    },
+  });
+  assert.equal(auditUnderstandingTask(transferish.id)!.checks.comparison, true, "‘换到/比较’算迁移辨析");
 });
 
 test.after(() => {
