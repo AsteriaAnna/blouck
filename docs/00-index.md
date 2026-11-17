@@ -13,6 +13,7 @@
 7. [07-line-implementation-notes.md](07-line-implementation-notes.md)：**四类线的当前实现与实现笔记（不是需求）**；四种 kind、节点生成真实路径、需求映射、迁移选项。
 8. [08-relation-gate-qa.md](08-relation-gate-qa.md)：**锚点优先/关系准入的验证 Q&A 与现状审计**；dev 原型验证、当前模型重跑、真实链路与坑、是否偏离原设计。
 9. [09-web-bp-brief.md](09-web-bp-brief.md)：Web BP（官网/宣传页）设计 Brief，交付网页设计师；不是产品功能文档。
+10. [10-onboarding-cognitive-load.md](10-onboarding-cognitive-load.md)：**新工程师认知成本评估与简化方案**；命名/职责/状态/文档问题、认知成本估算、P0/P1/P2 简化路径。
 
 ## 历史设计基线（清理前，只读）
 

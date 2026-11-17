@@ -18,6 +18,7 @@
 - **四类线体验与设计口径（v2.0，未实现）**：[docs/06-four-line-system.md](docs/06-four-line-system.md)（只写用户感受/视觉/交互/设计思路，含关系 MD、节点 MD、副本体验，Q1–Q7 待确认）
 - **四类线实现笔记（当前代码/迁移选项）**：[docs/07-line-implementation-notes.md](docs/07-line-implementation-notes.md)（不是需求）
 - **锚点优先/关系准入验证 Q&A**：[docs/08-relation-gate-qa.md](docs/08-relation-gate-qa.md)（dev 验证、当前模型重跑、真实链路与坑）
+- **新工程师认知成本与简化方案**：[docs/10-onboarding-cognitive-load.md](docs/10-onboarding-cognitive-load.md)（命名/职责/状态/文档问题，P0/P1/P2）
 - 索引：[docs/00-index.md](docs/00-index.md)
 
 > `01/02` 是历史记录，`04` 是问题/方案探索过程，`05` 是早期设计草稿，`06` 是需求口径，`07` 是实现笔记；代码里有没有某个能力，只以 `03-implemented.md` 和源码为准。
