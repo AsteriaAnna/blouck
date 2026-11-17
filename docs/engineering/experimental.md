@@ -33,7 +33,7 @@
 | 隐藏/撤回 | `/hide/preview`、`/hide`、`/hide/undo`、`hide_batches` | 后端可用，UI 无入口 | 节点抽屉的隐藏面板 MVP 删除 | 决定：恢复 UI 或标 internal |
 | 导出 | `GET /api/worlds/:id/export` | 后端可用，UI 无入口 | 顶栏“导出”移除 | 决定：恢复 UI 或标 internal |
 | 节点题/三档 | `/nodes/:id/quiz*`、`quizzes`、`attempts`、`tier` | 后端活跃，UI 隐藏 | MVP 隐藏题目区/档位 | 不是死代码；是产品隐藏；恢复前先确认 |
-| 副本题 | `domain_questions`、`daily_domain` | 后端活跃 | 领域副本每日题；BuildingDrawer 可能仍在用 | 保留 |
+| 副本题 | `domain_questions`、`daily_domain` | 后端活跃 | 领域副本每日题；DungeonDrawer 在用 | 保留 |
 | 关系题 | 无 | 未实现 | 原设计有“关系判断题/三档”，当前没有 | 需求项，不是死代码 |
 
 ## 4. 预留字段/旧字段

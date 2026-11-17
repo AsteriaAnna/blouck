@@ -52,8 +52,9 @@ type EdgeOrigin = "auto" | "manual" | "stream" | "direction";
 - ✅ 测试：`db.test` 断言 formal→relation/confirmed、source→sequence/provenance；integration 断言 seed demo 方向线 `line_type=exploration`。
 - ✅ Phase 2：extract 不再直接 `addEdge(kind='direction')`；seed demo 改用 `addDirection`；GET world 会 `materializeDirectionEdges`；consume 改为 `consumeDirectionEdge`（先从 directions 表找 open 方向再置 consumed，投影边只打 `consumed=1`）。**方向边只由 materialize 投影生成**（dev 模拟除外）。
 - ⬜ Phase 2 剩余：读取逻辑（explore 仍用 edgeId 查投影以保持 API 兼容）逐步改为先读 directions。
+- ✅ Phase 4（部分）：`BuildingDrawer.tsx` → `DungeonDrawer.tsx`；shared 增加 `DungeonDTO/DungeonKind/DungeonStatus` alias。API/DB 仍保留 building 兼容。
 - ⬜ Phase 3：DB 值迁移/重命名（见 §4）。
-- ⬜ Phase 4：前端组件全面使用 canonical，后端内部逐步改名。
+- ⬜ Phase 4 剩余：前端组件全面使用 canonical，后端内部逐步改名。
 
 ## 3. direction 的单一来源（待做）
 
@@ -85,6 +86,8 @@ edges(kind=direction)：自环 + frontier_x/y + consumed  ← 地图投影
 3. **DB 值迁移**：`formal→relation`、`source→sequence`、`suggest→hint`、`direction→exploration`；`building→dungeon` 单独迁移（表名/字段/API 一起）。
 4. **删除旧字段**：`target_hint`、`claim_status/revision`（若仍无行为）清理。
 5. **rename 文件/服务**：`assetops`、`dungeons`、`directions` 命名统一。
+
+已完成的小步：`BuildingDrawer` → `DungeonDrawer`；shared `DungeonDTO` alias。DB/API 不动，保证旧数据可读。
 
 禁止：在没有迁移测试/回滚方案时直接改 DB 值；一次同时改 kind + 表名 + API。
 

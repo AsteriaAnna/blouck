@@ -17,6 +17,7 @@
 |---|---|
 | [engineering/README.md](engineering/README.md) | 工程文档入口/阅读顺序 |
 | [engineering/onboarding.md](engineering/onboarding.md) | 新人 1 小时跑通 + 主链路/13 表/改动定位/验收 |
+| [engineering/acceptance.md](engineering/acceptance.md) | 本次验收记录：环境/门禁/demo API/UI smoke/目标对照 |
 | [engineering/architecture.md](engineering/architecture.md) | 进程、主链路、32 路由分组、13 张表归属、改功能去哪 |
 | [engineering/glossary.md](engineering/glossary.md) | 产品词 ↔ 代码词 ↔ 状态 ↔ 表 |
 | [engineering/states.md](engineering/states.md) | 节点/边/方向/副本状态机 |

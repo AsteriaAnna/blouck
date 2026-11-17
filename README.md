@@ -13,6 +13,7 @@
 文档已按“工程 / 产品 / 历史 / 原设计基线 / 市场”分区，入口见 [docs/00-index.md](docs/00-index.md)。
 
 - **新人 1 小时跑通 + 验收路径**：[docs/engineering/onboarding.md](docs/engineering/onboarding.md)
+- **本次验收记录**：[docs/engineering/acceptance.md](docs/engineering/acceptance.md)
 - **实现事实（找 bug 只看这个）**：[docs/engineering/implemented.md](docs/engineering/implemented.md)
 - **工程总览**：[docs/engineering/README.md](docs/engineering/README.md)（架构、术语、状态机、实验代码）
 - **产品/体验口径**：[docs/product/four-line-system.md](docs/product/four-line-system.md)（四类线体验 v2.0，未实现）

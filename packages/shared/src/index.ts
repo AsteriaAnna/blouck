@@ -171,6 +171,14 @@ export type BuildingDTO = {
   y: number;
 };
 
+/**
+ * 产品名“副本”的 alias。DB/API 仍保留 building 命名以兼容旧数据；
+ * 新代码/前端组件可优先用 Dungeon*，等 DB 迁移时再统一。
+ */
+export type DungeonDTO = BuildingDTO;
+export type DungeonKind = BuildingKind;
+export type DungeonStatus = BuildingStatus;
+
 export type DirectionDTO = {
   id: string;
   world_id: string;

@@ -3,6 +3,7 @@
 给要改代码的人。先读顺序：
 
 1. [onboarding.md](onboarding.md)：新人 1 小时跑通 + 主链路/13 表/改动定位/验收问题。
+2. [acceptance.md](acceptance.md)：本次实际验收记录（命令耗时、16 tests、demo API、UI smoke）。
 2. [architecture.md](architecture.md)：进程、主链路、32 路由分组、13 张表归属、改功能去哪。
 3. [glossary.md](glossary.md)：产品词 ↔ 代码词 ↔ 状态 ↔ 表；先解决“说的是不是同一件事”。
 4. [states.md](states.md)：节点/边/方向/副本状态机；改状态前必读。

@@ -332,7 +332,7 @@ web/src/
   components/World.tsx
   components/NodeDrawer.tsx
   components/RelationDrawer.tsx
-  components/BuildingDrawer.tsx
+  components/DungeonDrawer.tsx（产品名；API/DB 仍 building）
   models3d.ts
   styles.css / styles3d.css
 ```

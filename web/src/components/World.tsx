@@ -2,7 +2,7 @@ import { useStore } from "../store";
 import World3D from "./World3D";
 import InputBar from "./InputBar";
 import NodeDrawer from "./NodeDrawer";
-import BuildingDrawer from "./BuildingDrawer";
+import DungeonDrawer from "./DungeonDrawer";
 import RelationDrawer from "./RelationDrawer";
 
 /**
@@ -40,7 +40,7 @@ export default function World() {
         </div>
 
         {drawer?.kind === "node" && <NodeDrawer />}
-        {drawer?.kind === "building" && <BuildingDrawer />}
+        {drawer?.kind === "building" && <DungeonDrawer />}
         {drawer?.kind === "edge" && <RelationDrawer />}
       </div>
     </>

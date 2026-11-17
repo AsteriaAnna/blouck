@@ -86,7 +86,7 @@ POST /api/worlds/:id/relations
 
 ```text
 /extract → detectDungeons → createBuilding（detected/…）
-GET /api/buildings/:id → BuildingDrawer
+GET /api/buildings/:id → DungeonDrawer（文件已按产品名重命名；API/表仍 building）
 POST /api/buildings/:id/challenge → 出题/连线
 POST /api/buildings/:id/submit → 判题/通关/cleared
 refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触发
@@ -145,7 +145,7 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 | frontier | `server/src/db.ts computeFrontier` | 只看 formal 出边 |
 | 副本检测/刷新 | `server/src/services/buildings.ts`、`server/src/routes/buildings.ts` | 只读 formal；语音不触发 |
 | 3D 渲染/线/路牌 | `web/src/components/World3D.tsx` | 721 行；边/节点/建筑/相机/点击混在一起 |
-| 抽屉/MD | `NodeDrawer.tsx`、`RelationDrawer.tsx`、`BuildingDrawer.tsx` | 节点 MD/关系 MD/副本 MD 分开 |
+| 抽屉/MD | `NodeDrawer.tsx`、`RelationDrawer.tsx`、`DungeonDrawer.tsx` | 节点 MD/关系 MD/副本 MD 分开；Dungeon 是产品名，API/DB 仍 building |
 | 流式状态/UI | `web/src/store.ts`、`InputBar.tsx` | store 混 API/UI/stream；InputBar 混音频/WS/UI |
 | 布局 | `layout.ts`、`wfc.ts` | `/layout` UI 无入口 |
 

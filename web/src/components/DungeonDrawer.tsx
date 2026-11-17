@@ -3,7 +3,7 @@ import ReactMarkdown from "react-markdown";
 import { useStore } from "../store";
 
 /** 副本抽屉：领域副本（每日 10 题）/ 流程副本（排序连线），MD 可编辑 */
-export default function BuildingDrawer() {
+export default function DungeonDrawer() {
   const drawer = useStore((s) => s.drawer);
   const buildings = useStore((s) => s.buildings);
   const challenge = useStore((s) => s.challenge);
