@@ -1,7 +1,9 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { useStore } from "./store";
 import Home from "./components/Home";
-import World from "./components/World";
+
+/** 3D 世界（three.js）按需加载：首页不背 3D 首包。 */
+const World = lazy(() => import("./components/World"));
 
 export default function App() {
   const view = useStore((s) => s.view);
@@ -30,7 +32,9 @@ export default function App() {
 
   return (
     <>
-      {view === "home" ? <Home /> : <World />}
+      <Suspense fallback={<div style={{ padding: 24 }}>加载世界…</div>}>
+        {view === "home" ? <Home /> : <World />}
+      </Suspense>
       {toast && <div className="toast">{toast}</div>}
     </>
   );
