@@ -1,7 +1,7 @@
 # 08 · Q&A：锚点优先/关系准入的验证与现状
 
 > 性质：**验证记录 + 现状审计，不是需求，也不是实现基线。**
-> 需求看 [06-four-line-system.md](06-four-line-system.md)；当前实现看 [07-line-implementation-notes.md](07-line-implementation-notes.md)；代码事实以 [03-implemented.md](03-implemented.md) 和源码为准。
+> 需求看 [four-line-system.md](../product/four-line-system.md)；当前实现看 [line-implementation-notes.md](./line-implementation-notes.md)；代码事实以 [implemented.md](./implemented.md) 和源码为准。
 > 记录日期：2026-11-17。旧测试报告来自 Git 历史（`8125bfe` / `dae8b8f` / `5d379ab` 等，文件 `docs/reviews/anchor-first-prototype-2026-11-16.md`，后在文档清理中移出主目录）。
 
 ## Q1：这个 dev 效果验证过吗？

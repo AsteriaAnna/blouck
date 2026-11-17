@@ -1,7 +1,7 @@
 # 06 · 四类线的体验与设计口径（v2.0，2026-11-17）
 
 > **这是体验/设计文档：只写“用户看到什么、感受到什么、为什么这样设计”，不写代码怎么实现。**
-> 当前实现、DB/API、迁移选项看 [07-line-implementation-notes.md](07-line-implementation-notes.md)；已实现事实看 [03-implemented.md](03-implemented.md)。
+> 当前实现、DB/API、迁移选项看 [line-implementation-notes.md](../engineering/line-implementation-notes.md)；已实现事实看 [implemented.md](../engineering/implemented.md)。
 >
 > 标记约定：
 > - 【你的口径】= 你本轮明确表达的期望；
@@ -152,7 +152,7 @@
 ## 10. 待确认的设计选择
 
 - **Q1 关系优先**：新节点必须至少有一条已识别的语义关系才生成/显示吗？抽到实体但没关系的怎么处理（丢弃/后台）？  
-  （可行性/验证记录见 [08-relation-gate-qa.md](08-relation-gate-qa.md)）
+  （可行性/验证记录见 [relation-gate-qa.md](../engineering/relation-gate-qa.md)）
 - **Q2 顺序线没有语义关系时**：保留在地图上作为来路，还是只在节点 MD 展示、地图隐藏？
 - **Q3 关联提示池**：4 个展示位是全世界共享，还是每节点一组？4 条按什么规则挑？
 - **Q4 关系 MD 字段**：按 §6 的结构定稿吗？哪些字段可编辑？
@@ -164,5 +164,5 @@
 
 **文档关系**：
 - 本文件回答“做什么、为什么、用户看到什么、感受如何”；
-- [07-line-implementation-notes.md](07-line-implementation-notes.md) 回答“当前代码是什么、差距在哪、迁移/实现选项”；
-- 已实现事实以 [03-implemented.md](03-implemented.md) 和源码为准。
+- [line-implementation-notes.md](../engineering/line-implementation-notes.md) 回答“当前代码是什么、差距在哪、迁移/实现选项”；
+- 已实现事实以 [implemented.md](../engineering/implemented.md) 和源码为准。

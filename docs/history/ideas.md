@@ -1,7 +1,7 @@
 # 01 · 之前讨论过的设想
 
 > 这是历史记录，不是实现依据。
-> 当前代码实际采用的范围见 [03-implemented.md](03-implemented.md)；不要根据本文判断某功能存在，也不要据此直接开工。
+> 当前代码实际采用的范围见 [implemented.md](../engineering/implemented.md)；不要根据本文判断某功能存在，也不要据此直接开工。
 
 ## 产品方向
 

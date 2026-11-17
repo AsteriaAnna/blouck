@@ -1,7 +1,7 @@
 # 05 · 线系统设计草稿（v0，历史研究）
 
-> **当前四类线口径以 [06-four-line-system.md](06-four-line-system.md) 为准；本文保留为早期研究与算法约束记录。** 它先回答“现有算法/契约对线有哪些约束、哪些方案在现实里做不了”，再把交互、后端、字段、任务与待决策点摊开。
-> 关联：[04-problems.md](04-problems.md) 001（问题与探索记录）；实现事实以 [03-implemented.md](03-implemented.md) + 源码为准。
+> **当前四类线口径以 [four-line-system.md](../product/four-line-system.md) 为准；本文保留为早期研究与算法约束记录。** 它先回答“现有算法/契约对线有哪些约束、哪些方案在现实里做不了”，再把交互、后端、字段、任务与待决策点摊开。
+> 关联：[problems.md](./problems.md) 001（问题与探索记录）；实现事实以 [implemented.md](../engineering/implemented.md) + 源码为准。
 > 阅读约定：
 > - 【事实】= 代码/实测可证，附文件行号或证据；
 > - 【假设】= 本轮提出、**尚未经你确认**的设计候选，不能当结论；

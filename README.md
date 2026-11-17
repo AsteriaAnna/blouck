@@ -10,18 +10,19 @@
 
 ## 文档
 
-- **实现事实（找 bug 只看这个）**：[docs/03-implemented.md](docs/03-implemented.md)
-- 之前讨论过的设想：[docs/01-ideas.md](docs/01-ideas.md)（历史，不是实现依据）
-- 之前尝试/推断过的措施：[docs/02-reasoning.md](docs/02-reasoning.md)（历史，不是实现依据）
-- 使用问题与探索记录：[docs/04-problems.md](docs/04-problems.md)（过程记录，不是实现依据）
-- 线系统设计草稿：[docs/05-line-system-draft.md](docs/05-line-system-draft.md)（早期研究，不是当前口径）
-- **四类线体验与设计口径（v2.0，未实现）**：[docs/06-four-line-system.md](docs/06-four-line-system.md)（只写用户感受/视觉/交互/设计思路，含关系 MD、节点 MD、副本体验，Q1–Q7 待确认）
-- **四类线实现笔记（当前代码/迁移选项）**：[docs/07-line-implementation-notes.md](docs/07-line-implementation-notes.md)（不是需求）
-- **锚点优先/关系准入验证 Q&A**：[docs/08-relation-gate-qa.md](docs/08-relation-gate-qa.md)（dev 验证、当前模型重跑、真实链路与坑）
-- **新工程师认知成本与简化方案**：[docs/10-onboarding-cognitive-load.md](docs/10-onboarding-cognitive-load.md)（命名/职责/状态/文档问题，P0/P1/P2）
-- 索引：[docs/00-index.md](docs/00-index.md)
+文档已按“工程 / 产品 / 历史 / 原设计基线 / 市场”分区，入口见 [docs/00-index.md](docs/00-index.md)。
 
-> `01/02` 是历史记录，`04` 是问题/方案探索过程，`05` 是早期设计草稿，`06` 是需求口径，`07` 是实现笔记；代码里有没有某个能力，只以 `03-implemented.md` 和源码为准。
+- **实现事实（找 bug 只看这个）**：[docs/engineering/implemented.md](docs/engineering/implemented.md)
+- **工程总览**：[docs/engineering/README.md](docs/engineering/README.md)（架构、术语、状态机、实验代码）
+- **产品/体验口径**：[docs/product/four-line-system.md](docs/product/four-line-system.md)（四类线体验 v2.0，未实现）
+- **线实现笔记**：[docs/engineering/line-implementation-notes.md](docs/engineering/line-implementation-notes.md)（当前 4 种 kind、迁移选项）
+- **关系准入验证 Q&A**：[docs/engineering/relation-gate-qa.md](docs/engineering/relation-gate-qa.md)（dev 验证、当前模型重跑、真实链路坑）
+- **新人认知成本与简化方案**：[docs/engineering/onboarding-cognitive-load.md](docs/engineering/onboarding-cognitive-load.md)（P0/P1/P2）
+- **原设计基线（清理前）**：[docs/baseline/README.md](docs/baseline/README.md)
+- **历史记录**：[docs/history/README.md](docs/history/README.md)
+- **市场/官网 Brief**：[docs/marketing/web-bp-brief.md](docs/marketing/web-bp-brief.md)
+
+> 代码里有没有某个能力，只以 `docs/engineering/implemented.md` 和源码为准；旧设计只作为“原来设计过什么”的来源。
 
 ## 当前实际链路
 
@@ -60,4 +61,4 @@ pnpm --filter @blouck/server eval
 pnpm --filter @blouck/server eval:dungeons
 ```
 
-技术栈、接口、DB 字段、focus/关系/音频实现细节都在 [docs/03-implemented.md](docs/03-implemented.md)。
+技术栈、接口、DB 字段、focus/关系/音频实现细节都在 [docs/engineering/implemented.md](docs/engineering/implemented.md)。

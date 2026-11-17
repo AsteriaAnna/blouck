@@ -167,4 +167,4 @@
 
 ---
 
-**关联**：[00-index.md](00-index.md)、[03-implemented.md](03-implemented.md)、[06-four-line-system.md](06-four-line-system.md)、[07-line-implementation-notes.md](07-line-implementation-notes.md)、[08-relation-gate-qa.md](08-relation-gate-qa.md)。
+**关联**：[00-index.md](../00-index.md)、[implemented.md](./implemented.md)、[four-line-system.md](../product/four-line-system.md)、[line-implementation-notes.md](./line-implementation-notes.md)、[relation-gate-qa.md](./relation-gate-qa.md)。

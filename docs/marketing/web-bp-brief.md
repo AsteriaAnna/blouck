@@ -386,7 +386,7 @@ blouck 把用户说的一句话，变成一个可以走进去、继续生长、�
 如果设计师想更多背景，可按顺序看：
 
 1. 本文件；
-2. `docs/03-implemented.md` §8（当前产品能做什么）；
-3. `docs/06-four-line-system.md` §1–§5（体验目标，不要照搬内部术语）。
+2. `docs/engineering/implemented.md` §8（当前产品能做什么）；
+3. `docs/product/four-line-system.md` §1–§5（体验目标，不要照搬内部术语）。
 
-其他文档（04/05/07/08）是内部设计/实现记录，**不需要读**。
+其他文档（history/engineering 的实现记录）是内部设计/实现记录，**不需要读**。

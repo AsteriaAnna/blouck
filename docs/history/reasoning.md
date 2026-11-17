@@ -1,7 +1,7 @@
 # 02 · 尝试过的思考方式和推断过的措施
 
 > 历史记录，不是实现依据。
-> 这里记录的是“当时怎么想/怎么试”，不代表代码里现在有这些做法。当前实现见 [03-implemented.md](03-implemented.md)。
+> 这里记录的是“当时怎么想/怎么试”，不代表代码里现在有这些做法。当前实现见 [implemented.md](../engineering/implemented.md)。
 
 ## 1. 只保留单 focus
 
