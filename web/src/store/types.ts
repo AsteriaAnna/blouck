@@ -59,6 +59,8 @@ export type State = {
   extract: (text: string, exploreEdgeId?: string) => Promise<void>;
   /** 沿方向线落图：直接创建方向生成时计划好的延伸节点 */
   exploreDirection: (edgeId: string) => Promise<void>;
+  /** 沿节点卡里的方向计划落图（不要求地图上已 materialize） */
+  explorePlanDirection: (directionId: string) => Promise<void>;
   ingestSegment: (text: string) => Promise<void>;
   commitStream: () => Promise<void>;
   saveMd: (id: string, md: string) => Promise<void>;

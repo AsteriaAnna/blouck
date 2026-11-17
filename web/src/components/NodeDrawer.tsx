@@ -16,6 +16,7 @@ export default function NodeDrawer() {
   const generateQuiz = useStore((s) => s.generateQuiz);
   const answerQuiz = useStore((s) => s.answerQuiz);
   const directions = useStore((s) => s.directions);
+  const explorePlanDirection = useStore((s) => s.explorePlanDirection);
 
   const node = nodes.find((n) => n.id === (drawer?.kind === "node" ? drawer.id : ""));
   const [payload, setPayload] = useState<NodeDocPayload | null>(null);
@@ -190,9 +191,21 @@ export default function NodeDrawer() {
             {directions
               .filter((d) => d.node_id === node.id && d.status === "open")
               .map((d) => (
-                <div key={d.id} className="hintline">
-                  · {d.question}
-                  {d.target_name ? ` → ${d.target_name}` : ""}
+                <div key={d.id} className="hintline" style={{ marginBottom: 6 }}>
+                  <div>
+                    · {d.question}
+                    {d.target_name ? ` → ${d.target_name}` : ""}
+                  </div>
+                  <button
+                    className="secondary"
+                    style={{ marginTop: 2 }}
+                    onClick={async () => {
+                      closeDrawer();
+                      await explorePlanDirection(d.id);
+                    }}
+                  >
+                    去探索
+                  </button>
                 </div>
               ))}
           </div>

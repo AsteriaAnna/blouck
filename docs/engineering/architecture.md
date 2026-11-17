@@ -63,7 +63,7 @@ POST /api/worlds/:id/extract
 ### 2.3 探索方向落图
 
 ```text
-POST /api/worlds/:id/explore { edgeId }
+POST /api/worlds/:id/explore { edgeId | directionId }
 → 读方向计划（没有则懒规划）
 → 在 frontier 点沿 source→frontier 方向 placeAround
 → 建计划节点 + source + formal

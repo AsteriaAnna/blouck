@@ -61,29 +61,53 @@ graphRouter.post("/api/worlds/:id/explore", async (req, res) => {
   const world = getWorld(req.params.id);
   if (!world) return res.status(404).json({ error: "world not found" });
   const edgeId = String(req.body?.edgeId ?? "");
-  if (!edgeId) return res.status(400).json({ error: "edgeId required" });
-  const edge = db.prepare("SELECT * FROM edges WHERE id=? AND world_id=?").get(edgeId, world.id) as
-    | EdgeRow
-    | undefined;
-  if (!edge || edge.kind !== "direction") return res.status(404).json({ error: "direction edge not found" });
-  if (edge.consumed) return res.status(409).json({ error: "这个方向已经探索过了" });
-  const src = getNode(edge.src);
+  const directionId = String(req.body?.directionId ?? "");
+  if (!edgeId && !directionId) return res.status(400).json({ error: "edgeId or directionId required" });
+  let edge: EdgeRow | undefined;
+  let directionRow: ReturnType<typeof listDirections>[number] | undefined;
+  let sourceId = "";
+  let question = "";
+  let frontierX: number | undefined;
+  let frontierY: number | undefined;
+
+  if (edgeId) {
+    edge = db.prepare("SELECT * FROM edges WHERE id=? AND world_id=?").get(edgeId, world.id) as
+      | EdgeRow
+      | undefined;
+    if (!edge || edge.kind !== "direction") {
+      return res.status(404).json({ error: "direction edge not found" });
+    }
+    if (edge.consumed) return res.status(409).json({ error: "这个方向已经探索过了" });
+    sourceId = edge.src;
+    question = edge.question ?? "";
+    frontierX = edge.frontier_x ?? undefined;
+    frontierY = edge.frontier_y ?? undefined;
+    directionRow = listDirections(world.id).find(
+      (d) => d.node_id === edge!.src && d.question === question && d.status === "open",
+    );
+  } else {
+    directionRow = listDirections(world.id).find((d) => d.id === directionId);
+    if (!directionRow) return res.status(404).json({ error: "direction not found" });
+    if (directionRow.status !== "open") {
+      return res.status(409).json({ error: "这个方向已经探索过了" });
+    }
+    sourceId = directionRow.node_id;
+    question = directionRow.question;
+  }
+  const src = getNode(sourceId);
   if (!src) return res.status(404).json({ error: "source node not found" });
 
   let graph = getGraph(world.id);
-  let directionRow = listDirections(world.id).find(
-    (d) => d.node_id === edge.src && d.question === (edge.question ?? "") && d.status === "open",
-  );
   const readPlan = () => {
-    const name = edge.target_name ?? directionRow?.target_name ?? null;
+    const name = edge?.target_name ?? directionRow?.target_name ?? null;
     if (!name) return null;
     return {
       name,
-      type: edge.target_type ?? directionRow?.target_type ?? "概念",
-      definition: edge.target_definition ?? directionRow?.target_definition ?? "",
-      aliasesRaw: edge.target_aliases ?? directionRow?.target_aliases ?? "[]",
-      predicate: edge.target_predicate ?? directionRow?.target_predicate ?? "related",
-      label: edge.target_label ?? directionRow?.target_label ?? "延伸",
+      type: edge?.target_type ?? directionRow?.target_type ?? "概念",
+      definition: edge?.target_definition ?? directionRow?.target_definition ?? "",
+      aliasesRaw: edge?.target_aliases ?? directionRow?.target_aliases ?? "[]",
+      predicate: edge?.target_predicate ?? directionRow?.target_predicate ?? "related",
+      label: edge?.target_label ?? directionRow?.target_label ?? "延伸",
     };
   };
 
@@ -117,9 +141,11 @@ graphRouter.post("/api/worlds/:id/explore", async (req, res) => {
             "UPDATE directions SET target_name=?, target_type=?, target_definition=?, target_aliases=?, target_predicate=?, target_label=? WHERE id=?",
           ).run(plan.name, plan.type, plan.definition, aliases, plan.predicate, plan.label, directionRow.id);
         }
-        db.prepare(
-          "UPDATE edges SET target_name=?, target_type=?, target_definition=?, target_aliases=?, target_predicate=?, target_label=? WHERE id=?",
-        ).run(plan.name, plan.type, plan.definition, aliases, plan.predicate, plan.label, edgeId);
+        if (edgeId) {
+          db.prepare(
+            "UPDATE edges SET target_name=?, target_type=?, target_definition=?, target_aliases=?, target_predicate=?, target_label=? WHERE id=?",
+          ).run(plan.name, plan.type, plan.definition, aliases, plan.predicate, plan.label, edgeId);
+        }
       }
     } catch (err) {
       console.warn("[explore] 方向规划失败：", err);
@@ -155,8 +181,8 @@ graphRouter.post("/api/worlds/:id/explore", async (req, res) => {
     })(),
   );
 
-  const fx = edge.frontier_x ?? src.x + 312;
-  const fy = edge.frontier_y ?? src.y;
+  const fx = frontierX ?? src.x + 312;
+  const fy = frontierY ?? src.y;
   const angle = Math.atan2(fy - src.y, fx - src.x);
   const placed = graph.nodes.map((n) => ({ id: n.id, x: n.x, y: n.y }));
   const createdNodes: NodeRow[] = [];
@@ -168,7 +194,7 @@ graphRouter.post("/api/worlds/:id/explore", async (req, res) => {
       createdEdges.push(
         addEdge(world.id, src.id, existingNode.id, "formal", plan.label, null, "", {
           predicate: plan.predicate,
-          evidence: edge.question ?? "",
+          evidence: question,
           confidence: 0.75,
           origin: "direction",
         }),
@@ -176,7 +202,7 @@ graphRouter.post("/api/worlds/:id/explore", async (req, res) => {
     }
   } else {
     const pos = placeAround(placed, { id: "__explore_anchor", x: fx, y: fy }, { preferAngle: angle });
-    const span = createSourceSpan(world.id, edge.question || plan.definition || plan.name);
+    const span = createSourceSpan(world.id, question || plan.definition || plan.name);
     const node = addNode(world.id, plan.name, pos.x, pos.y, "", {
       type: plan.type,
       definition: plan.definition,
@@ -186,7 +212,7 @@ graphRouter.post("/api/worlds/:id/explore", async (req, res) => {
     createdNodes.push(node);
     createdEdges.push(
       addEdge(world.id, src.id, node.id, "source", "本轮探索来源", null, "", {
-        evidence: edge.question ?? "",
+        evidence: question,
         confidence: 0.9,
         origin: "direction",
       }),
@@ -194,7 +220,7 @@ graphRouter.post("/api/worlds/:id/explore", async (req, res) => {
     createdEdges.push(
       addEdge(world.id, src.id, node.id, "formal", plan.label || "延伸", null, "", {
         predicate: plan.predicate || "related",
-        evidence: edge.question ?? "",
+        evidence: question,
         confidence: 0.75,
         origin: "direction",
       }),
@@ -225,7 +251,7 @@ graphRouter.post("/api/worlds/:id/explore", async (req, res) => {
     }
   }
 
-  consumeDirection(edgeId);
+  if (edgeId) db.prepare("UPDATE edges SET consumed=1 WHERE id=?").run(edgeId);
   if (directionRow) db.prepare("UPDATE directions SET status='consumed' WHERE id=?").run(directionRow.id);
   computeFrontier(world.id);
   materializeDirectionEdges(world.id);

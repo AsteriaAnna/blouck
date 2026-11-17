@@ -172,6 +172,31 @@ test("软准入：无语义关系的实体只进候选，不直接上地图", as
   await fetch(`${base}/api/worlds/${world.id}`, { method: "DELETE" });
 });
 
+test("方向计划可直接探索（directionId，不依赖地图投影边）", async () => {
+  const created = await api("/api/worlds", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "direction-plan", rootName: "根" }),
+  });
+  const world = created.world;
+  const extract = await api(`/api/worlds/${world.id}/extract`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: "混合检索属于检索。检索包含向量检索。" }),
+  });
+  const dir = (extract.directions ?? []).find((d: any) => d.status === "open");
+  assert.ok(dir, "should have an open direction plan");
+  const explored = await api(`/api/worlds/${world.id}/explore`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ directionId: dir.id }),
+  });
+  assert.ok(explored.createdNodes.length >= 1 || explored.warning);
+  const graph = await api(`/api/worlds/${world.id}`);
+  assert.ok(graph.directions.find((d: any) => d.id === dir.id)?.status === "consumed");
+  await fetch(`${base}/api/worlds/${world.id}`, { method: "DELETE" });
+});
+
 test.after(async () => {
   if (child) {
     child.kill("SIGTERM");

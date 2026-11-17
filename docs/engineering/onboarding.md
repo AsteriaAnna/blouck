@@ -105,7 +105,7 @@ pnpm test
 pnpm build
 ```
 
-当前基线：24 个测试通过；mock 集成覆盖 world→extract→stream segment/commit、重复抽取去重、方向物化/消费；旧库启动迁移/双写回填；节点/关系理解卡生成、备注、异步 worker、手动关系、软准入候选确认；提示池排序；副本解锁。
+当前基线：25 个测试通过；mock 集成覆盖 world→extract→stream segment/commit、重复抽取去重、方向物化/消费、directionId 直接探索；旧库启动迁移/双写回填；节点/关系理解卡生成、备注、异步 worker、手动关系、软准入候选确认；提示池排序；副本解锁。
 
 新人自检问题：
 
