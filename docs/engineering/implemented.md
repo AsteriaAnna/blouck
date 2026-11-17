@@ -14,6 +14,7 @@
 ```bash
 pnpm install
 cp server/.env.example server/.env   # 可选，不配 key 自动 mock
+# Windows: Copy-Item server/.env.example server/.env
 pnpm dev
 ```
 
@@ -56,11 +57,11 @@ InputBar
 → 直接建 committed 节点/关系 + 规则方向/副本候选
 ```
 
-语音链路核心在 `server/src/stream/session.ts`，文字链路在 `server/src/index.ts`。
+语音链路核心在 `server/src/stream/session.ts`，文字链路在 `server/src/routes/graph.ts`。
 
 ## 2. 音频采集事实
 
-- `InputBar` 不强制 AudioContext 16k；使用原生采样率。
+- `web/src/hooks/useVoiceInput.ts` 不强制 AudioContext 16k；使用原生采样率。
 - `AudioWorkletNode` 通过 `processorOptions.sampleRate` 拿到输入采样率。
 - Worklet 内部用连续相位线性插值重采样到 16k。
 - 主线程只接收 Int16，不再做 Float32 重采样。
@@ -144,7 +145,7 @@ DeepSeek 抽取失败/超时时：本段不落图，返回空结果并在响应�
 
 ## 5. 数据库事实
 
-`server/src/db.ts` 中实际存在的表：
+`server/src/db/schema.ts` 中实际存在的表：
 
 ```text
 worlds, nodes, edges, buildings, quizzes, attempts,
@@ -167,6 +168,10 @@ id, world_id, src, dst, kind, label, md, question,
 frontier_x, frontier_y, consumed,
 predicate, evidence, confidence, origin,
 claim_status, revision, created_at
+
+# API（getGraph）额外派生，不存库：
+line_type   = relation|sequence|hint|exploration
+line_state  = confirmed|proposed|provenance|planned|consumed
 ```
 
 `kind` 只有：
@@ -228,9 +233,9 @@ parent 选择顺序（新节点挂到谁）：
 
 ## 8. 前端事实
 
-- `web/src/components/InputBar.tsx`：麦克风、Worklet、WS、keepalive、重连、按句去重、segment/commit、失败 toast、停止后兜底 commit；“试听”按钮走 mock ASR。
-- `web/src/store.ts`：`splitCumulativeText` / `sentenceKey` / `pickNewSentences` 纯函数（累计文本切句与去重）；`ingestSegment` / `commitStream` 更新 nodes/edges/focus，失败 toast，`warning` 防御式读取后 toast。
-- `web/src/components/World3D.tsx`：节点、关系、建筑、方向线。四种线按类型分美术：正式关系=深色 3D 管状实线（半径约 2.8）、探索来源=蓝灰管状实线 + 起点圆点（半径约 2.0）、待确认建议=统一色虚线 + 中点圆珠、方向=点线 + 末端「旧版木柱路牌 + 地面方向箭头」。所有线都带透明命中管，点击可打开关系/方向文档。
+- `web/src/components/InputBar.tsx`：输入框/提交/状态展示；`web/src/hooks/useVoiceInput.ts`：麦克风、Worklet、WS、keepalive、重连、按句去重、segment/commit、失败提示、停止后兜底 commit；“试听”按钮走 mock ASR。
+- `web/src/store.ts` 只做 slices 组合；`store/streamText.ts` 是 `splitCumulativeText` / `sentenceKey` / `pickNewSentences` 纯函数（累计文本切句与去重）；`store/streamSlice.ts` 的 `ingestSegment` / `commitStream` 更新 nodes/edges/focus，失败 toast，`warning` 防御式读取后 toast；`store/worldSlice.ts` 管世界/抽屉/题目/副本。
+- `web/src/components/World3D.tsx`：场景组装；`World3DScene.tsx`：岛/建筑/相机；`World3DEdges.tsx`：节点、关系、建筑、方向线。四种线按类型分美术：正式关系=深色 3D 管状实线（半径约 2.8）、探索来源=蓝灰管状实线 + 起点圆点（半径约 2.0）、待确认建议=统一色虚线 + 中点圆珠、方向=点线 + 末端「旧版木柱路牌 + 地面方向箭头」。所有线都带透明命中管，点击可打开关系/方向文档。
 - 世界页顶栏只保留「← 世界列表 + 世界名」；示例数据标记、节点/关系/副本统计、LLM/ASR、3D 视图、重排、撤回隐藏、导出、操作提示均已从 UI 移除（后端对应接口仍在，MVP 无入口）。
 - 点节点显示**节点文档**：标题（节点名）、正文（`definition` + `free_md`，ReactMarkdown 渲染）、来源 blockquote（来自 `source_text/source_at`）、以及「编辑」自由区；MVP 暂不展示答题/档位/关系列表/手动关联/继续探索/隐藏面板。
 - 点线显示**一句话文档**（按语义类型）：正式/来源/建议线用 predicate 关系类型（归类/组成/前置/对比/替代/相关；来源线为“探索来源”）；建议线额外提供「接受为正式关系」，方向线提供「去探索」。MVP 不再展示证据/置信度/关系 MD 编辑器。
@@ -245,6 +250,7 @@ parent 选择顺序（新节点挂到谁）：
 - provisional 节点直接作为地图节点渲染，与 committed 同一套坐标（不用另一套 ghost 坐标）；标签显示「候选 · 名字」、虚线弱化样式与脉冲环，commit 后恢复普通标签样式。
 - 相机只在进入世界（world id 变化）时自动 fit 一次，把全部节点+副本框进视野；之后新增节点不重设相机，也不给 OrbitControls 传会随每次重渲染重设的 `target` prop。
 - 节点坐标到世界坐标的映射用“当前节点包围盒质心”居中（`World3D.tsx` 的 `posOf` 用 `cx/cy`），所以节点集合变化时整张地图会按新包围盒重新居中；这是既有布局行为，不是相机移动。
+- 方向消费：`POST /api/edges/:id/consume` 以 `directions` 表为源，按 world/node/question 找 open 方向置 `consumed`；投影边只打 `consumed=1`。
 - `direction` 边只有 frontier 节点渲染。
 - `/api/worlds/:id/stream/detect` 路由仍存在，但前端不再调用；`ghosts` 现在恒为空（`GhostIsland` 渲染代码仍在，但不会出现）。
 - 3D 资产在 `web/public/assets3d/`：21 个岛屿 + 2 个副本门，`manifest.json` 映射。
@@ -297,8 +303,11 @@ pnpm build
 ```text
 server/src/
   env.ts                 环境变量/provider
-  db.ts                  schema/迁移/查询/删除世界清理
-  index.ts               REST + /ws/asr + 文字 extract
+  db.ts                  barrel + world/getGraph/recordAttempt/refresh/seed
+  db/                    connection/schema/repo（nodes/edges/quizzes/sources/domain/directions/buildings）
+  index.ts               express/server/ws 装配 + health（约 71 行）
+  routes/                graph/stream/nodes/edges/worlds/buildings/worldAdmin/dev
+  services/              directions（物化/消费）、buildings（检测/刷新）
   stream/session.ts      语音 provisional/focus/关系幂等/commit
   providers/types.ts     LLM/ASR 接口（ExtractResult 可带 warning）
   providers/deepseek.ts  DeepSeek（20s 超时；抽取失败不降级 mock）
@@ -309,14 +318,16 @@ server/src/
   wfc.ts                 WFC 岛屿布局
   assetops.ts            建筑坐标/方向/隐藏/导出
   dungeons.ts            副本检测
-  anchorFirst.ts         anchor-first 实验，不是语音主链路
+  experiments/           anchorFirst、exploreSim（不是主链路）
 
 web/src/
   App.tsx / main.tsx
-  api.ts                 REST 类型/客户端
-  store.ts               Zustand（含按句去重纯函数）
+  api.ts                 REST 类型/客户端（re-export shared DTO）
+  store.ts               Zustand slices 组合（约 14 行）
+  store/                 types/worldSlice/streamSlice/streamText
+  hooks/useVoiceInput.ts 麦克风/WS/segment/commit 状态机
   components/InputBar.tsx
-  components/World3D.tsx
+  components/World3D.tsx / World3DScene.tsx / World3DEdges.tsx
   components/Home.tsx
   components/World.tsx
   components/NodeDrawer.tsx
