@@ -1,6 +1,7 @@
 import { useStore } from "../store";
 import World3D from "./World3D";
 import InputBar from "./InputBar";
+import CandidatePanel from "./CandidatePanel";
 import NodeDrawer from "./NodeDrawer";
 import DungeonDrawer from "./DungeonDrawer";
 import RelationDrawer from "./RelationDrawer";
@@ -37,6 +38,7 @@ export default function World() {
             <div style={{ marginTop: 6 }}><b>节点三档</b>：核心 → Ⅰ 环 → Ⅱ → Ⅲ 塔</div>
           </div>
           <InputBar />
+          <CandidatePanel />
         </div>
 
         {drawer?.kind === "node" && <NodeDrawer />}

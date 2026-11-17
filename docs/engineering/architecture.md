@@ -101,6 +101,7 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 | graph | POST `/api/worlds/:id/extract`；POST `/api/worlds/:id/explore` | 2 | 文字抽取、方向落图 |
 | nodes | PATCH `/api/nodes/:id` | 1 | 节点编辑（定义/自由区等） |
 | docs | GET/POST `.../doc`、`.../doc/regenerate`、PATCH `.../doc/notes`（node/edge） | 6 | V3 节点卡/关系卡懒生成、备注、重生成 |
+| candidates | GET `/api/worlds/:id/candidates`；POST `/api/candidates/:id/admit`、`/reject` | 3 | 软准入候选列表/确认（建节点+formal 关系）/忽略 |
 | quizzes | GET `/api/nodes/:id/quiz`；POST `/api/nodes/:id/quiz/generate`；POST `/api/quiz/:id/answer` | 3 | 节点题/生成/判题 |
 | edges | POST `/api/edges/:id/accept`；PATCH `/api/edges/:id`；POST `/api/edges/:id/consume` | 3 | 接受建议/编辑 MD/消费方向 |
 | relations | POST `/api/worlds/:id/relations` | 1 | 手动关系 |

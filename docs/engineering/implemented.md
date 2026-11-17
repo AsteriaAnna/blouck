@@ -168,6 +168,8 @@ node_docs, relation_docs, node_candidates, generation_jobs
 - 软准入：`/extract` 只让被 `formal/suggest` 语义关系引用的实体上地图；只有 source/direction 或无关系的实体进入 `node_candidates`（`createdCandidates` 返回）。旧数据/根节点不受影响。
 - 地图克制：`World3D` 只显示置信度最高的 2 条 suggest 提示线；方向仍按 frontier + materialize ≤2。
 - 节点卡已接回「理解检查」：显示档位/简答/判断，能生成/提交节点题；答题后 `refreshWorldData` 刷新副本状态，重新打通“答题→tier→副本解锁”链路。
+- 候选 UI：`CandidatePanel` 在存在候选时显示，选择目标节点+谓词后确认（建节点+formal 关系，origin=manual）或忽略；API `GET /api/worlds/:id/candidates`、`POST /api/candidates/:id/admit|reject`。
+- 副本解锁已有单测：节点 tier>=1 后 domain/flow 从 detected → playable。
 
 
 ### nodes 关键字段

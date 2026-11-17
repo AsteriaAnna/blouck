@@ -148,6 +148,18 @@ test("软准入：无语义关系的实体只进候选，不直接上地图", as
   assert.ok(extract.createdCandidates.length >= 1, "orphan entity should be candidate");
   assert.equal(extract.createdNodes.length, 0, "orphan entity must not become node");
   assert.equal(extract.nodes.length, 1, "only root should remain visible");
+
+  const list = await api(`/api/worlds/${world.id}/candidates`);
+  assert.ok(list.candidates.length >= 1);
+  const admitted = await api(`/api/candidates/${list.candidates[0].id}/admit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ targetNodeId: world.root_node_id, predicate: "related" }),
+  });
+  assert.equal(admitted.edge.kind, "formal");
+  assert.equal(admitted.edge.origin, "manual");
+  const after = await api(`/api/worlds/${world.id}/candidates`);
+  assert.equal(after.candidates.length, list.candidates.length - 1);
   await fetch(`${base}/api/worlds/${world.id}`, { method: "DELETE" });
 });
 

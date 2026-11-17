@@ -207,6 +207,12 @@ export function listNodeCandidates(worldId: string, status = "candidate"): NodeC
     .all(worldId, status) as NodeCandidateRow[];
 }
 
+export function getNodeCandidate(id: string): NodeCandidateRow | undefined {
+  return db.prepare("SELECT * FROM node_candidates WHERE id=?").get(id) as
+    | NodeCandidateRow
+    | undefined;
+}
+
 export function setNodeCandidateStatus(id: string, status: "candidate" | "admitted" | "rejected") {
   db.prepare("UPDATE node_candidates SET status=? WHERE id=?").run(status, id);
 }

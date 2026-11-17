@@ -34,6 +34,7 @@ export type {
   NodeDocPayload,
   RelationDoc,
   RelationDocPayload,
+  NodeCandidateDTO,
   WorldPayloadDTO as WorldPayload,
   EdgeKind,
   NodeType,

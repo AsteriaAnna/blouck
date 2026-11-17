@@ -251,6 +251,21 @@ export type RelationDocPayload = {
   status: DocStatus;
 };
 
+/** 未准入节点：缺语义关系，等待用户确认/忽略。 */
+export type NodeCandidateDTO = {
+  id: string;
+  world_id: string;
+  name: string;
+  type: string;
+  definition: string;
+  aliases: string;
+  evidence: string;
+  confidence: number;
+  reason: string;
+  status: string;
+  created_at: number;
+};
+
 
 export type WorldPayloadDTO = {
   world: WorldDTO;
