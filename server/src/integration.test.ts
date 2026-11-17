@@ -137,6 +137,13 @@ test("mock 全链路：世界 → extract → stream segment/commit", async () =
   });
   assert.ok(Array.isArray(commit.nodes));
   assert.ok(commit.nodes.every((n: any) => n.status === "committed" || n.status === undefined));
+  const afterVoice = await api(`/api/worlds/${world.id}`);
+  const committedIds = new Set(commit.committed ?? []);
+  const voiced = afterVoice.nodes.filter((n: any) => committedIds.has(n.id));
+  assert.ok(
+    voiced.some((n: any) => Boolean(n.source_span_id)),
+    "语音/流式提交的节点必须挂到 source_spans，才能生成事实题",
+  );
 
   await fetch(`${base}/api/worlds/${world.id}`, { method: "DELETE" });
 });
