@@ -4,6 +4,7 @@ import { LINE_TYPE_LABEL, deriveLineFields, type LineType } from "@blouck/shared
 import { get, send, type RelationDocPayload } from "../api";
 import { useStore } from "../store";
 import { track } from "../telemetry";
+import UnderstandingTaskPanel from "./UnderstandingTaskPanel";
 
 const PRED_LABEL: Record<string, string> = {
   kindOf: "归类",
@@ -48,22 +49,6 @@ export default function RelationDrawer() {
   const [loading, setLoading] = useState(false);
   const [notes, setNotes] = useState("");
   const [saved, setSaved] = useState("");
-  const [taskPayload, setTaskPayload] = useState<{
-    status: string;
-    message?: string;
-    task: {
-      id: string;
-      stem: string;
-      misconception: string;
-      choices: { id: string; text: string }[];
-      rubric: string[];
-      evidence_quote: string;
-      follow_up: string;
-    } | null;
-  } | null>(null);
-  const [choice, setChoice] = useState("");
-  const [explanation, setExplanation] = useState("");
-  const [taskFeedback, setTaskFeedback] = useState("");
 
   useEffect(() => {
     if (!edge || (edge.kind !== "formal" && edge.kind !== "suggest")) {
@@ -126,43 +111,6 @@ export default function RelationDrawer() {
     }
   }
 
-  async function loadTask() {
-    if (!edge) return;
-    setLoading(true);
-    setTaskFeedback("");
-    try {
-      const p = await get<NonNullable<typeof taskPayload>>(`/api/edges/${edge.id}/understanding`);
-      setTaskPayload(p);
-      track("understanding_task_start", {
-        worldId: edge.world_id,
-        targetId: edge.id,
-        payload: { status: p.status },
-      });
-    } catch {
-      setTaskPayload({ status: "failed", message: "任务生成失败", task: null });
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function submitTask() {
-    const task = taskPayload?.task;
-    if (!edge || !task || !choice) return;
-    const r = await send<{
-      correct: boolean;
-      feedback: string;
-      follow_up: string;
-    }>(`/api/understanding/${task.id}/answer`, "POST", { choice, explanation });
-    setTaskFeedback(
-      `${r.correct ? "判断正确" : "再想想"}：${r.feedback}${r.follow_up ? `\n追问：${r.follow_up}` : ""}`,
-    );
-    track("understanding_task_answer", {
-      worldId: edge.world_id,
-      targetId: task.id,
-      payload: { correct: r.correct },
-    });
-  }
-
   return (
     <div className="drawer">
       <header>
@@ -213,61 +161,11 @@ export default function RelationDrawer() {
         )}
 
         {(edge.kind === "formal" || edge.kind === "suggest") && (
-          <div className="section">
-            <h4>辨析任务</h4>
-            {!taskPayload ? (
-              <button className="secondary" onClick={loadTask} disabled={loading}>
-                生成一个辨析任务
-              </button>
-            ) : taskPayload.status === "source_required" ? (
-              <div className="hintline">{taskPayload.message}</div>
-            ) : taskPayload.status !== "ready" || !taskPayload.task ? (
-              <div className="hintline">{taskPayload.message ?? "任务生成失败"}</div>
-            ) : (
-              <>
-                <div className="hintline" style={{ marginBottom: 6 }}>
-                  目标：辨析关系类型/边界，而不是背定义。
-                </div>
-                {taskPayload.task.misconception && (
-                  <div className="hintline">易错点：{taskPayload.task.misconception}</div>
-                )}
-                {taskPayload.task.evidence_quote && (
-                  <blockquote>依据：{taskPayload.task.evidence_quote}</blockquote>
-                )}
-                <div className="q" style={{ marginTop: 6 }}>
-                  {taskPayload.task.stem}
-                </div>
-                {taskPayload.task.choices.map((c) => (
-                  <label key={c.id} className="hintline" style={{ display: "block", marginTop: 4 }}>
-                    <input
-                      type="radio"
-                      name={`choice-${taskPayload.task!.id}`}
-                      checked={choice === c.id}
-                      onChange={() => setChoice(c.id)}
-                    />{" "}
-                    {c.text}
-                  </label>
-                ))}
-                <textarea
-                  className="md-edit"
-                  style={{ marginTop: 6 }}
-                  value={explanation}
-                  onChange={(e) => setExplanation(e.target.value)}
-                  placeholder="用原文说明为什么是这个类型、为什么不是相邻类型…"
-                />
-                <div className="row" style={{ marginTop: 6 }}>
-                  <button
-                    className="primary"
-                    onClick={submitTask}
-                    disabled={!choice || explanation.trim().length < 4}
-                  >
-                    提交辨析
-                  </button>
-                </div>
-                {taskFeedback && <div className="hintline" style={{ whiteSpace: "pre-wrap" }}>{taskFeedback}</div>}
-              </>
-            )}
-          </div>
+          <UnderstandingTaskPanel
+            endpoint={`/api/edges/${edge.id}/understanding`}
+            worldId={edge.world_id}
+            targetId={edge.id}
+          />
         )}
 
         {(edge.kind === "formal" || edge.kind === "suggest") && (

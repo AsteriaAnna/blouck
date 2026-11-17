@@ -173,7 +173,7 @@ node_docs, relation_docs, node_candidates, generation_jobs
 - 方向：新节点/焦点尽量生成 **4 条 open 方向计划**（LLM 优先，模板补足 4）；地图仍只 materialize 1–2 条；节点卡「全部探索方向」列出全部，每条可「去探索」；`/explore` 支持 `{directionId}`，不依赖地图投影边；从方向探索生成的新节点也会补到 4 条。
 - 副本解锁已有单测：节点 tier>=1 后 domain/flow 从 detected → playable；`short+judge` 都答对 → tier=1 → DOMAIN playable（答题链路）。
 - 关系辨析（替代“3 题复习”）：`understanding_tasks/understanding_attempts`；`GET /api/edges/:id/understanding` 生成一个“类型/边界 + 选择 + 理由 + 原文引用 + rubric + follow_up”的任务；无源返回 `source_required`；`POST /api/understanding/:id/answer` 判选择+解释并记录。旧 `edge_practice` 接口保留但 UI 已不用。
-- 节点辨析：`GET /api/nodes/:id/understanding`，任务目标为体系位置/边界；节点无 `source_span_id` 时 `source_required`。`NodeDrawer` 与 `RelationDrawer` 均使用 `UnderstandingTaskPanel`（关系卡仍内联旧实现，待统一）。
+- 节点辨析：`GET /api/nodes/:id/understanding`，任务目标为体系位置/边界；节点无 `source_span_id` 时 `source_required`。节点卡与关系卡都使用 `UnderstandingTaskPanel`，关系卡不再维护内联任务状态。
 - 指标：`events` 表 + `web/src/telemetry.ts` fire-and-forget；已埋 node_card_open、relation_card_open、direction_explore、candidate_admit/reject、manual_relation_create、relation_practice_start/answer；`GET /api/worlds/:id/events/summary` 汇总。CDP 实测 demo 产生 2 条事件（node/relation card open）。
 
 
