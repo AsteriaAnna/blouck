@@ -50,10 +50,9 @@ type EdgeOrigin = "auto" | "manual" | "stream" | "direction";
 
 - ✅ Phase 1：shared 增加 canonical 类型/映射；`getGraph` 给每条 edge 附加 `line_type/line_state`；`RelationDrawer` 已改用 canonical 判断（不再直接 switch `edge.kind`）。
 - ✅ 测试：`db.test` 断言 formal→relation/confirmed、source→sequence/provenance；integration 断言 seed demo 方向线 `line_type=exploration`。
-- ✅ Phase 2：extract 不再直接 `addEdge(kind='direction')`；seed demo 改用 `addDirection`；GET world 会 `materializeDirectionEdges`；consume 改为 `consumeDirectionEdge`（先从 directions 表找 open 方向再置 consumed，投影边只打 `consumed=1`）。**方向边只由 materialize 投影生成**（dev 模拟除外）。
-- ⬜ Phase 2 剩余：读取逻辑（explore 仍用 edgeId 查投影以保持 API 兼容）逐步改为先读 directions。
-- ✅ Phase 4（部分）：`BuildingDrawer.tsx` → `DungeonDrawer.tsx`；shared 增加 `DungeonDTO/DungeonKind/DungeonStatus` alias。API/DB 仍保留 building 兼容。
-- ⬜ Phase 3：DB 值迁移/重命名（见 §4）。
+- ✅ Phase 2：direction 写入/消费都收敛到 directions 表；方向边只由 materialize 投影生成。
+- ✅ Phase 3（Stage A/B）：启动时自动加 `kind_v2/consumed_v2` + 回填 + trigger 双写；`edges_canonical` 视图读新列。旧代码/旧查询不动。
+- ⬜ Phase 3 剩余：代码读取切 `kind_v2`（Stage B/C）、删旧列（Stage D）；见 migrations.md。
 - ⬜ Phase 4 剩余：前端组件全面使用 canonical，后端内部逐步改名。
 
 ## 3. direction 的单一来源（待做）

@@ -6,13 +6,18 @@
 
 ## 0. 当前已有兼容层
 
-启动时由 `server/src/db/schema.ts` 重建：
+启动时由 `server/src/db/schema.ts` 自动执行（幂等）：
+
+1. `edges` 加 `kind_v2` / `consumed_v2` 两列；
+2. 回填旧 kind/consumed；
+3. 建 `AFTER INSERT` / `AFTER UPDATE OF kind, consumed` trigger，旧代码只写 kind 时新列自动同步；
+4. 重建只读视图：
 
 ```sql
 CREATE VIEW edges_canonical AS
 SELECT *,
-  CASE kind WHEN 'formal' THEN 'relation' ... END AS line_type,
-  CASE kind WHEN 'formal' THEN 'confirmed' ... END AS line_state
+  COALESCE(kind_v2, CASE kind ... END) AS line_type,
+  CASE COALESCE(kind_v2, kind) ... END AS line_state
 FROM edges;
 
 CREATE VIEW dungeons AS SELECT * FROM buildings;
@@ -21,7 +26,7 @@ CREATE VIEW dungeons AS SELECT * FROM buildings;
 - 旧查询/旧数据完全不变；
 - 新代码/报表可直接 `SELECT ... FROM edges_canonical`；
 - `dungeons` 是 `buildings` 的只读 alias；
-- 测试：`db.test.ts` 断言 view 映射与行数一致。
+- 测试：`db.test.ts` 断言 view 映射、双写 trigger；`directions.test.ts` 断言 consume 后 `line_state=consumed`。
 
 ## 1. 迁移前检查（每次必做）
 
@@ -42,6 +47,8 @@ SELECT status, COUNT(*) FROM directions GROUP BY status;
 - 确认没有未完成写入（停 server 或只读窗口）。
 
 ## 2. Stage A：加新列（不删旧列）
+
+**主路径**：schema 启动时已自动完成 Stage A（加列、回填、trigger）。CLI 仍是可选的独立工具/核对手段：
 
 已实现脚本（默认 dry-run，`--apply` 前自动备份）：
 

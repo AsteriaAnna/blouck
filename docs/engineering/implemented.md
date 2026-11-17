@@ -172,6 +172,11 @@ claim_status, revision, created_at
 # API（getGraph）额外派生，不存库：
 line_type   = relation|sequence|hint|exploration
 line_state  = confirmed|proposed|provenance|planned|consumed
+
+# P2 双写列（schema 启动自动加/同步）：
+kind_v2, consumed_v2
+edges_canonical 只读视图 = kind_v2/consumed_v2 派生
+dungeons 只读视图 = buildings alias
 ```
 
 `kind` 只有：

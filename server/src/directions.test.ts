@@ -65,6 +65,18 @@ test("consume: directions 状态 consumed，投影边只打 consumed 标记", ()
   assert.equal(consumeDirectionEdge(edge!.id), true);
   assert.equal(listDirections(world.id).find((d) => d.id === dir.id)?.status, "consumed");
   assert.equal(getGraph(world.id).edges.find((e) => e.id === edge!.id)?.consumed, 1);
+  const v2 = db
+    .prepare("SELECT kind_v2, consumed_v2, line_type, line_state FROM edges_canonical WHERE id=?")
+    .get(edge!.id) as {
+    kind_v2: string;
+    consumed_v2: number;
+    line_type: string;
+    line_state: string;
+  };
+  assert.equal(v2.kind_v2, "exploration");
+  assert.equal(v2.consumed_v2, 1);
+  assert.equal(v2.line_type, "exploration");
+  assert.equal(v2.line_state, "consumed");
   assert.equal(consumeDirectionEdge(edge!.id), false, "second consume should be rejected");
 });
 

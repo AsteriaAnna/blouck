@@ -9,7 +9,7 @@ const dbPath = path.join(os.tmpdir(), `blouck-test-${Date.now()}.db`);
 process.env.DB_PATH = dbPath;
 process.env.DEEPSEEK_API_KEY = "";
 
-const { addDirection, addEdge, addNode, commitStreamEdges, computeFrontier, createWorld, db, getGraph, listDirections } =
+const { addDirection, addEdge, addNode, commitStreamEdges, computeFrontier, createWorld, db, getGraph, listDirections, updateEdgeKind } =
   await import("./db.js");
 
 test("computeFrontier: 只看 formal 出边", () => {
@@ -41,6 +41,19 @@ test("computeFrontier: 只看 formal 出边", () => {
     .get(formalEdge!.id) as { line_type: string; line_state: string };
   assert.equal(viewFormal.line_type, "relation");
   assert.equal(viewFormal.line_state, "confirmed");
+
+  // 双写 trigger：旧代码只 update kind，kind_v2 自动同步
+  const v2Before = db.prepare("SELECT kind_v2, consumed_v2 FROM edges WHERE id=?").get(formalEdge!.id) as {
+    kind_v2: string;
+    consumed_v2: number;
+  };
+  assert.equal(v2Before.kind_v2, "relation");
+  assert.equal(v2Before.consumed_v2, 0);
+  updateEdgeKind(formalEdge!.id, "suggest");
+  const v2After = db.prepare("SELECT kind_v2 FROM edges WHERE id=?").get(formalEdge!.id) as { kind_v2: string };
+  assert.equal(v2After.kind_v2, "hint");
+  updateEdgeKind(formalEdge!.id, "formal");
+
   const viewDungeons = db.prepare("SELECT COUNT(*) AS c FROM dungeons").get() as { c: number };
   const viewBuildings = db.prepare("SELECT COUNT(*) AS c FROM buildings").get() as { c: number };
   assert.equal(viewDungeons.c, viewBuildings.c);

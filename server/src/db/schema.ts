@@ -108,6 +108,47 @@ for (const [col, ddl] of [
 ] as const) {
   if (!columnNames("directions").includes(col)) db.exec(`ALTER TABLE directions ADD COLUMN ${col} ${ddl}`);
 }
+// P2 Stage A/B：canonical 双写列 + 回填。旧代码继续读 kind，canonical 视图读 kind_v2。
+if (!columnNames("edges").includes("kind_v2")) db.exec("ALTER TABLE edges ADD COLUMN kind_v2 TEXT");
+if (!columnNames("edges").includes("consumed_v2")) db.exec("ALTER TABLE edges ADD COLUMN consumed_v2 INTEGER");
+const kindV2Sql = `CASE kind
+  WHEN 'formal' THEN 'relation'
+  WHEN 'source' THEN 'sequence'
+  WHEN 'suggest' THEN 'hint'
+  WHEN 'direction' THEN 'exploration'
+  ELSE kind END`;
+db.exec(`UPDATE edges SET kind_v2 = ${kindV2Sql} WHERE kind_v2 IS NULL OR kind_v2 IS NOT (${kindV2Sql})`);
+db.exec("UPDATE edges SET consumed_v2 = consumed WHERE consumed_v2 IS NULL OR consumed_v2 <> consumed");
+// 双写 trigger：旧代码仍只写 kind/consumed，新列自动同步。
+db.exec(`
+  DROP TRIGGER IF EXISTS trg_edges_canonical_ai;
+  CREATE TRIGGER trg_edges_canonical_ai AFTER INSERT ON edges
+  BEGIN
+    UPDATE edges SET
+      kind_v2 = CASE NEW.kind
+        WHEN 'formal' THEN 'relation'
+        WHEN 'source' THEN 'sequence'
+        WHEN 'suggest' THEN 'hint'
+        WHEN 'direction' THEN 'exploration'
+        ELSE NEW.kind END,
+      consumed_v2 = NEW.consumed
+    WHERE id = NEW.id;
+  END;
+  DROP TRIGGER IF EXISTS trg_edges_canonical_au;
+  CREATE TRIGGER trg_edges_canonical_au AFTER UPDATE OF kind, consumed ON edges
+  BEGIN
+    UPDATE edges SET
+      kind_v2 = CASE NEW.kind
+        WHEN 'formal' THEN 'relation'
+        WHEN 'source' THEN 'sequence'
+        WHEN 'suggest' THEN 'hint'
+        WHEN 'direction' THEN 'exploration'
+        ELSE NEW.kind END,
+      consumed_v2 = NEW.consumed
+    WHERE id = NEW.id;
+  END;
+`);
+
 // 副本 v2：版本/依据/指纹
 for (const [col, ddl] of [
   ["version", "INTEGER NOT NULL DEFAULT 1"],
@@ -165,18 +206,24 @@ db.exec(`
 DROP VIEW IF EXISTS edges_canonical;
 CREATE VIEW edges_canonical AS
 SELECT *,
-  CASE kind
-    WHEN 'formal' THEN 'relation'
-    WHEN 'source' THEN 'sequence'
-    WHEN 'suggest' THEN 'hint'
-    WHEN 'direction' THEN 'exploration'
-    ELSE kind
-  END AS line_type,
-  CASE kind
+  COALESCE(kind_v2,
+    CASE kind
+      WHEN 'formal' THEN 'relation'
+      WHEN 'source' THEN 'sequence'
+      WHEN 'suggest' THEN 'hint'
+      WHEN 'direction' THEN 'exploration'
+      ELSE kind
+    END
+  ) AS line_type,
+  CASE COALESCE(kind_v2, kind)
+    WHEN 'relation' THEN 'confirmed'
+    WHEN 'sequence' THEN 'provenance'
+    WHEN 'hint' THEN 'proposed'
+    WHEN 'exploration' THEN CASE WHEN COALESCE(consumed_v2, consumed)=1 THEN 'consumed' ELSE 'planned' END
     WHEN 'formal' THEN 'confirmed'
     WHEN 'source' THEN 'provenance'
     WHEN 'suggest' THEN 'proposed'
-    WHEN 'direction' THEN CASE WHEN consumed=1 THEN 'consumed' ELSE 'planned' END
+    WHEN 'direction' THEN CASE WHEN COALESCE(consumed_v2, consumed)=1 THEN 'consumed' ELSE 'planned' END
     ELSE 'unknown'
   END AS line_state
 FROM edges;
