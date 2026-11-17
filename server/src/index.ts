@@ -41,14 +41,14 @@ import {
   type EdgeRow,
   type NodeRow,
 } from "./db.js";
-import { deepseekLLM } from "./providers/deepseek.js";
-import { doubaoASR } from "./providers/doubao.js";
-import { mockASR, mockLLM } from "./providers/mock.js";
+import { mockASR } from "./providers/mock.js";
+import { asr, llm } from "./providers/active.js";
+import { streamRouter } from "./routes/stream.js";
 import { elkLayout, wfcLayout } from "./layout.js";
 import { placeAround } from "./placement.js";
 import { simulateExplore } from "./experiments/exploreSim.js";
 import { runAnchorFirst } from "./experiments/anchorFirst.js";
-import { ingestSegment, commitStream } from "./stream/session.js";
+import { materializeDirectionEdges } from "./services/directions.js";
 import { wfcGraphLayout } from "./wfc.js";
 import {
   detectDomainCandidates,
@@ -72,52 +72,9 @@ import {
 
 seedDemoIfEmpty();
 
-/** 把 frontier 节点的方向数据物化成可点击的方向线（每节点最多 2 条） */
-function materializeDirectionEdges(worldId: string) {
-  // 非边缘节点的方向线不再保留（方向数据仍在 directions 表，节点 MD 可看）
-  db.prepare(
-    "DELETE FROM edges WHERE world_id=? AND kind='direction' AND src IN (SELECT id FROM nodes WHERE world_id=? AND frontier=0)",
-  ).run(worldId, worldId);
-  const graph = getGraph(worldId);
-  const byId = new Map(graph.nodes.map((n) => [n.id, n]));
-  const existing = new Set(
-    graph.edges
-      .filter((e) => e.kind === "direction")
-      .map((e) => `${e.src}|${e.question ?? ""}`),
-  );
-  const count = new Map<string, number>();
-  for (const d of listDirections(worldId)) {
-    if (d.status !== "open") continue;
-    const node = byId.get(d.node_id);
-    if (!node || !node.frontier || node.hidden) continue;
-    const used = count.get(node.id) ?? 0;
-    if (used >= 2) continue;
-    const key = `${node.id}|${d.question}`;
-    if (existing.has(key)) {
-      count.set(node.id, used + 1);
-      continue;
-    }
-    addEdge(worldId, node.id, node.id, "direction", d.target_name ?? "", d.question, "", {
-      evidence: d.reason,
-      confidence: 0.6,
-      origin: "direction",
-      target_name: d.target_name,
-      target_type: d.target_type,
-      target_definition: d.target_definition,
-      target_aliases: d.target_aliases,
-      target_predicate: d.target_predicate,
-      target_label: d.target_label,
-    });
-    existing.add(key);
-    count.set(node.id, used + 1);
-  }
-}
-
-const llm = env.deepseekApiKey ? deepseekLLM : mockLLM;
-const asr = env.doubaoAppId && env.doubaoToken ? doubaoASR : mockASR;
-
 const app = express();
 app.use(express.json({ limit: "2mb" }));
+app.use("/api/worlds", streamRouter);
 
 app.get("/api/health", (_req, res) => {
   res.json({
@@ -1286,96 +1243,6 @@ app.post("/api/dev/anchor-first", async (req, res) => {
       apply: Boolean(req.body?.apply),
     });
     res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: String(err?.message ?? err) });
-  }
-});
-
-/** 正式流式链路：稳定文本 → provisional 节点/关系 */
-app.post("/api/worlds/:id/stream/segment", async (req, res) => {
-  try {
-    const world = getWorld(req.params.id);
-    if (!world) return res.status(404).json({ error: "world not found" });
-    const text = String(req.body?.text ?? "").trim();
-    if (!text) return res.status(400).json({ error: "text required" });
-    const result = await ingestSegment(
-      world.id,
-      text,
-      req.body?.focusId ? String(req.body.focusId) : null,
-      llm,
-    );
-    res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: String(err?.message ?? err) });
-  }
-});
-
-/** 正式流式链路：句/段 final → commit */
-app.post("/api/worlds/:id/stream/commit", (req, res) => {
-  try {
-    const world = getWorld(req.params.id);
-    if (!world) return res.status(404).json({ error: "world not found" });
-    const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : undefined;
-    res.json(commitStream(world.id, ids));
-  } catch (err: any) {
-    res.status(500).json({ error: String(err?.message ?? err) });
-  }
-});
-
-/** 流式实体检测：只抽候选，不判关系、不落图 */
-app.post("/api/worlds/:id/stream/detect", async (req, res) => {
-  try {
-    const world = getWorld(req.params.id);
-    if (!world) return res.status(404).json({ error: "world not found" });
-    const text = String(req.body?.text ?? "").trim();
-    if (!text) return res.status(400).json({ error: "text required" });
-    const graph = getGraph(world.id);
-    const anchor = getNode(String(req.body?.anchorId ?? "")) ?? graph.nodes[0];
-    if (!anchor) return res.status(400).json({ error: "anchor required" });
-    const t = Date.now();
-    const result = await llm.extract({
-      text,
-      focus: { id: anchor.id, name: anchor.name },
-      existing: graph.nodes.map((n) => n.name),
-    });
-    const existing = new Set(graph.nodes.map((n) => n.name));
-    const candidates = result.entities
-      .map((e) => ({ name: e.name.trim(), evidence: e.evidence ?? "", type: e.type ?? "" }))
-      .filter((e) => e.name && !existing.has(e.name));
-    res.json({ text, candidates, totalMs: Date.now() - t });
-  } catch (err: any) {
-    res.status(500).json({ error: String(err?.message ?? err) });
-  }
-});
-
-/** 流式预览：只返回 ghost/决策，不落图 */
-app.post("/api/worlds/:id/stream/preview", async (req, res) => {
-  try {
-    const world = getWorld(req.params.id);
-    if (!world) return res.status(404).json({ error: "world not found" });
-    const text = String(req.body?.text ?? "").trim();
-    if (!text) return res.status(400).json({ error: "text required" });
-    const result = await runAnchorFirst({
-      worldId: world.id,
-      anchorId: req.body?.anchorId ? String(req.body.anchorId) : undefined,
-      text,
-      candidates: [],
-      variant: "A2",
-      apply: false,
-    });
-    const existing = new Set(getGraph(world.id).nodes.map((n) => n.name));
-    const ghosts = result.decisions
-      .filter((d) => !existing.has(d.name) && ["commit_relation", "commit_topic_pending", "candidate"].includes(d.action))
-      .map((d) => ({
-        name: d.name,
-        role: d.role,
-        action: d.action,
-        label: d.label,
-        predicate: d.predicate,
-        confidence: d.confidence,
-        pairVerdict: d.pairVerdict,
-      }));
-    res.json({ text, ghosts, totalMs: result.totalMs, timeline: result.timeline });
   } catch (err: any) {
     res.status(500).json({ error: String(err?.message ?? err) });
   }

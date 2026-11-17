@@ -17,11 +17,11 @@ CI：`.github/workflows/ci.yml`，push main / PR 跑 install → typecheck → t
 | 放置算法 | `server/src/placement.test.ts` | 空图起点、minGap、relax 局部松弛 |
 | 副本校验 | `server/src/dungeons.test.ts` | 线性扩展计数、流程校验、领域共同上位 |
 | DB 基础 | `server/src/db.test.ts` | frontier 只看 formal、commitStreamEdges 只提升 stream suggest、directions 状态 |
+| 方向物化 | `server/src/directions.test.ts` | 每节点最多 2 条、重复执行幂等、非 frontier 删除 |
 | mock 集成 | `server/src/integration.test.ts` | 起临时 server + 临时 DB：世界创建、extract、stream segment/commit、重复抽取不重复建边、方向物化只给 frontier/≤2 |
 
 ## 已知缺口
 
-- 没有 `materializeDirectionEdges` 的独立单测（当前靠集成测试间接覆盖）；P1 拆 `index.ts` 后补。
 - 没有前端组件/E2E 测试；现有 `_verify` 脚本在仓库外（CDP/浏览器），未纳入 CI。
 - 没有 LLM 真实调用的稳定评测；`server/eval` 是离线评测，不阻断 CI。
 - 没有 DB 迁移回归测试；schema 迁移目前靠启动时执行。

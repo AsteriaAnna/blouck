@@ -1,0 +1,66 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import os from "node:os";
+import path from "node:path";
+import fs from "node:fs";
+
+const dbPath = path.join(os.tmpdir(), `blouck-dirservice-${Date.now()}.db`);
+process.env.DB_PATH = dbPath;
+process.env.DEEPSEEK_API_KEY = "";
+
+const { addDirection, addEdge, addNode, computeFrontier, createWorld, db, getGraph } = await import("./db.js");
+const { materializeDirectionEdges } = await import("./services/directions.js");
+
+test("materialize: 每节点最多 2 条，重复执行幂等", () => {
+  const world = createWorld("materialize-test", "root");
+  const root = getGraph(world.id).nodes[0];
+  const a = addNode(world.id, "A", 100, 100);
+  for (const q of ["方向一是什么？", "方向二是什么？", "方向三是什么？"]) {
+    addDirection(world.id, a.id, q, "test", { name: `目标${q}` });
+  }
+  computeFrontier(world.id);
+  materializeDirectionEdges(world.id);
+  let dirs = getGraph(world.id).edges.filter((e) => e.kind === "direction");
+  assert.equal(dirs.length, 2);
+  assert.ok(dirs.every((e) => e.src === a.id && e.dst === a.id));
+
+  materializeDirectionEdges(world.id);
+  dirs = getGraph(world.id).edges.filter((e) => e.kind === "direction");
+  assert.equal(dirs.length, 2, "materialize must be idempotent");
+  assert.ok(root);
+});
+
+test("materialize: 非 frontier 的方向边被删除", () => {
+  const world = createWorld("materialize-frontier-test", "root");
+  const root = getGraph(world.id).nodes[0];
+  const a = addNode(world.id, "A2", 100, 100);
+  const b = addNode(world.id, "B2", 200, 200);
+  addDirection(world.id, a.id, "A 的下一步？", "test", { name: "A next" });
+  computeFrontier(world.id);
+  materializeDirectionEdges(world.id);
+  assert.equal(getGraph(world.id).edges.filter((e) => e.kind === "direction").length, 1);
+
+  // A 有 formal 出边后不再是 frontier，方向边应删除
+  addEdge(world.id, a.id, b.id, "formal", "依赖", null, "", {
+    predicate: "related",
+    evidence: "A 依赖 B",
+  });
+  computeFrontier(world.id);
+  materializeDirectionEdges(world.id);
+  assert.equal(
+    getGraph(world.id).edges.filter((e) => e.kind === "direction" && e.src === a.id).length,
+    0,
+  );
+  assert.ok(root);
+});
+
+test.after(() => {
+  try {
+    db.close();
+  } catch {}
+  for (const suffix of ["", "-wal", "-shm"]) {
+    try {
+      fs.rmSync(dbPath + suffix, { force: true });
+    } catch {}
+  }
+});

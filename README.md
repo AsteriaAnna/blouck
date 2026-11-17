@@ -56,6 +56,7 @@ pnpm dev
 
 ```bash
 pnpm typecheck
+pnpm test
 pnpm build
 pnpm --filter @blouck/server eval
 pnpm --filter @blouck/server eval:dungeons
