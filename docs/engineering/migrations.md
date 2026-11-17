@@ -26,7 +26,7 @@ CREATE VIEW dungeons AS SELECT * FROM buildings;
 - 旧查询/旧数据完全不变；
 - 新代码/报表可直接 `SELECT ... FROM edges_canonical`；
 - `dungeons` 是 `buildings` 的只读 alias；
-- 测试：`db.test.ts` 断言 view 映射、双写 trigger；`directions.test.ts` 断言 consume 后 `line_state=consumed`。
+- 测试：`db.test.ts` 断言 view 映射、双写 trigger；`directions.test.ts` 断言 consume 后 `line_state=consumed`；`legacy-boot.test.ts` 用旧 edges schema 起真实 server 验证自动迁移/回填/API。
 
 ## 1. 迁移前检查（每次必做）
 
