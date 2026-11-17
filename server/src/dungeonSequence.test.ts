@@ -13,7 +13,7 @@ const { addEdge, addNode, createBuilding, createSourceSpan, createWorld, db, get
 const { ensureDungeonSequence, completeDungeonSequence } = await import(
   "./services/dungeonSequence.js"
 );
-const { answerUnderstandingTask } = await import("./services/understanding.js");
+const { answerUnderstandingTask, ensureUnderstandingTask } = await import("./services/understanding.js");
 const { mockLLM } = await import("./providers/mock.js");
 
 test("辨析副本：边界→反例→迁移，三关通过后 cleared", async () => {
@@ -67,8 +67,9 @@ test("辨析副本：两条关系 → 多误解点 4 关", async () => {
     evidence: "A 包含 C",
   });
   const building = createBuilding(world.id, "domain", a.id, "领域", "", "", [a.id, b.id, c.id]);
-  const seq = await ensureDungeonSequence(building.id, mockLLM);
+  const seq = await ensureDungeonSequence(building.id, mockLLM, { forceMode: "hard" });
   assert.equal(seq.status, "ready");
+  assert.equal(seq.mode, "hard");
   assert.equal(seq.stages.length, 4);
   assert.deepEqual(
     seq.stages.map((s: any) => s.variant),
@@ -104,6 +105,34 @@ test("辨析副本：优先选更具辨析价值的关系（类型/证据）", a
   assert.equal(seq.status, "ready");
   assert.equal(seq.stages[0].edgeId, strong.id);
   assert.notEqual(seq.stages[0].edgeId, weak.id);
+});
+
+test("辨析副本：最近正确率高时自动切强化 4 关", async () => {
+  const world = createWorld("dungeon-adaptive", "根");
+  const a = addNode(world.id, "A", 0, 0);
+  const b = addNode(world.id, "B", 100, 0);
+  const c = addNode(world.id, "C", 200, 0);
+  createSourceSpan(world.id, "A 包含 B。A 包含 C。");
+  const e1 = addEdge(world.id, a.id, b.id, "formal", "A 包含 B", null, "", {
+    predicate: "partOf",
+    evidence: "A 包含 B",
+  });
+  addEdge(world.id, a.id, c.id, "formal", "A 包含 C", null, "", {
+    predicate: "partOf",
+    evidence: "A 包含 C",
+  });
+  const building = createBuilding(world.id, "domain", a.id, "领域", "", "", [a.id, b.id, c.id]);
+  const task = await ensureUnderstandingTask(e1.id, mockLLM, "boundary");
+  const row = db
+    .prepare("SELECT correct_choice FROM understanding_tasks WHERE id=?")
+    .get(task.task!.id) as { correct_choice: string };
+  for (let i = 0; i < 3; i++) {
+    await answerUnderstandingTask(task.task!.id, row.correct_choice, task.task!.rubric.join("；"), mockLLM);
+  }
+  const seq = await ensureDungeonSequence(building.id, mockLLM);
+  assert.equal(seq.status, "ready");
+  assert.equal(seq.mode, "hard");
+  assert.equal(seq.stages.length, 4);
 });
 
 test.after(() => {

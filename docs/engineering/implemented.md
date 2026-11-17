@@ -172,7 +172,7 @@ node_docs, relation_docs, node_candidates, generation_jobs
 - 提示池：`services/hints.ts refreshHintDisplay` 按 confidence/新近/热度排序，写 `hint_score/hint_display`；地图只显示 `hint_display=1` 的 top-k，旧数据回退到置信度前 2。
 - 方向：新节点/焦点尽量生成 **4 条 open 方向计划**（LLM 优先，模板补足 4）；地图仍只 materialize 1–2 条；节点卡「全部探索方向」列出全部，每条可「去探索」；`/explore` 支持 `{directionId}`，不依赖地图投影边；从方向探索生成的新节点也会补到 4 条。
 - 副本解锁已有单测：节点 tier>=1 后 domain/flow 从 detected → playable；`short+judge` 都答对 → tier=1 → DOMAIN playable（答题链路）。
-- 辨析副本：`dungeon_stages` 持久化关卡；一个副本最多选 2 条带原文证据关系：单关系 → 边界/反例/迁移 3 关；两条关系 → 每条边界/反例 2 关，共 4 关。选关系按 `rankDungeonEdges`：类型权重（kindOf/partOf 高、related 低）+ 证据长度 + 局部易混度 + 置信度。`POST .../sequence/complete` 按持久化阶段检查，全部答对 → cleared。DungeonDrawer 以「辨析副本 · 误解纠正」为主入口，旧 10 题/流程排序收进默认折叠的「复习模式」。E2E 实测单关系 3 关通关。
+- 辨析副本：`dungeon_stages` 持久化关卡；难度自适应：最近 5 次作答样本 ≥3 且正确率 ≥75% 且有 2 条候选关系时切「强化」（2 关系 × 2 关 = 4 关），否则「基础」（1 关系 3 关：边界/反例/迁移）。选关系按 `rankDungeonEdges`：类型权重（kindOf/partOf 高、related 低）+ 证据长度 + 局部易混度 + 置信度。`POST .../sequence/complete` 按持久化阶段检查，全部答对 → cleared。DungeonDrawer 显示「基础/强化」；旧 10 题/流程排序收进默认折叠的「复习模式」。E2E 实测单关系 3 关通关。
 - 关系辨析（替代“3 题复习”）：`understanding_tasks/understanding_attempts`；`GET /api/edges/:id/understanding?variant=boundary|counterexample|error_correction|transfer` 生成“类型/边界、反例、纠错、迁移 + 选择 + 理由 + 原文引用 + rubric + follow_up”；无源返回 `source_required`；`POST /api/understanding/:id/answer` 判选择+解释并记录。旧 `edge_practice` 接口保留但 UI 已不用。
 - 题目质量审计：`GET /api/understanding/:id/quality`，7 项：证据可回查 25、误解具体 15、选项含干扰项 15、rubric 15、非定义题 10、含比较/边界/反例/迁移 10、要求解释 10；UI 显示“质量 N/100”和低分 flags。生成 prompt 同步要求“不得是可抄定义；必须有干扰项和比较/边界/反例/迁移”。
 - 真实 LLM 抽样（`pnpm quality:sample`，默认 2 条关系 × 2 种题型）：实测 4/4 均 100/100；抽样暴露并修正 3 个启发式误判：“到底是什么关系”不算定义题，“错在哪里/错误/修正”算辨析，“换到/比较/怎么判断”算迁移辨析。测试增加对应回归。

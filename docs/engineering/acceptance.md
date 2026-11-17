@@ -33,7 +33,7 @@ curl http://localhost:8787/api/health
 | 命令 | 耗时 | 结果 |
 |---|---|---|
 | `pnpm typecheck` | 3.6s | shared/server/web 全通过 |
-| `pnpm test` | 3.0s | **42 pass / 0 fail** |
+| `pnpm test` | 3.0s | **43 pass / 0 fail** |
 | `pnpm build` | 5.6s | web build 成功 |
 
 测试覆盖见 [testing.md](testing.md)。
@@ -83,7 +83,7 @@ hit node label=概念
 | 指标导出 | ✅ | `learning/export?days=7` 返回 text/csv，8 行含表头；面板「导出 CSV」可按需下载 |
 | 真实 LLM 抽样 | ✅ | `pnpm quality:sample`：2 关系 × 2 题型均 100 分；修正 3 个启发式误判并加回归测试 |
 | 方向动画 | ✅ | 修复 consumed 方向占名额后：两帧截图 hash 不同、`sparkMoved=true` |
-| 2–3 天完成带测试小 PR | ✅ 有测试/CI/小 PR 先例 | 42 tests + CI workflow |
+| 2–3 天完成带测试小 PR | ✅ 有测试/CI/小 PR 先例 | 43 tests + CI workflow |
 | 1 周独立改非核心功能 | 🟡 结构已支持，但无真人计时样本 | 前端已拆 hooks/slices/scene；后端 routes/services/db |
 | 2–4 周安全改核心逻辑 | 🟡 canonical/单源已就绪，DB 重命名未执行 | 见 [canonical-state.md](canonical-state.md) Phase 3 |
 

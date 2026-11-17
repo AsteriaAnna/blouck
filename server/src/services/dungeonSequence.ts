@@ -45,6 +45,22 @@ type StageRow = {
   created_at: number;
 };
 
+/** 最近 5 次作答正确率；样本不足或 <75% 时用基础难度。 */
+function recentAccuracy(worldId: string): { attempts: number; rate: number } {
+  const rows = db
+    .prepare(
+      `SELECT a.correct FROM understanding_attempts a
+       JOIN understanding_tasks t ON t.id=a.task_id
+       WHERE t.world_id=? ORDER BY a.at DESC LIMIT 5`,
+    )
+    .all(worldId) as { correct: number }[];
+  if (!rows.length) return { attempts: 0, rate: 0 };
+  return {
+    attempts: rows.length,
+    rate: rows.reduce((n, r) => n + r.correct, 0) / rows.length,
+  };
+}
+
 function stagePayload(rows: StageRow[]) {
   return rows
     .map((r) => ({
@@ -71,7 +87,11 @@ function correctCount(taskIds: string[]) {
  * - 单一误解 → 边界/反例/迁移 3 关；
  * - 多个误解 → 每条关系 边界/反例 2 关（最多 4 关）。
  */
-export async function ensureDungeonSequence(buildingId: string, llm: LLMProvider) {
+export async function ensureDungeonSequence(
+  buildingId: string,
+  llm: LLMProvider,
+  opts: { forceMode?: "gentle" | "hard" } = {},
+) {
   const building = getBuilding(buildingId);
   if (!building) return { status: "not_found" as const, stages: [], progress: { done: 0, total: 3 } };
   const existing = db
@@ -80,10 +100,12 @@ export async function ensureDungeonSequence(buildingId: string, llm: LLMProvider
   if (existing.length > 0) {
     const stages = stagePayload(existing);
     const done = correctCount(stages.map((s) => s.task!.id));
+    const mode = stages.length >= 4 ? "hard" : "gentle";
     return {
       status: "ready" as const,
       buildingId,
       edgeId: stages[0]?.edgeId,
+      mode,
       stages,
       progress: { done, total: stages.length },
     };
@@ -108,10 +130,14 @@ export async function ensureDungeonSequence(buildingId: string, llm: LLMProvider
       message: "这个副本还没有带原文证据的关系；辨析副本需要先有来源。",
     };
   }
-  const picked = rankDungeonEdges(candidates).slice(0, 2);
-  const variants = picked.length >= 2 ? VARIANTS_MANY : VARIANTS_ONE;
+  const recent = recentAccuracy(building.world_id);
+  const autoHard =
+    !opts.forceMode && candidates.length >= 2 && recent.attempts >= 3 && recent.rate >= 0.75;
+  const mode: "gentle" | "hard" = opts.forceMode ?? (autoHard ? "hard" : "gentle");
+  const selected = rankDungeonEdges(candidates).slice(0, mode === "hard" ? 2 : 1);
+  const variants = selected.length >= 2 ? VARIANTS_MANY : VARIANTS_ONE;
   const collected: { edgeId: string; variant: string; taskId: string }[] = [];
-  for (const edge of picked) {
+  for (const edge of selected) {
     for (const variant of variants) {
       const p = await ensureUnderstandingTask(edge.id, llm, variant);
       if (p.status === "ready" && p.task) {
@@ -141,6 +167,7 @@ export async function ensureDungeonSequence(buildingId: string, llm: LLMProvider
     status: "ready" as const,
     buildingId,
     edgeId: stages[0]?.edgeId,
+    mode,
     stages,
     progress: { done: 0, total: stages.length },
   };

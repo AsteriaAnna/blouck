@@ -140,6 +140,7 @@ export default function DungeonDrawer() {
             <>
               <div className="hintline">
                 进度：{Math.min(stage + 1, sequence.stages.length)} / {sequence.stages.length} ·{" "}
+                {sequence.mode === "hard" ? "强化" : "基础"} ·{" "}
                 {sequence.stages
                   .map((s: any) =>
                     s.variant === "boundary"
