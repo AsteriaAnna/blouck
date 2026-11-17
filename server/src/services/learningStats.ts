@@ -207,12 +207,14 @@ export function calibrationReport(worldId: string): CalibrationReport {
   };
 }
 
-/** 跨世界总览：首页/总览用，按创建时间倒序。 */
-export function learningOverview(): WorldOverview[] {
+/** 跨世界总览：首页/总览用；支持 recent/tasks/accuracy 排序与名称过滤。 */
+export function learningOverview(opts: { sort?: "recent" | "tasks" | "accuracy"; q?: string } = {}): WorldOverview[] {
   const worlds = db
     .prepare("SELECT id,name,is_demo,created_at FROM worlds ORDER BY created_at DESC")
     .all() as { id: string; name: string; is_demo: number; created_at: number }[];
-  return worlds.map((w) => {
+  const q = (opts.q ?? "").trim().toLowerCase();
+  const filtered = q ? worlds.filter((w) => w.name.toLowerCase().includes(q)) : worlds;
+  const rows = filtered.map((w) => {
     const s = learningStats(w.id);
     return {
       id: w.id,
@@ -230,6 +232,17 @@ export function learningOverview(): WorldOverview[] {
       directions: s.directions,
     };
   });
+  const sort = opts.sort ?? "recent";
+  rows.sort((a, b) => {
+    if (sort === "tasks") return b.tasks - a.tasks || b.createdAt - a.createdAt;
+    if (sort === "accuracy") {
+      const aa = a.attempts ? a.correctRate : -1;
+      const bb = b.attempts ? b.correctRate : -1;
+      return bb - aa || b.attempts - a.attempts || b.createdAt - a.createdAt;
+    }
+    return b.createdAt - a.createdAt;
+  });
+  return rows;
 }
 
 /** CSV 导出：近 N 天趋势，可直接给表格工具。 */

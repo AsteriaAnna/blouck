@@ -191,7 +191,8 @@ node_docs, relation_docs, node_candidates, generation_jobs
 - 按缩放披露：`MapCameraProbe` 在相机高度跨过 720 时写 `mapZoom`；远看提示 top2/方向 2，拉近提示 top6/方向 4。CDP 用可信滚轮输入实测 far→near→far，`镜头拉近：提示 top6 / 方向 4` 文案生效，errors=[]。
 - 方向可探索感：`DirectionEdge` 增加 `TravelingSpark`（沿曲线流动的光点）和 `DirectionSign` 轻微呼吸浮动。**修复：已消费的方向不再占地图 top2 名额**，否则 demo 前两条 consumed 方向被选中后又被渲染层过滤，导致方向线完全不可见。CDP 实测 `frameChanged=true`、`sparkMoved=true`，两帧截图 hash 不同；DEV 下 `__spark` 仅作验收探针。
 - 四类线视觉：关系=粗实线；序列=实线+中途箭头；提示=虚线+路牌；方向=点线+路牌+光点。图例明确写出四种线型；CDP 实测图例含“实线/箭头/虚线/点线”，errors=[]。
-- 学习指标：`GET /api/worlds/:id/learning/stats` 汇总任务总数/低质量题/题型、作答正确率与平均解释分、卡片打开、方向探索、副本 cleared/playable；低质量题最多返回 20 条。`GET .../learning/trend?days=7` 返回近 7 日答题/正确/解释分/任务/卡片/方向，缺日补 0。`GET .../learning/export?days=30` 导出 CSV（day/attempts/correct/avgExplanation/tasks/nodeCards/directions）。`GET /api/learning/overview` 返回跨世界总览，首页世界卡显示任务/正确率/通关/低质量。
+- 学习指标：`GET /api/worlds/:id/learning/stats` 汇总任务总数/低质量题/题型、作答正确率与平均解释分、卡片打开、方向探索、副本 cleared/playable；低质量题最多返回 20 条。`/trend?days=7` 返回近 7 日趋势，缺日补 0；`/export?days=30` 导出 CSV；`/calibration` 返回人工标签校准。
+- 跨世界总览：`GET /api/learning/overview?sort=recent|tasks|accuracy&q=`；首页世界卡显示任务/正确率/通关/低质量，增加搜索框与排序。CDP 实测搜索“第二”只保留目标世界，errors=[]。
 - 指标面板：顶栏「学习指标」按需打开，显示任务/低质量、作答/正确率/平均解释分、卡片、方向、副本、题型与低质量 flags；近 7 日有小型柱状趋势；「导出 CSV」下载 30 天数据。不常驻占地图。CDP 实测打开/关闭/字段/趋势/导出按钮正常，errors=[]。
 - 浏览器 E2E：`pnpm e2e:v3` 用 dev fixture + 确定性任务，在真实 UI 走「节点辨析 → 三关副本 → 指标面板」；实测解释分 100/100、三关通过、作答 4/4、副本通关 1、errors=[]。脚本会直接写本地 DB 种子，只能本地跑，不进 CI。
 - 节点辨析：`GET /api/nodes/:id/understanding`，任务目标为体系位置/边界；节点无 `source_span_id` 时 `source_required`。节点卡与关系卡都使用 `UnderstandingTaskPanel`，关系卡不再维护内联任务状态。

@@ -34,7 +34,7 @@ CI：`.github/workflows/ci.yml`，push main / PR 跑 install → typecheck → t
 | V3 人工反馈 | `server/src/taskReviews.test.ts` | 好题/差题记录、列表、按世界汇总；校准报告；阈值建议（样本<4 用 60） |
 | 真实 LLM 抽样 | `scripts/quality-sample.mjs` | 本地调 provider，默认 2 关系 × 2 题型并查质量分；非 CI |
 | mock ASR E2E | `scripts/voice-check.mjs` | 浏览器点「试听」→ stream segment/commit → 新节点挂 source_spans；非 CI |
-| V3 学习指标 | `server/src/learningStats.test.ts` | 任务/作答/卡片/方向/副本汇总；平均解释分；近 7 日趋势；CSV；跨世界 overview |
+| V3 学习指标 | `server/src/learningStats.test.ts` | 任务/作答/卡片/方向/副本汇总；平均解释分；近 7 日趋势；CSV；跨世界 overview 排序/搜索 |
 | V3 解释质量 | `server/src/explanationQuality.test.ts` | 空解释 0；完整解释高分；rubric 覆盖降分 |
 | V3 全链路 | `server/src/v3Loop.test.ts` | 源→关系→辨析→三关副本→cleared→指标 |
 | V3 浏览器 E2E | `scripts/e2e-v3.mjs` | 节点辨析→三关→指标面板；需 dev server + Chrome，非 CI |

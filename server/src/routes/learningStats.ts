@@ -13,8 +13,12 @@ learningStatsRouter.get("/api/worlds/:id/learning/calibration", (req, res) => {
   res.json(calibrationReport(req.params.id));
 });
 
-learningStatsRouter.get("/api/learning/overview", (_req, res) => {
-  res.json({ worlds: learningOverview() });
+learningStatsRouter.get("/api/learning/overview", (req, res) => {
+  const sortRaw = String(req.query.sort ?? "recent");
+  const sort = ["recent", "tasks", "accuracy"].includes(sortRaw)
+    ? (sortRaw as "recent" | "tasks" | "accuracy")
+    : "recent";
+  res.json({ worlds: learningOverview({ sort, q: String(req.query.q ?? "") }) });
 });
 
 learningStatsRouter.get("/api/worlds/:id/learning/stats", (req, res) => {

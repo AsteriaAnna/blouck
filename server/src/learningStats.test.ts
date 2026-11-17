@@ -65,6 +65,12 @@ test("学习指标：任务/作答/卡片/方向/副本汇总", async () => {
   assert.equal(overview[0].id, world.id);
   assert.equal(overview[0].tasks, 2);
   assert.equal(overview[0].cleared, 1);
+
+  const second = createWorld("stats-second", "根");
+  assert.equal(learningOverview().length, 2);
+  assert.equal(learningOverview({ q: "second" }).length, 1);
+  assert.equal(learningOverview({ q: "second" })[0].id, second.id);
+  assert.equal(learningOverview({ sort: "tasks" })[0].id, world.id);
 });
 
 test.after(() => {

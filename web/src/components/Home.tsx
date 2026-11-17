@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { get } from "../api";
 import { useStore } from "../store";
 
@@ -21,17 +21,34 @@ export default function Home() {
   const createWorld = useStore((s) => s.createWorld);
   const [name, setName] = useState("");
   const [root, setRoot] = useState("");
-  const [overview, setOverview] = useState<Record<string, Overview>>({});
+  const [overviewList, setOverviewList] = useState<Overview[]>([]);
+  const [sort, setSort] = useState<"recent" | "tasks" | "accuracy">("recent");
+  const [q, setQ] = useState("");
 
   useEffect(() => {
     loadWorlds();
   }, [loadWorlds]);
 
   useEffect(() => {
-    get<{ worlds: Overview[] }>("/api/learning/overview")
-      .then((r) => setOverview(Object.fromEntries(r.worlds.map((w) => [w.id, w]))))
-      .catch(() => setOverview({}));
-  }, [worlds.length]);
+    const timer = window.setTimeout(() => {
+      get<{ worlds: Overview[] }>(
+        `/api/learning/overview?sort=${sort}&q=${encodeURIComponent(q)}`,
+      )
+        .then((r) => setOverviewList(r.worlds))
+        .catch(() => setOverviewList([]));
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [sort, q, worlds.length]);
+
+  const overviewById = useMemo(
+    () => Object.fromEntries(overviewList.map((o) => [o.id, o])),
+    [overviewList],
+  );
+  const orderedWorlds = useMemo(() => {
+    if (!overviewList.length) return worlds;
+    const byId = new Map(worlds.map((w) => [w.id, w]));
+    return overviewList.map((o) => byId.get(o.id)).filter(Boolean) as typeof worlds;
+  }, [overviewList, worlds]);
 
   return (
     <div className="home">
@@ -39,8 +56,21 @@ export default function Home() {
       <div className="sub">
         把口头理解变成可探索、可编辑、可挑战的知识地图 · MVP
       </div>
+      <div className="world-controls">
+        <input
+          placeholder="搜索世界…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          aria-label="搜索世界"
+        />
+        <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+          <option value="recent">最近创建</option>
+          <option value="tasks">任务最多</option>
+          <option value="accuracy">正确率最高</option>
+        </select>
+      </div>
       <div className="world-grid">
-        {worlds.map((w) => (
+        {orderedWorlds.map((w) => (
           <div className="world-card" key={w.id} onClick={() => useStore.getState().openWorld(w.id)}>
             <h3>
               {w.name}
@@ -49,11 +79,14 @@ export default function Home() {
             <div className="meta">
               {new Date(w.created_at).toLocaleString()} · 点击进入
             </div>
-            {overview[w.id] && (
+            {overviewById[w.id] && (
               <div className="hintline" style={{ marginTop: 4 }}>
-                任务 {overview[w.id].tasks} · 正确率 {Math.round(overview[w.id].correctRate * 100)}% ·
-                通关 {overview[w.id].cleared}/{overview[w.id].dungeons}
-                {overview[w.id].lowQuality > 0 ? ` · 低质量 ${overview[w.id].lowQuality}` : ""}
+                任务 {overviewById[w.id].tasks} · 正确率{" "}
+                {Math.round(overviewById[w.id].correctRate * 100)}% · 通关{" "}
+                {overviewById[w.id].cleared}/{overviewById[w.id].dungeons}
+                {overviewById[w.id].lowQuality > 0
+                  ? ` · 低质量 ${overviewById[w.id].lowQuality}`
+                  : ""}
               </div>
             )}
           </div>

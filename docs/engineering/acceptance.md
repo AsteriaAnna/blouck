@@ -84,7 +84,7 @@ hit node label=概念
 | 回到全局 | ✅ | CDP：near → 点击「回到全局」→ `mapZoom=far`，errors=[] |
 | 单指旋转 | ✅ | CDP 触摸拖动：相机 x/y/z 变化、distance 2363 不变、mapZoom 保持 far（修复旋转误触发 near） |
 | 指标导出 | ✅ | `learning/export?days=7` 返回 text/csv，8 行含表头；面板「导出 CSV」可按需下载 |
-| 跨世界总览 | ✅ | `GET /api/learning/overview`；CDP 首页显示任务/正确率/通关，errors=[] |
+| 跨世界总览 | ✅ | `GET /api/learning/overview`；CDP 首页显示任务/正确率/通关，搜索过滤正常，errors=[] |
 | 语音→知识层 | ✅ | 集成测试：stream commit 节点至少一个挂 `source_spans`，可回源生成事实题 |
 | mock ASR 浏览器链路 | ✅ | `pnpm voice:check`：流式文本正常，节点 1→4，3 个挂 source_span，errors=[] |
 | 人工题目反馈 | ✅ | 面板「这题好/这题差」写入 `understanding_task_reviews`；统计面板显示好/差数量与校准均分/建议阈值 |
