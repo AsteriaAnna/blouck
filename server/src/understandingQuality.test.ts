@@ -52,6 +52,31 @@ test("质量审计：有源/有误解/rubric 的好题高分；定义题/无源�
   assert.ok(report!.flags.includes("notDefinition"));
   assert.ok(report!.flags.includes("comparison"));
   assert.ok(report!.flags.includes("choices"));
+
+  // 反例：真实 LLM 常见措辞不应被误判
+  const realish = createUnderstandingTask({
+    world_id: world.id,
+    edge_id: "y",
+    target_type: "edge",
+    node_id: null,
+    task_kind: "counterexample",
+    learning_goal: "discriminate",
+    misconception: "把流程顺序关系误判为同类关系",
+    stem: "有人说两者是同一类技术。请判断这种说法错在哪里，并说明到底是什么关系。",
+    answer_type: "choice_explain",
+    choices_json: JSON.stringify([
+      { id: "a", text: "前置关系" },
+      { id: "b", text: "同类关系" },
+    ]),
+    correct_choice: "a",
+    rubric_json: JSON.stringify(["指出错误", "说明真实关系"]),
+    evidence_quote: "A 是一种 B 的实现",
+    source_span_id: null,
+    follow_up: "",
+  });
+  const r2 = auditUnderstandingTask(realish.id)!;
+  assert.equal(r2.checks.notDefinition, true, "‘是什么关系’不是定义题");
+  assert.equal(r2.checks.comparison, true, "‘错在哪里’算辨析");
 });
 
 test.after(() => {

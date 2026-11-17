@@ -48,8 +48,15 @@ export function auditUnderstandingTask(taskId: string): QualityReport | null {
       choices.some((c) => c.id === task.correct_choice) &&
       choices.some((c) => c.id !== task.correct_choice),
     rubric: rubric.length >= 2,
-    notDefinition: !/什么是|是什么|的定义是|定义：/.test(task.stem),
-    comparison: /为什么|区别|不同|不是|边界|反例|迁移|换一个|哪一项|哪一种|哪一个/.test(task.stem),
+    // 只有“什么是 X / X 是什么？”这类定义提问才扣分；“是什么关系”不算。
+    notDefinition:
+      !/(^|[，。；：])什么是/.test(task.stem) &&
+      !/的定义是|定义：|的定义是什么/.test(task.stem) &&
+      !/^[^，。；：]{0,24}是什么[？?]\s*$/.test(task.stem.trim()),
+    comparison:
+      /为什么|区别|不同|不是|边界|反例|迁移|换一个|哪一项|哪一种|哪一个|错在哪里|哪里错|错误|修正|改成|判断.*(错|不对)/.test(
+        task.stem,
+      ),
     explain: task.answer_type === "choice_explain",
   };
   const weights: Record<keyof typeof checks, number> = {
