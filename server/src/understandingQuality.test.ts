@@ -50,6 +50,8 @@ test("质量审计：有源/有误解/rubric 的好题高分；定义题/无源�
   assert.ok(report!.score < 60);
   assert.ok(report!.flags.includes("evidence"));
   assert.ok(report!.flags.includes("notDefinition"));
+  assert.ok(report!.flags.includes("comparison"));
+  assert.ok(report!.flags.includes("choices"));
 });
 
 test.after(() => {

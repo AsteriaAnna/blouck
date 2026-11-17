@@ -42,19 +42,24 @@ export function auditUnderstandingTask(taskId: string): QualityReport | null {
     evidence: Boolean(
       task.evidence_quote && span?.text && span.text.includes(task.evidence_quote),
     ),
-    misconception: Boolean(task.misconception?.trim()),
-    choices: choices.length >= 2 && choices.some((c) => c.id === task.correct_choice),
+    misconception: (task.misconception ?? "").trim().length >= 8,
+    choices:
+      choices.length >= 2 &&
+      choices.some((c) => c.id === task.correct_choice) &&
+      choices.some((c) => c.id !== task.correct_choice),
     rubric: rubric.length >= 2,
     notDefinition: !/什么是|是什么|的定义是|定义：/.test(task.stem),
+    comparison: /为什么|区别|不同|不是|边界|反例|迁移|换一个|哪一项|哪一种|哪一个/.test(task.stem),
     explain: task.answer_type === "choice_explain",
   };
   const weights: Record<keyof typeof checks, number> = {
-    evidence: 30,
-    misconception: 10,
+    evidence: 25,
+    misconception: 15,
     choices: 15,
     rubric: 15,
-    notDefinition: 15,
-    explain: 15,
+    notDefinition: 10,
+    comparison: 10,
+    explain: 10,
   };
   let score = 0;
   const flags: string[] = [];
