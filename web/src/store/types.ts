@@ -49,6 +49,9 @@ export type State = {
   /** 渐进披露：默认只显示提示 top2/方向少量；展开后显示全部关系 */
   mapExpand: boolean;
   toggleMapExpand: () => void;
+  /** 镜头远近：拉近自动多显示一些线索 */
+  mapZoom: "far" | "near";
+  setMapZoom: (zoom: "far" | "near") => void;
 
   loadWorlds: () => Promise<void>;
   createWorld: (name: string, root: string) => Promise<void>;

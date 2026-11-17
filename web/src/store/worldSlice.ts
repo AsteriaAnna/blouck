@@ -31,6 +31,8 @@ export type WorldSlice = Pick<
   | "challenge"
   | "mapExpand"
   | "toggleMapExpand"
+  | "mapZoom"
+  | "setMapZoom"
   | "loadWorlds"
   | "createWorld"
   | "openWorld"
@@ -67,9 +69,14 @@ export const createWorldSlice: StateCreator<State, [], [], WorldSlice> = (set, g
   quizStatus: "idle",
   challenge: null,
   mapExpand: false,
+  mapZoom: "far",
 
   toggleMapExpand() {
     set({ mapExpand: !getState().mapExpand });
+  },
+
+  setMapZoom(zoom) {
+    set({ mapZoom: zoom });
   },
 
   async loadWorlds() {
@@ -96,6 +103,7 @@ export const createWorldSlice: StateCreator<State, [], [], WorldSlice> = (set, g
       drawer: null,
       challenge: null,
       mapExpand: false,
+      mapZoom: "far",
       partial: "",
       streamText: "",
       mentions: [],

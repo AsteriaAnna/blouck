@@ -11,6 +11,7 @@ const LABEL: Record<string, string> = {
 export default function MapControls() {
   const edges = useStore((s) => s.edges);
   const mapExpand = useStore((s) => s.mapExpand);
+  const mapZoom = useStore((s) => s.mapZoom);
   const toggleMapExpand = useStore((s) => s.toggleMapExpand);
   const counts: Record<string, number> = { relation: 0, sequence: 0, hint: 0, exploration: 0 };
   for (const e of edges) {
@@ -46,7 +47,11 @@ export default function MapControls() {
         {mapExpand ? "收起：只看重点" : "展开：显示全部关系"}
       </button>
       <div className="hintline" style={{ marginTop: 4 }}>
-        {mapExpand ? "当前显示全部线索" : "默认提示 top2 / 方向 2"}
+        {mapExpand
+          ? "当前显示全部线索"
+          : mapZoom === "near"
+            ? "镜头拉近：提示 top6 / 方向 4"
+            : "默认提示 top2 / 方向 2"}
       </div>
     </div>
   );

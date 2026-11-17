@@ -4,6 +4,7 @@ import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { useStore } from "../store";
 import { Edge, DirectionEdge } from "./World3DEdges";
+import MapCameraProbe from "./MapCameraProbe";
 import { Building, CameraFit, GhostIsland, Island } from "./World3DScene";
 
 export default function World3D() {
@@ -15,6 +16,7 @@ export default function World3D() {
   const openBuilding = useStore((s) => s.openBuilding);
   const openEdge = useStore((s) => s.openEdge);
   const mapExpand = useStore((s) => s.mapExpand);
+  const mapZoom = useStore((s) => s.mapZoom);
   const newNodeIds = useStore((s) => s.newNodeIds);
   const mentions = useStore((s) => s.mentions);
   const ghosts = useStore((s) => s.ghosts);
@@ -83,9 +85,15 @@ export default function World3D() {
   // 地图克制：提示线由后端 hint_display 给出 top-k；旧数据回退到置信度前 2
   const displayEdges = useMemo(() => {
     if (mapExpand) return edges;
+    const near = mapZoom === "near";
     const marked = edges.filter((e) => e.kind === "suggest" && e.hint_display === 1);
-    const hints =
-      marked.length > 0
+    const hints = near
+      ? edges
+          .filter((e) => e.kind === "suggest")
+          .slice()
+          .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
+          .slice(0, 6)
+      : marked.length > 0
         ? marked
         : edges
             .filter((e) => e.kind === "suggest")
@@ -93,14 +101,16 @@ export default function World3D() {
             .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
             .slice(0, 2);
     const allowed = new Set(hints.map((e) => e.id));
-    const directions = edges.filter((e) => e.kind === "direction").slice(0, 2);
+    const directions = edges
+      .filter((e) => e.kind === "direction")
+      .slice(0, near ? 4 : 2);
     for (const d of directions) allowed.add(d.id);
     return edges.filter(
       (e) =>
         (e.kind !== "suggest" && e.kind !== "direction") ||
         allowed.has(e.id),
     );
-  }, [edges, mapExpand]);
+  }, [edges, mapExpand, mapZoom]);
 
   return (
     <div className="world3d">
@@ -110,6 +120,7 @@ export default function World3D() {
         camera={{ position: [0, 820, 1000], fov: 38, near: 10, far: 8000 }}
       >
         <color attach="background" args={["#f7f2e8"]} />
+        <MapCameraProbe />
         <fog attach="fog" args={["#f7f2e8", 1400, 4200]} />
         <ambientLight intensity={0.9} />
         <hemisphereLight args={["#fffdf7", "#d8cbb5", 0.55]} />
