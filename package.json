@@ -8,6 +8,7 @@
     "build": "pnpm -r run build",
     "start:server": "pnpm --filter @blouck/server start",
     "test": "pnpm --filter @blouck/server test",
+    "e2e:v3": "node scripts/e2e-v3.mjs",
     "typecheck": "pnpm -r run typecheck"
   },
   "pnpm": {
