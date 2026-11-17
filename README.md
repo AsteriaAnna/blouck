@@ -15,10 +15,11 @@
 - 之前尝试/推断过的措施：[docs/02-reasoning.md](docs/02-reasoning.md)（历史，不是实现依据）
 - 使用问题与探索记录：[docs/04-problems.md](docs/04-problems.md)（过程记录，不是实现依据）
 - 线系统设计草稿：[docs/05-line-system-draft.md](docs/05-line-system-draft.md)（早期研究，不是当前口径）
-- **四类线系统口径（v1.1，未实现）**：[docs/06-four-line-system.md](docs/06-four-line-system.md)（当前“想要什么”以此为准，含 Q1–Q10 待确认）
+- **四类线需求口径（v1.2，未实现）**：[docs/06-four-line-system.md](docs/06-four-line-system.md)（只写需求/用户体验，含副本需求，Q1–Q7 待确认）
+- **四类线实现笔记（当前代码/迁移选项）**：[docs/07-line-implementation-notes.md](docs/07-line-implementation-notes.md)（不是需求）
 - 索引：[docs/00-index.md](docs/00-index.md)
 
-> `01/02` 是历史记录，`04` 是问题/方案探索过程，`05` 是早期设计草稿，`06` 是当前四类线口径（未实现）；代码里有没有某个能力，只以 `03-implemented.md` 和源码为准。
+> `01/02` 是历史记录，`04` 是问题/方案探索过程，`05` 是早期设计草稿，`06` 是需求口径，`07` 是实现笔记；代码里有没有某个能力，只以 `03-implemented.md` 和源码为准。
 
 ## 当前实际链路
 
