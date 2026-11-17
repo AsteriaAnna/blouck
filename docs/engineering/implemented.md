@@ -175,6 +175,7 @@ node_docs, relation_docs, node_candidates, generation_jobs
 - 辨析副本：`GET /api/buildings/:id/sequence` 选一条带原文证据的 formal 关系，生成“边界→反例→迁移”三关；`POST .../sequence/complete` 检查三关是否都答对，全部通过则 building cleared。DungeonDrawer 有「辨析副本 · 误解纠正」（旧 10 题仍保留）。
 - 关系辨析（替代“3 题复习”）：`understanding_tasks/understanding_attempts`；`GET /api/edges/:id/understanding?variant=boundary|counterexample|error_correction|transfer` 生成“类型/边界、反例、纠错、迁移 + 选择 + 理由 + 原文引用 + rubric + follow_up”；无源返回 `source_required`；`POST /api/understanding/:id/answer` 判选择+解释并记录。旧 `edge_practice` 接口保留但 UI 已不用。
 - 题目质量审计：`GET /api/understanding/:id/quality`，按 evidence/误解/choices/rubric/非定义题/解释 6 项打分；UI 显示“质量 N/100”和低分 flags。CDP 实测 demo 关系任务质量 100/100。
+- 学习指标：`GET /api/worlds/:id/learning/stats` 汇总任务总数/低质量题/题型、作答正确率、卡片打开、方向探索、副本 cleared/playable；低质量题最多返回 20 条。
 - 节点辨析：`GET /api/nodes/:id/understanding`，任务目标为体系位置/边界；节点无 `source_span_id` 时 `source_required`。节点卡与关系卡都使用 `UnderstandingTaskPanel`，关系卡不再维护内联任务状态。
 - 指标：`events` 表 + `web/src/telemetry.ts` fire-and-forget；已埋 node_card_open、relation_card_open、direction_explore、candidate_admit/reject、manual_relation_create、relation_practice_start/answer；`GET /api/worlds/:id/events/summary` 汇总。CDP 实测 demo 产生 2 条事件（node/relation card open）。
 
