@@ -32,6 +32,7 @@ export default function UnderstandingTaskPanel({
   const [explanation, setExplanation] = useState("");
   const [feedback, setFeedback] = useState("");
   const [variant, setVariant] = useState("boundary");
+  const [quality, setQuality] = useState<{ score: number; flags: string[] } | null>(null);
 
   async function load(nextVariant = "boundary") {
     setLoading(true);
@@ -39,9 +40,18 @@ export default function UnderstandingTaskPanel({
     setVariant(nextVariant);
     setChoice("");
     setExplanation("");
+    setQuality(null);
     try {
       const p = await get<TaskPayload>(`${endpoint}?variant=${nextVariant}`);
       setPayload(p);
+      if (p.task?.id) {
+        try {
+          const q = await get<{ score: number; flags: string[] }>(
+            `/api/understanding/${p.task.id}/quality`,
+          );
+          setQuality(q);
+        } catch {}
+      }
       track("understanding_task_start", {
         worldId,
         targetId,
@@ -84,6 +94,12 @@ export default function UnderstandingTaskPanel({
           <div className="hintline" style={{ marginBottom: 6 }}>
             目标：辨析类型/边界，而不是背定义。
           </div>
+          {quality && (
+            <div className="hintline">
+              质量 {quality.score}/100
+              {quality.score < 60 ? ` · 偏低：${quality.flags.join("、")}` : " · 证据/结构合格"}
+            </div>
+          )}
           {payload.task.misconception && (
             <div className="hintline">易错点：{payload.task.misconception}</div>
           )}

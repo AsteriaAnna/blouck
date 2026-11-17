@@ -1,9 +1,16 @@
 import { Router } from "express";
 import { db } from "../db.js";
 import { answerUnderstandingTask, ensureNodeUnderstandingTask, ensureUnderstandingTask } from "../services/understanding.js";
+import { auditUnderstandingTask } from "../services/understandingQuality.js";
 import { llm } from "../providers/active.js";
 
 export const understandingRouter = Router();
+
+understandingRouter.get("/api/understanding/:id/quality", (req, res) => {
+  const report = auditUnderstandingTask(req.params.id);
+  if (!report) return res.status(404).json({ error: "task not found" });
+  res.json(report);
+});
 
 understandingRouter.get("/api/nodes/:id/understanding", async (req, res) => {
   const node = db.prepare("SELECT id FROM nodes WHERE id=?").get(req.params.id) as

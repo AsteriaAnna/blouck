@@ -103,7 +103,7 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 | docs | GET/POST `.../doc`、`.../doc/regenerate`、PATCH `.../doc/notes`（node/edge） | 6 | V3 节点卡/关系卡懒生成、备注、重生成 |
 | candidates | GET `/api/worlds/:id/candidates`；POST `/api/candidates/:id/admit`、`/reject` | 3 | 软准入候选列表/确认（建节点+formal 关系）/忽略 |
 | practice | GET `/api/edges/:id/practice`；POST `/api/practice/:id/answer` | 2 | 旧关系短练习；UI 已由辨析任务替代 |
-| understanding | GET `/api/nodes/:id/understanding`、`/api/edges/:id/understanding`；POST `/api/understanding/:id/answer` | 3 | 节点/关系辨析任务（类型/边界+理由+原文） |
+| understanding | GET `/api/nodes/:id/understanding`、`/api/edges/:id/understanding`；POST `/api/understanding/:id/answer`；GET `/api/understanding/:id/quality` | 4 | 节点/关系辨析任务（类型/边界+理由+原文）、质量审计 |
 | dungeon-seq | GET `/api/buildings/:id/sequence`；POST `/api/buildings/:id/sequence/complete` | 2 | 边界→反例→迁移误解纠正序列 |
 | events | POST `/api/events`；GET `/api/worlds/:id/events/summary` | 2 | 本地指标上报/汇总 |
 | quizzes | GET `/api/nodes/:id/quiz`；POST `/api/nodes/:id/quiz/generate`；POST `/api/quiz/:id/answer` | 3 | 节点题/生成/判题 |

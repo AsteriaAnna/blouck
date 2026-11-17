@@ -1,0 +1,66 @@
+import { db } from "../db.js";
+import { getUnderstandingTask } from "../db/understanding.js";
+
+export type QualityReport = {
+  score: number;
+  flags: string[];
+  checks: Record<string, boolean>;
+};
+
+/**
+ * 题目质量审计（启发式，不是真理）：
+ * - 有原文引用且能回查
+ * - 有明确误解
+ * - 有选择/正确项
+ * - 有 rubric
+ * - 不是定义回忆题
+ * - 要求解释
+ */
+export function auditUnderstandingTask(taskId: string): QualityReport | null {
+  const task = getUnderstandingTask(taskId);
+  if (!task) return null;
+  const span = task.source_span_id
+    ? (db.prepare("SELECT text FROM source_spans WHERE id=?").get(task.source_span_id) as
+        | { text: string }
+        | undefined)
+    : undefined;
+  const choices = (() => {
+    try {
+      return JSON.parse(task.choices_json || "[]") as { id: string; text: string }[];
+    } catch {
+      return [];
+    }
+  })();
+  const rubric = (() => {
+    try {
+      return JSON.parse(task.rubric_json || "[]") as string[];
+    } catch {
+      return [];
+    }
+  })();
+  const checks = {
+    evidence: Boolean(
+      task.evidence_quote && span?.text && span.text.includes(task.evidence_quote),
+    ),
+    misconception: Boolean(task.misconception?.trim()),
+    choices: choices.length >= 2 && choices.some((c) => c.id === task.correct_choice),
+    rubric: rubric.length >= 2,
+    notDefinition: !/什么是|是什么|的定义是|定义：/.test(task.stem),
+    explain: task.answer_type === "choice_explain",
+  };
+  const weights: Record<keyof typeof checks, number> = {
+    evidence: 30,
+    misconception: 10,
+    choices: 15,
+    rubric: 15,
+    notDefinition: 15,
+    explain: 15,
+  };
+  let score = 0;
+  const flags: string[] = [];
+  for (const [k, ok] of Object.entries(checks) as [keyof typeof checks, boolean][]) {
+    if (ok) score += weights[k];
+    else flags.push(k);
+  }
+  return { score, flags, checks };
+}
