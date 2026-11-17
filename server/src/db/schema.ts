@@ -302,6 +302,9 @@ CREATE TABLE IF NOT EXISTS edge_practice(
   kind TEXT NOT NULL,
   prompt TEXT NOT NULL,
   answer TEXT NOT NULL,
+  source_span_id TEXT,
+  evidence_quote TEXT NOT NULL DEFAULT '',
+  verification TEXT NOT NULL DEFAULT 'unverified',
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_edge_practice_edge ON edge_practice(edge_id);

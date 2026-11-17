@@ -51,6 +51,9 @@ export default function RelationDrawer() {
   const [practice, setPractice] = useState<{
     items: { id: string; kind: string; prompt: string }[];
     progress: { total: number; correct: number };
+    status?: string;
+    message?: string;
+    evidence_quote?: string;
   } | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState<Record<string, string>>({});
@@ -123,6 +126,9 @@ export default function RelationDrawer() {
       const p = await get<{
         items: { id: string; kind: string; prompt: string }[];
         progress: { total: number; correct: number };
+        status?: string;
+        message?: string;
+        evidence_quote?: string;
       }>(`/api/edges/${edge.id}/practice`);
       setPractice(p);
       track("relation_practice_start", { worldId: edge.world_id, targetId: edge.id, payload: { items: p.items.length } });
@@ -202,6 +208,14 @@ export default function RelationDrawer() {
               </button>
             ) : (
               <>
+                {practice.status === "source_required" && (
+                  <div className="hintline" style={{ marginBottom: 6 }}>
+                    {practice.message}
+                  </div>
+                )}
+                {practice.evidence_quote && (
+                  <blockquote style={{ marginBottom: 6 }}>依据：{practice.evidence_quote}</blockquote>
+                )}
                 <div className="hintline">
                   已答对 {practice.progress.correct} / {practice.progress.total}
                 </div>

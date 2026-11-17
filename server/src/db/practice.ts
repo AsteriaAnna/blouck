@@ -11,6 +11,9 @@ export type EdgePracticeRow = {
   kind: "short" | "judge";
   prompt: string;
   answer: string;
+  source_span_id: string | null;
+  evidence_quote: string;
+  verification: string;
   created_at: number;
 };
 
@@ -24,11 +27,25 @@ export function createEdgePractice(
   worldId: string,
   edgeId: string,
   items: { kind: "short" | "judge"; prompt: string; answer: string }[],
+  meta: { sourceSpanId?: string | null; evidenceQuote?: string; verification?: string } = {},
 ): EdgePracticeRow[] {
   const stmt = db.prepare(
-    "INSERT INTO edge_practice(id,world_id,edge_id,kind,prompt,answer,created_at) VALUES(?,?,?,?,?,?,?)",
+    "INSERT INTO edge_practice(id,world_id,edge_id,kind,prompt,answer,source_span_id,evidence_quote,verification,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
   );
-  for (const it of items.slice(0, 3)) stmt.run(uid(), worldId, edgeId, it.kind, it.prompt, it.answer, now());
+  for (const it of items.slice(0, 3)) {
+    stmt.run(
+      uid(),
+      worldId,
+      edgeId,
+      it.kind,
+      it.prompt,
+      it.answer,
+      meta.sourceSpanId ?? null,
+      meta.evidenceQuote ?? "",
+      meta.verification ?? "unverified",
+      now(),
+    );
+  }
   return listEdgePractice(edgeId);
 }
 
