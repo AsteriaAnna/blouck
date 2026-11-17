@@ -79,6 +79,16 @@ export function learningTrend(worldId: string, days = 7): TrendPoint[] {
   return keys.map((k) => base.get(k)!);
 }
 
+/** CSV 导出：近 N 天趋势，可直接给表格工具。 */
+export function learningCsv(worldId: string, days = 30): string {
+  const rows = learningTrend(worldId, days);
+  const head = "day,attempts,correct,avgExplanation,tasks,nodeCards,directions";
+  const body = rows.map((r) =>
+    [r.day, r.attempts, r.correct, r.avgExplanation, r.tasks, r.nodeCards, r.directions].join(","),
+  );
+  return [head, ...body].join("\n") + "\n";
+}
+
 export function learningStats(worldId: string): LearningStats {
   const tasks = db
     .prepare("SELECT id, task_kind FROM understanding_tasks WHERE world_id=?")

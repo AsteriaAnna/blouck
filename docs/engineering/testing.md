@@ -31,7 +31,7 @@ CI：`.github/workflows/ci.yml`，push main / PR 跑 install → typecheck → t
 | V3 辨析副本 | `server/src/dungeonSequence.test.ts` | 单关系 3 关；两条关系多误解点 4 关；按类型/证据优先选关系；全过 → cleared |
 | V3 题目质量 | `server/src/understandingQuality.test.ts` | 证据/误解/干扰项/比较/非定义题；好题高分、定义题低分 |
 | V3 质量重写 | `server/src/understandingRepair.test.ts` | 关系/节点低分题重写一次；保留高分版本、删低分 |
-| V3 学习指标 | `server/src/learningStats.test.ts` | 任务/作答/卡片/方向/副本汇总；平均解释分；近 7 日趋势 |
+| V3 学习指标 | `server/src/learningStats.test.ts` | 任务/作答/卡片/方向/副本汇总；平均解释分；近 7 日趋势；CSV 行数/表头 |
 | V3 解释质量 | `server/src/explanationQuality.test.ts` | 空解释 0；完整解释高分；rubric 覆盖降分 |
 | V3 全链路 | `server/src/v3Loop.test.ts` | 源→关系→辨析→三关副本→cleared→指标 |
 | V3 浏览器 E2E | `scripts/e2e-v3.mjs` | 节点辨析→三关→指标面板；需 dev server + Chrome，非 CI |

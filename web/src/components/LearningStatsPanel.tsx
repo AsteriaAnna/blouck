@@ -73,7 +73,14 @@ export default function LearningStatsPanel({ worldId }: { worldId: string }) {
         >
           <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
             <b style={{ fontSize: 13 }}>学习指标</b>
-            <button className="ghost-btn" style={{ marginLeft: "auto" }} onClick={load} disabled={loading}>
+            <button
+              className="ghost-btn"
+              style={{ marginLeft: "auto", marginRight: 6 }}
+              onClick={() => window.open(`/api/worlds/${worldId}/learning/export?days=30`, "_blank")}
+            >
+              导出 CSV
+            </button>
+            <button className="ghost-btn" onClick={load} disabled={loading}>
               刷新
             </button>
           </div>
