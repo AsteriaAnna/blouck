@@ -4,6 +4,7 @@ import {
   createUnderstandingTask,
   getUnderstandingTask,
   getUnderstandingTaskByEdge,
+  getUnderstandingTaskByNode,
   recordUnderstandingAttempt,
   type UnderstandingTaskRow,
 } from "../db/understanding.js";
@@ -73,6 +74,8 @@ export async function ensureUnderstandingTask(edgeId: string, llm: LLMProvider) 
   const task = createUnderstandingTask({
     world_id: edge.world_id,
     edge_id: edge.id,
+    target_type: "edge",
+    node_id: null,
     learning_goal: draft.learning_goal,
     misconception: draft.misconception,
     stem: draft.stem,
@@ -87,8 +90,83 @@ export async function ensureUnderstandingTask(edgeId: string, llm: LLMProvider) 
   return { status: "ready" as const, task: publicTask(task) };
 }
 
-export async function answerUnderstandingTask(
-  taskId: string,
+/** 节点辨析任务：体系位置/边界；必须带节点来源原文。 */
+export async function ensureNodeUnderstandingTask(nodeId: string, llm: LLMProvider) {
+  const node = db.prepare("SELECT * FROM nodes WHERE id=?").get(nodeId) as
+    | {
+        id: string;
+        world_id: string;
+        name: string;
+        type: string;
+        definition: string;
+        source_span_id: string | null;
+      }
+    | undefined;
+  if (!node) throw new Error("node not found");
+  const existing = getUnderstandingTaskByNode(nodeId);
+  if (existing) return { status: "ready" as const, task: publicTask(existing) };
+  const span = node.source_span_id
+    ? (db.prepare("SELECT id,text FROM source_spans WHERE id=?").get(node.source_span_id) as
+        | { id: string; text: string }
+        | undefined)
+    : undefined;
+  if (!span) {
+    return {
+      status: "source_required" as const,
+      task: null,
+      message: "这个节点没有来源原文；事实辨析需要先补充来源。",
+    };
+  }
+  const edges = db
+    .prepare(
+      "SELECT src,dst,predicate,evidence FROM edges WHERE world_id=? AND kind IN ('formal','suggest') AND (src=? OR dst=?)",
+    )
+    .all(node.world_id, node.id, node.id) as {
+    src: string;
+    dst: string;
+    predicate: string | null;
+    evidence: string;
+  }[];
+  const nodes = db.prepare("SELECT id,name FROM nodes WHERE world_id=?").all(node.world_id) as {
+    id: string;
+    name: string;
+  }[];
+  const neighbors = edges.slice(0, 6).map((e) => {
+    const otherId = e.src === node.id ? e.dst : e.src;
+    return {
+      name: nodes.find((n) => n.id === otherId)?.name ?? otherId,
+      predicate: e.predicate,
+      evidence: e.evidence,
+    };
+  });
+  const draft = await llm.generateNodeUnderstandingTask({
+    sourceText: span.text,
+    node: { name: node.name, type: node.type, definition: node.definition },
+    neighbors,
+  });
+  if (!draft.choices.length || !draft.correct_choice) {
+    return { status: "failed" as const, task: null, message: "任务生成失败，可稍后重试" };
+  }
+  const task = createUnderstandingTask({
+    world_id: node.world_id,
+    edge_id: "",
+    target_type: "node",
+    node_id: node.id,
+    learning_goal: draft.learning_goal,
+    misconception: draft.misconception,
+    stem: draft.stem,
+    answer_type: "choice_explain",
+    choices_json: JSON.stringify(draft.choices),
+    correct_choice: draft.correct_choice,
+    rubric_json: JSON.stringify(draft.rubric),
+    evidence_quote: draft.evidence_quote || span.text.slice(0, 160),
+    source_span_id: span.id,
+    follow_up: draft.follow_up,
+  });
+  return { status: "ready" as const, task: publicTask(task) };
+}
+
+export async function answerUnderstandingTask(  taskId: string,
   choice: string,
   explanation: string,
   llm: LLMProvider,

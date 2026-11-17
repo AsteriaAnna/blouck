@@ -8,6 +8,8 @@ export type UnderstandingTaskRow = {
   id: string;
   world_id: string;
   edge_id: string;
+  target_type: "edge" | "node" | string;
+  node_id: string | null;
   learning_goal: string;
   misconception: string;
   stem: string;
@@ -27,6 +29,12 @@ export function getUnderstandingTaskByEdge(edgeId: string): UnderstandingTaskRow
     .get(edgeId) as UnderstandingTaskRow | undefined;
 }
 
+export function getUnderstandingTaskByNode(nodeId: string): UnderstandingTaskRow | undefined {
+  return db
+    .prepare("SELECT * FROM understanding_tasks WHERE node_id=? ORDER BY created_at DESC LIMIT 1")
+    .get(nodeId) as UnderstandingTaskRow | undefined;
+}
+
 export function getUnderstandingTask(id: string): UnderstandingTaskRow | undefined {
   return db.prepare("SELECT * FROM understanding_tasks WHERE id=?").get(id) as
     | UnderstandingTaskRow
@@ -38,12 +46,14 @@ export function createUnderstandingTask(
 ): UnderstandingTaskRow {
   const id = uid();
   db.prepare(
-    `INSERT INTO understanding_tasks(id,world_id,edge_id,learning_goal,misconception,stem,answer_type,choices_json,correct_choice,rubric_json,evidence_quote,source_span_id,follow_up,created_at)
-     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO understanding_tasks(id,world_id,edge_id,target_type,node_id,learning_goal,misconception,stem,answer_type,choices_json,correct_choice,rubric_json,evidence_quote,source_span_id,follow_up,created_at)
+     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   ).run(
     id,
     input.world_id,
     input.edge_id,
+    input.target_type,
+    input.node_id,
     input.learning_goal,
     input.misconception,
     input.stem,

@@ -220,6 +220,24 @@ export const mockLLM: LLMProvider = {
     };
   },
 
+  async generateNodeUnderstandingTask({ node, neighbors, sourceText }) {
+    const other = neighbors[0]?.name ?? "相近概念";
+    return {
+      learning_goal: "discriminate",
+      misconception: `把「${node.name}」与「${other}」当成同一个东西`,
+      stem: `关于「${node.name}」的边界，下面哪一项最符合原文？请选择，并说明「${node.name}」与「${other}」的区别。`,
+      choices: [
+        { id: "boundary", text: `「${node.name}」不等同于「${other}」，需要说明两者的边界` },
+        { id: "same", text: `「${node.name}」与「${other}」是同义概念` },
+        { id: "upper", text: `「${other}」是「${node.name}」的下位概念` },
+      ],
+      correct_choice: "boundary",
+      rubric: ["指出边界", "引用原文", "说明为什么不是同义/上下位"],
+      evidence_quote: (sourceText || "").slice(0, 200),
+      follow_up: `如果换一个场景，「${node.name}」还成立吗？`,
+    };
+  },
+
   async generateNodeDoc({ name, type, definition, sourceText, neighbors }) {
     return {
       definition: definition || `${name} 是一个${type || "概念"}。`,

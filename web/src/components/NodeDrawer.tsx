@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import { get, send, type NodeDocPayload } from "../api";
 import { useStore } from "../store";
 import { track } from "../telemetry";
+import UnderstandingTaskPanel from "./UnderstandingTaskPanel";
 
 /** 点击节点的理解卡：定义 + 体系位置 + 边界 + 来源 + 下一步 + 笔记。 */
 export default function NodeDrawer() {
@@ -189,8 +190,7 @@ export default function NodeDrawer() {
 
         {directions.filter((d) => d.node_id === node.id && d.status === "open").length > 0 && (
           <div className="section">
-            <h4>全部探索方向</h4>
-            <div className="hintline">地图只显示 1–2 条，全部方向在这里。</div>
+            <h4>全部探索方向</h4>            <div className="hintline">地图只显示 1–2 条，全部方向在这里。</div>
             {directions
               .filter((d) => d.node_id === node.id && d.status === "open")
               .map((d) => (
@@ -213,6 +213,12 @@ export default function NodeDrawer() {
               ))}
           </div>
         )}
+
+        <UnderstandingTaskPanel
+          endpoint={`/api/nodes/${node.id}/understanding`}
+          worldId={world?.id}
+          targetId={node.id}
+        />
 
         <div className="section">
           <h4>理解检查</h4>

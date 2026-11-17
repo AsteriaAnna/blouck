@@ -361,4 +361,49 @@ B：${b.name}（${b.definition ?? ""}）
       });
     }
   },
+
+  async generateNodeUnderstandingTask({ sourceText, node, neighbors }) {
+    const system = `你是知识辨析教练。只输出 JSON：
+{"learning_goal":"discriminate","misconception":"用户可能把节点和哪个近邻混淆/放错位置","stem":"题干：要求判断该节点的边界/体系位置，并说明理由","choices":[{"id":"...","text":"..."}],"correct_choice":"...","rubric":["..."],"evidence_quote":"原文连续子串","follow_up":"..."}
+规则：
+- 不要问“它是什么”这种定义回忆题；
+- 必须比较该节点与一个近邻，或判断边界/上下位；
+- 干扰项要像真的；
+- evidence_quote 必须来自原文，没有就空字符串。`;
+    const user = `原文：${sourceText.slice(0, 2000)}
+节点：${node.name}（${node.type ?? "概念"}）
+定义：${node.definition ?? ""}
+近邻：
+${neighbors.map((n) => `- ${n.name}（${n.predicate ?? "related"}）${n.evidence ?? ""}`).join("\n")}`;
+    try {
+      const raw = await chat(system, user);
+      const parsed = JSON.parse(raw) as any;
+      const choices = Array.isArray(parsed.choices)
+        ? parsed.choices
+            .filter((x: any) => x && x.id && x.text)
+            .slice(0, 5)
+            .map((x: any) => ({ id: String(x.id), text: String(x.text).slice(0, 80) }))
+        : [];
+      const correct = choices.some((x: any) => x.id === parsed.correct_choice)
+        ? String(parsed.correct_choice)
+        : "";
+      if (!correct) throw new Error("invalid correct choice");
+      return {
+        learning_goal: "discriminate",
+        misconception: String(parsed.misconception ?? ""),
+        stem: String(parsed.stem ?? ""),
+        choices,
+        correct_choice: correct,
+        rubric: Array.isArray(parsed.rubric) ? parsed.rubric.map(String).slice(0, 5) : [],
+        evidence_quote:
+          typeof parsed.evidence_quote === "string" && sourceText.includes(parsed.evidence_quote)
+            ? parsed.evidence_quote
+            : "",
+        follow_up: String(parsed.follow_up ?? ""),
+      };
+    } catch (err) {
+      console.warn("[llm] deepseek 节点辨析任务失败：", err);
+      return mockLLM.generateNodeUnderstandingTask({ sourceText, node, neighbors });
+    }
+  },
 };

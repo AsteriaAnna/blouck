@@ -9,8 +9,12 @@ process.env.DB_PATH = dbPath;
 process.env.DEEPSEEK_API_KEY = "";
 
 const { addEdge, addNode, createSourceSpan, createWorld, db } = await import("./db.js");
-const { getUnderstandingTaskByEdge } = await import("./db/understanding.js");
-const { answerUnderstandingTask, ensureUnderstandingTask } = await import("./services/understanding.js");
+const { getUnderstandingTaskByEdge, getUnderstandingTaskByNode } = await import("./db/understanding.js");
+const {
+  answerUnderstandingTask,
+  ensureNodeUnderstandingTask,
+  ensureUnderstandingTask,
+} = await import("./services/understanding.js");
 const { mockLLM } = await import("./providers/mock.js");
 
 test("辨析任务：无源不出题", async () => {
@@ -51,6 +55,30 @@ test("辨析任务：带原文引用、选择+解释、判题", async () => {
   );
   assert.ok(result);
   assert.equal(result!.choice_correct, true);
+});
+
+test("节点辨析：无源不出题；有源生成边界任务", async () => {
+  const world = createWorld("understanding-node", "根");
+  const span = createSourceSpan(world.id, "RAG 包含检索，检索负责召回。");
+  const a = addNode(world.id, "RAG", 0, 0, "", { definition: "检索增强生成", sourceSpanId: span.id });
+  const b = addNode(world.id, "检索", 100, 0);
+  addEdge(world.id, a.id, b.id, "formal", "包含", null, "", {
+    predicate: "partOf",
+    evidence: "RAG 包含检索",
+  });
+  const noSource = await ensureNodeUnderstandingTask(b.id, mockLLM);
+  assert.equal(noSource.status, "source_required");
+
+  const p = await ensureNodeUnderstandingTask(a.id, mockLLM);
+  assert.equal(p.status, "ready");
+  assert.ok(p.task);
+  assert.ok(p.task!.evidence_quote.includes("RAG"));
+  assert.equal("correct_choice" in p.task!, false);
+  assert.ok(getUnderstandingTaskByNode(a.id));
+
+  const row = getUnderstandingTaskByNode(a.id)!;
+  const result = await answerUnderstandingTask(row.id, row.correct_choice, "依据原文，RAG 包含检索。", mockLLM);
+  assert.ok(result);
 });
 
 test.after(() => {

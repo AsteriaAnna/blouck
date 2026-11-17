@@ -142,6 +142,12 @@ export type UnderstandingTaskInput = {
   neighbors: string[];
 };
 
+export type NodeUnderstandingInput = {
+  sourceText: string;
+  node: { name: string; type?: string; definition?: string };
+  neighbors: { name: string; predicate?: string | null; evidence?: string }[];
+};
+
 export type LLMProvider = {
   name: string;
   /** 从一段稳定文本里抽取实体与关系（对应 MVP 的“节点生成/关系生成”） */
@@ -183,6 +189,9 @@ export type LLMProvider = {
 
   /** V3：关系辨析任务（不是定义回忆题）。必须针对一个误解，带原文引用与 rubric。 */
   generateUnderstandingTask(input: UnderstandingTaskInput): Promise<UnderstandingTaskDraft>;
+
+  /** V3：节点辨析任务（体系位置/边界），同样必须带原文引用。 */
+  generateNodeUnderstandingTask(input: NodeUnderstandingInput): Promise<UnderstandingTaskDraft>;
 };
 
 export type ASREvents = {

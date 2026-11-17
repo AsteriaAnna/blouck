@@ -360,3 +360,13 @@ CREATE TABLE IF NOT EXISTS understanding_attempts(
   at INTEGER NOT NULL
 );
 `);
+
+
+// 理解任务扩展到节点
+for (const [col, ddl] of [
+  ["target_type", "TEXT NOT NULL DEFAULT 'edge'"],
+  ["node_id", "TEXT"],
+] as const) {
+  if (!columnNames("understanding_tasks").includes(col)) db.exec(`ALTER TABLE understanding_tasks ADD COLUMN ${col} ${ddl}`);
+}
+db.exec("CREATE INDEX IF NOT EXISTS idx_understanding_node ON understanding_tasks(node_id)");
