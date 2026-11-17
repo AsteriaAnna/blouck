@@ -140,10 +140,10 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 | 想改 | 先看 | 注意 |
 |---|---|---|
 | 语音抽取/节点生成 | `server/src/stream/session.ts`、`providers/deepseek.ts` | provisional、parent 启发、suggest/source 双写 |
-| 文字抽取/关系分类 | `server/src/index.ts` `/extract` | 节点先建、关系后判；formal 阈值 0.75 |
+| 文字抽取/关系分类 | `server/src/routes/graph.ts` `/extract` | 节点先建、关系后判；formal 阈值 0.75 |
 | 方向生成/物化 | `providers/deepseek.ts suggestDirections`、`services/directions.ts materializeDirectionEdges`、`assetops.ts ensureDirectionFrontiers` | directions 表 + 自环边双写 |
 | frontier | `server/src/db.ts computeFrontier` | 只看 formal 出边 |
-| 副本检测 | `server/src/dungeons.ts`、`index.ts detectDungeons`、`buildings` | 只读 formal；语音不触发 |
+| 副本检测/刷新 | `server/src/services/buildings.ts`、`server/src/routes/buildings.ts` | 只读 formal；语音不触发 |
 | 3D 渲染/线/路牌 | `web/src/components/World3D.tsx` | 721 行；边/节点/建筑/相机/点击混在一起 |
 | 抽屉/MD | `NodeDrawer.tsx`、`RelationDrawer.tsx`、`BuildingDrawer.tsx` | 节点 MD/关系 MD/副本 MD 分开 |
 | 流式状态/UI | `web/src/store.ts`、`InputBar.tsx` | store 混 API/UI/stream；InputBar 混音频/WS/UI |
@@ -151,25 +151,25 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 
 ## 6. 已知架构问题
 
-1. `index.ts` 约 1.4k 行，路由 + 领域 + LLM + 副本 + 布局；P1 已拆出 `routes/stream.ts`、`services/directions.ts`、`providers/active.ts`，剩余 worlds/extract/explore/nodes/buildings/dev 待拆。
+1. `index.ts` 已降到约 78 行：只剩 express/server/ws 装配 + health；业务路由已拆到 `routes/*`。
 2. `db.ts` 约 640 行，已拆出 `db/connection.ts` 与 `db/schema.ts`（schema+迁移）；repo/services 仍与查询函数混在一起。
 3. `stream/session.ts` 混合 LLM/父子启发/DB 写/focus；无事务。
 4. `assetops.ts` 混合建筑位置、方向 frontier、隐藏、导出；名字无意义。
 5. `World3D`、`InputBar`、`store` 过大；P2 拆分。
-6. web/server DTO 手工复制（无 shared package）；`send<any>`。
-7. 无鉴权、无静态托管、无 CI；验收脚本在仓库外。
+6. web/server DTO 已抽到 `packages/shared`；仍有少量 `send<any>`/组件内类型。
+7. 已有 CI；仍无鉴权/静态托管；验收脚本在仓库外。
 8. 方向/来源/suggest 的“源数据 vs 地图投影”没有单一来源。
 
 ## 7. P1 拆分目标（供实现参考）
 
 ```text
 server/src/
-  routes/         stream.ts（已拆）；worlds/nodes/edges/explore/buildings/dev 待拆
-  services/       directions.ts（已拆）；extract/stream/explore/relations/dungeons/quiz 待拆
+  routes/         stream/nodes/edges/worlds/dev/buildings/worldAdmin/graph（已拆）
+  services/       directions/buildings（已拆）；extract/stream/explore/relations/quiz 待拆
   db/             connection.ts + schema.ts（已拆）；repo/*.ts 待拆
   providers/      deepseek, doubao, mock, types, active
   domain/         placement, frontier, dungeon-validation
-  experiments/    anchorFirst, exploreSim（已隔离）；dev fixtures 待拆
+  experiments/    anchorFirst, exploreSim（已隔离）；dev fixtures 已拆到 routes/dev
 ```
 
 拆完后本文和 `glossary.md`/`states.md` 必须同步更新。

@@ -1,6 +1,6 @@
 # 10 · 新工程师认知成本评估与简化方案
 
-> 2026-11-17 P1 进度：已建 `packages/shared`、`routes/stream.ts`、`services/directions.ts`、`providers/active.ts`、`db/connection.ts`/`db/schema.ts`、单测+mock 集成+CI；`index.ts` 1,626→约 1,427 行，`db.ts` 787→约 637 行。以下评估保留原始基线，便于对比。
+> 2026-11-17 P1 进度：已建 `packages/shared`、`routes/*`（stream/nodes/edges/worlds/dev/buildings/worldAdmin/graph）、`services/directions`/`services/buildings`、`providers/active`、`db/connection`/`db/schema`、单测+mock 集成+CI；`index.ts` 1,626→约 78 行，`db.ts` 787→约 640 行。以下评估保留原始基线，便于对比。
 
 > 评估对象：一个能力很强、但**完全不了解本项目**的工程师，假设明天接手。
 > 目的：不是吐槽，而是给出“从入职到能安全改核心链路”的成本、风险点和最短简化路径。

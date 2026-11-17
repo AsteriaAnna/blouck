@@ -9,12 +9,12 @@
 | 项 | 位置 | 状态 | 说明 | 建议 |
 |---|---|---|---|---|
 | 锚点优先链路 | `server/src/experiments/anchorFirst.ts` | dev 原型，未进主链路 | 句子快判 + `pairFastLLM` + 慢判 + 决策；见 `docs/baseline/anchor-first-prototype.md` | 已移入 `experiments/`；保留供关系准入实验 |
-| `/api/dev/anchor-first` | `index.ts` | dev 路由 | 可 apply=false 观察决策 | P1 后续移到 dev router/实验开关 |
+| `/api/dev/anchor-first` | `routes/dev.ts` | dev 路由 | 可 apply=false 观察决策 | 已移到 dev router/实验开关 |
 | `/api/worlds/:id/stream/preview` | `routes/stream.ts` | 未使用的 API | 用 `runAnchorFirst` 生成 ghost/决策；前端不调用 | 标 experimental 或删除 |
 | `/api/worlds/:id/stream/detect` | `routes/stream.ts` | 未使用的 API | 只抽候选、不判关系；前端不调用 | 标 experimental 或删除 |
-| `/api/dev/explore` | `index.ts` | 开发模拟 | 旧版占位重复路由已删除；现在只保留 `simulateExplore` 一个 handler | 已修复（P1） |
-| `/api/dev/world` | `index.ts` | dev fixture | 构造随机世界 | 移到 dev router |
-| `/api/dev/dungeon-fixture` | `index.ts` | dev fixture | 构造必然触发副本的世界 | 移到 dev router |
+| `/api/dev/explore` | `routes/dev.ts` | 开发模拟；重复路由已修 | 旧版占位重复注册已删除；现在只保留 `simulateExplore` 一个 handler | 已修复（P1） |
+| `/api/dev/world` | `routes/dev.ts` | dev fixture | 构造随机世界 | 已移到 dev router |
+| `/api/dev/dungeon-fixture` | `routes/dev.ts` | dev fixture | 构造必然触发副本的世界 | 已移到 dev router |
 | `server/src/experiments/exploreSim.ts` | 已移入 experiments | dev 模拟 | 只被 `/api/dev/explore` 用 | 已隔离 |
 
 ## 2. 幽灵/流式旧路径
