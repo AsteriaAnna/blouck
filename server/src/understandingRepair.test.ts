@@ -9,7 +9,7 @@ process.env.DB_PATH = dbPath;
 process.env.DEEPSEEK_API_KEY = "";
 
 const { addEdge, addNode, createSourceSpan, createWorld, db } = await import("./db.js");
-const { ensureUnderstandingTask } = await import("./services/understanding.js");
+const { ensureNodeUnderstandingTask, ensureUnderstandingTask } = await import("./services/understanding.js");
 const { auditUnderstandingTask } = await import("./services/understandingQuality.js");
 
 function draft(over: any = {}) {
@@ -65,6 +65,45 @@ test("质量自检：低分题带缺失项重写一次，保留高分版本", as
   assert.ok(report && report.score >= 80, `repaired score ${report?.score}`);
   const count = (db.prepare("SELECT COUNT(*) c FROM understanding_tasks").get() as { c: number }).c;
   assert.equal(count, 1, "low-quality first task should be deleted");
+});
+
+test("节点质量自检：低分题重写后保留高分版本", async () => {
+  const world = createWorld("repair-node", "根");
+  const span = createSourceSpan(world.id, "RAG 包含检索。");
+  const node = addNode(world.id, "RAG", 0, 0, "", {
+    definition: "检索增强生成",
+    sourceSpanId: span.id,
+  });
+  let calls = 0;
+  const fake = {
+    async generateNodeUnderstandingTask(input: any) {
+      calls++;
+      if (calls === 1) {
+        return draft({
+          misconception: "",
+          stem: "RAG 是什么？",
+          choices: [{ id: "a", text: "RAG" }],
+          rubric: [],
+        });
+      }
+      assert.ok(input.repair);
+      return draft({
+        misconception: "把 RAG 与检索当成同义",
+        stem: "RAG 与检索的区别是什么？请用原文说明边界。",
+        choices: [
+          { id: "a", text: "RAG 包含检索" },
+          { id: "b", text: "RAG 就是检索" },
+        ],
+        correct_choice: "a",
+        evidence_quote: "RAG 包含检索",
+      });
+    },
+  } as any;
+  const p = await ensureNodeUnderstandingTask(node.id, fake);
+  assert.equal(p.status, "ready");
+  assert.equal(calls, 2);
+  const report = auditUnderstandingTask(p.task!.id);
+  assert.ok(report && report.score >= 80, `node repaired score ${report?.score}`);
 });
 
 test.after(() => {

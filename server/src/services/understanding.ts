@@ -75,6 +75,39 @@ function createEdgeTask(
   });
 }
 
+function createNodeTask(
+  node: { id: string; world_id: string },
+  span: { id: string; text: string },
+  draft: {
+    learning_goal: string;
+    misconception: string;
+    stem: string;
+    choices: { id: string; text: string }[];
+    correct_choice: string;
+    rubric: string[];
+    evidence_quote: string;
+    follow_up: string;
+  },
+) {
+  return createUnderstandingTask({
+    world_id: node.world_id,
+    edge_id: "",
+    target_type: "node",
+    node_id: node.id,
+    task_kind: "boundary",
+    learning_goal: draft.learning_goal,
+    misconception: draft.misconception,
+    stem: draft.stem,
+    answer_type: "choice_explain",
+    choices_json: JSON.stringify(draft.choices),
+    correct_choice: draft.correct_choice,
+    rubric_json: JSON.stringify(draft.rubric),
+    evidence_quote: draft.evidence_quote || span.text.slice(0, 160),
+    source_span_id: span.id,
+    follow_up: draft.follow_up,
+  });
+}
+
 /** 事实辨析任务：必须能回到用户原文；无源不出题。 */
 export async function ensureUnderstandingTask(
   edgeId: string,
@@ -208,23 +241,30 @@ export async function ensureNodeUnderstandingTask(nodeId: string, llm: LLMProvid
   if (!draft.choices.length || !draft.correct_choice) {
     return { status: "failed" as const, task: null, message: "任务生成失败，可稍后重试" };
   }
-  const task = createUnderstandingTask({
-    world_id: node.world_id,
-    edge_id: "",
-    target_type: "node",
-    node_id: node.id,
-    task_kind: "boundary",
-    learning_goal: draft.learning_goal,
-    misconception: draft.misconception,
-    stem: draft.stem,
-    answer_type: "choice_explain",
-    choices_json: JSON.stringify(draft.choices),
-    correct_choice: draft.correct_choice,
-    rubric_json: JSON.stringify(draft.rubric),
-    evidence_quote: draft.evidence_quote || span.text.slice(0, 160),
-    source_span_id: span.id,
-    follow_up: draft.follow_up,
-  });
+  let task = createNodeTask(node, span, draft);
+  const firstAudit = auditUnderstandingTask(task.id);
+  if (firstAudit && firstAudit.score < 60) {
+    try {
+      const repaired = await llm.generateNodeUnderstandingTask({
+        sourceText: span.text,
+        node: { name: node.name, type: node.type, definition: node.definition },
+        neighbors,
+        repair: `上一次题目质检不合格（${firstAudit.flags.join("、")}）。请重写：必须引用原文、有具体误解、含错误干扰项，并且题干要求比较/边界/反例/迁移。`,
+      });
+      if (repaired.choices.length && repaired.correct_choice) {
+        const repairedTask = createNodeTask(node, span, repaired);
+        const repairedAudit = auditUnderstandingTask(repairedTask.id);
+        if (repairedAudit && repairedAudit.score > firstAudit.score) {
+          deleteUnderstandingTask(task.id);
+          task = repairedTask;
+        } else {
+          deleteUnderstandingTask(repairedTask.id);
+        }
+      }
+    } catch (err) {
+      console.warn("[understanding] 节点题质量重写失败，保留原题：", err);
+    }
+  }
   return { status: "ready" as const, task: publicTask(task) };
 }
 

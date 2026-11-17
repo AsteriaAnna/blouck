@@ -366,7 +366,7 @@ B：${b.name}（${b.definition ?? ""}）
     }
   },
 
-  async generateNodeUnderstandingTask({ sourceText, node, neighbors }) {
+  async generateNodeUnderstandingTask({ sourceText, node, neighbors, repair }) {
     const system = `你是知识辨析教练。只输出 JSON：
 {"learning_goal":"discriminate","misconception":"用户可能把节点和哪个近邻混淆/放错位置","stem":"题干：要求判断该节点的边界/体系位置，并说明理由","choices":[{"id":"...","text":"..."}],"correct_choice":"...","rubric":["..."],"evidence_quote":"原文连续子串","follow_up":"..."}
 规则：
@@ -374,7 +374,7 @@ B：${b.name}（${b.definition ?? ""}）
 - 必须比较该节点与一个近邻，或判断边界/上下位；
 - 干扰项要像真的，至少 2 个选项且有错误项；
 - 题干要包含为什么/区别/不是/边界之一；
-- evidence_quote 必须来自原文，没有就空字符串。`;
+- evidence_quote 必须来自原文，没有就空字符串。${repair ? `\n- 这是重写：${repair}` : ""}`;
     const user = `原文：${sourceText.slice(0, 2000)}
 节点：${node.name}（${node.type ?? "概念"}）
 定义：${node.definition ?? ""}
