@@ -12,6 +12,7 @@
 
 文档已按“工程 / 产品 / 历史 / 原设计基线 / 市场”分区，入口见 [docs/00-index.md](docs/00-index.md)。
 
+- **新人 1 小时跑通 + 验收路径**：[docs/engineering/onboarding.md](docs/engineering/onboarding.md)
 - **实现事实（找 bug 只看这个）**：[docs/engineering/implemented.md](docs/engineering/implemented.md)
 - **工程总览**：[docs/engineering/README.md](docs/engineering/README.md)（架构、术语、状态机、实验代码）
 - **产品/体验口径**：[docs/product/four-line-system.md](docs/product/four-line-system.md)（四类线体验 v2.0，未实现）
@@ -42,15 +43,20 @@ POST /api/worlds/:id/extract
 
 ## 快速开始
 
+前置：Node.js 24、pnpm 10。
+
 ```bash
 pnpm install
-cp server/.env.example server/.env   # 可选；不配置自动 mock
+# 可选；不配置自动 mock
+cp server/.env.example server/.env          # macOS/Linux
+# Copy-Item server/.env.example server/.env # Windows PowerShell
 pnpm dev
 ```
 
 - 前端：http://localhost:5173
 - 服务端：http://localhost:8787
 - 麦克风/ASR 自检：http://localhost:5173/mic-test.html
+- 1 小时验收：见 [docs/engineering/onboarding.md](docs/engineering/onboarding.md)
 
 ## 开发命令
 

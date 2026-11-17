@@ -50,8 +50,8 @@ type EdgeOrigin = "auto" | "manual" | "stream" | "direction";
 
 - ✅ Phase 1：shared 增加 canonical 类型/映射；`getGraph` 给每条 edge 附加 `line_type/line_state`；`RelationDrawer` 已改用 canonical 判断（不再直接 switch `edge.kind`）。
 - ✅ 测试：`db.test` 断言 formal→relation/confirmed、source→sequence/provenance；integration 断言 seed demo 方向线 `line_type=exploration`。
-- ✅ Phase 2（大部分）：extract 不再直接 `addEdge(kind='direction')`；seed demo 改用 `addDirection`；GET world 会 `materializeDirectionEdges`。**方向边现在只由 materialize 投影生成**（dev 模拟除外）。
-- ⬜ Phase 2 剩余：`consumeDirection` 只改 directions.status；读取逻辑逐步只读 directions。
+- ✅ Phase 2：extract 不再直接 `addEdge(kind='direction')`；seed demo 改用 `addDirection`；GET world 会 `materializeDirectionEdges`；consume 改为 `consumeDirectionEdge`（先从 directions 表找 open 方向再置 consumed，投影边只打 `consumed=1`）。**方向边只由 materialize 投影生成**（dev 模拟除外）。
+- ⬜ Phase 2 剩余：读取逻辑（explore 仍用 edgeId 查投影以保持 API 兼容）逐步改为先读 directions。
 - ⬜ Phase 3：DB 值迁移/重命名（见 §4）。
 - ⬜ Phase 4：前端组件全面使用 canonical，后端内部逐步改名。
 
@@ -69,10 +69,10 @@ edges(kind=direction)：自环 + frontier_x/y + consumed  ← 地图投影
 执行顺序（建议）：
 
 1. ✅ extract 不再直接写方向边；seed 改用 `addDirection`；GET world 负责 materialize。方向边只由 `materializeDirectionEdges` 投影生成（dev `exploreSim` 除外）。
-2. `materializeDirectionEdges` 只负责读 directions → 生成/更新投影，禁止反向写计划。
-3. `consumeDirection` 只改 `directions.status='consumed'`；投影的 `consumed` 由派生字段生成，不再作为独立源。
-4. 读取逻辑（节点 MD/探索入口/API）只读 directions；渲染读投影。
-5. 稳定后再考虑删除 `edges.consumed` 或改为纯派生。
+2. ✅ `materializeDirectionEdges` 只读 directions → 生成/更新投影；不反向写计划。
+3. ✅ `consumeDirectionEdge(edgeId)` 先从 directions 表找 open 方向置 `consumed`，投影边只打 `consumed=1`；不再拿 edge id 当 direction id。
+4. ⬜ 读取逻辑（节点 MD/探索入口/API）逐步只读 directions；渲染读投影。
+5. ⬜ 稳定后再考虑删除 `edges.consumed` 或改为纯派生。
 
 风险：当前 `explore` 用 edgeId 找方向和 status；改造时要保持 API 兼容（edgeId 仍可用）。
 

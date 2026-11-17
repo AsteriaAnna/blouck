@@ -8,8 +8,8 @@ const dbPath = path.join(os.tmpdir(), `blouck-dirservice-${Date.now()}.db`);
 process.env.DB_PATH = dbPath;
 process.env.DEEPSEEK_API_KEY = "";
 
-const { addDirection, addEdge, addNode, computeFrontier, createWorld, db, getGraph } = await import("./db.js");
-const { materializeDirectionEdges } = await import("./services/directions.js");
+const { addDirection, addEdge, addNode, computeFrontier, createWorld, db, getGraph, listDirections } = await import("./db.js");
+const { consumeDirectionEdge, materializeDirectionEdges } = await import("./services/directions.js");
 
 test("materialize: 每节点最多 2 条，重复执行幂等", () => {
   const world = createWorld("materialize-test", "root");
@@ -52,6 +52,20 @@ test("materialize: 非 frontier 的方向边被删除", () => {
     0,
   );
   assert.ok(root);
+});
+
+test("consume: directions 状态 consumed，投影边只打 consumed 标记", () => {
+  const world = createWorld("consume-test", "root");
+  const root = getGraph(world.id).nodes[0];
+  const dir = addDirection(world.id, root.id, "下一步探索什么？", "test", { name: "下一步" });
+  computeFrontier(world.id);
+  materializeDirectionEdges(world.id);
+  const edge = getGraph(world.id).edges.find((e) => e.kind === "direction");
+  assert.ok(edge, "direction projection should exist");
+  assert.equal(consumeDirectionEdge(edge!.id), true);
+  assert.equal(listDirections(world.id).find((d) => d.id === dir.id)?.status, "consumed");
+  assert.equal(getGraph(world.id).edges.find((e) => e.id === edge!.id)?.consumed, 1);
+  assert.equal(consumeDirectionEdge(edge!.id), false, "second consume should be rejected");
 });
 
 test.after(() => {

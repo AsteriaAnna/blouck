@@ -1,4 +1,4 @@
-import { addEdge, db, getGraph, listDirections } from "../db.js";
+import { addEdge, consumeDirection, db, getGraph, listDirections } from "../db.js";
 
 /**
  * 把 frontier 节点的方向数据物化成可点击的方向边。
@@ -40,4 +40,26 @@ export function materializeDirectionEdges(worldId: string) {
     existing.add(key);
     count.set(node.id, used + 1);
   }
+}
+
+/**
+ * 消费一条方向边：以 directions 表为源，把对应 open 方向置 consumed，并给投影边打 consumed=1。
+ * edge id 只用于地图投影；不能拿 edge id 当 direction id。
+ */
+export function consumeDirectionEdge(edgeId: string): boolean {
+  const e = db
+    .prepare("SELECT id, world_id, src, kind, question FROM edges WHERE id=?")
+    .get(edgeId) as
+    | { id: string; world_id: string; src: string; kind: string; question: string | null }
+    | undefined;
+  if (!e || e.kind !== "direction") return false;
+  const d = db
+    .prepare(
+      "SELECT id FROM directions WHERE world_id=? AND node_id=? AND question=? AND status='open' ORDER BY created_at DESC LIMIT 1",
+    )
+    .get(e.world_id, e.src, e.question ?? "") as { id: string } | undefined;
+  if (!d) return false;
+  consumeDirection(d.id);
+  db.prepare("UPDATE edges SET consumed=1 WHERE id=?").run(edgeId);
+  return true;
 }

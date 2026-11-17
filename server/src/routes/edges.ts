@@ -10,7 +10,7 @@ import {
 } from "../db.js";
 import { consumeDirection } from "../assetops.js";
 import { llm } from "../providers/active.js";
-import { materializeDirectionEdges } from "../services/directions.js";
+import { consumeDirectionEdge, materializeDirectionEdges } from "../services/directions.js";
 
 /** /api/edges/*、/api/worlds/:id/relations：关系接受/手动连线/编辑/方向消费 */
 export const edgesRouter = Router();
@@ -94,17 +94,9 @@ edgesRouter.patch("/api/edges/:id", (req, res) => {
   res.json({ ok: true });
 });
 
-/** 方向探索被消费：标记 consumed，前端隐藏该方向标记 */
+/** 方向探索被消费：以 directions 表为源，置 consumed；投影边只打标记 */
 edgesRouter.post("/api/edges/:id/consume", (req, res) => {
-  const e = db.prepare("SELECT * FROM edges WHERE id=?").get(req.params.id) as
-    | { world_id: string; src: string; kind: string; question: string | null }
-    | undefined;
-  const ok = consumeDirection(req.params.id);
+  const ok = consumeDirectionEdge(req.params.id);
   if (!ok) return res.status(400).json({ error: "不是可消费的方向线" });
-  if (e?.kind === "direction") {
-    db.prepare(
-      "UPDATE directions SET status='consumed' WHERE world_id=? AND node_id=? AND question=?",
-    ).run(e.world_id, e.src, e.question ?? "");
-  }
   res.json({ ok });
 });
