@@ -10,7 +10,7 @@ pnpm build       # web build（shared/server 只 typecheck）
 
 CI：`.github/workflows/ci.yml`，push main / PR 跑 install → typecheck → test → build。
 
-## 当前覆盖（P1 起步，当前 16 个测试）
+## 当前覆盖（P1 起步，当前 17 个测试）
 
 | 测试 | 文件 | 覆盖 |
 |---|---|---|
@@ -18,6 +18,7 @@ CI：`.github/workflows/ci.yml`，push main / PR 跑 install → typecheck → t
 | 副本校验 | `server/src/dungeons.test.ts` | 线性扩展计数、流程校验、领域共同上位 |
 | DB 基础 | `server/src/db.test.ts` | frontier 只看 formal、commitStreamEdges 只提升 stream suggest、directions 状态、canonical line 映射 |
 | 方向物化/消费 | `server/src/directions.test.ts` | 每节点最多 2 条、重复执行幂等、非 frontier 删除、consume 以 directions 为源 |
+| DB 迁移 Stage A | `server/src/db/canonical-migrate.test.ts` | 旧 schema 临时库：kind→line_type 回填、consumed 回填、重复执行幂等 |
 | mock 集成 | `server/src/integration.test.ts` | 起临时 server + 临时 DB：世界创建、extract、stream segment/commit、重复抽取不重复建边、方向物化只给 frontier/≤2、seed demo 方向投影 |
 
 ## 已知缺口

@@ -43,21 +43,27 @@ SELECT status, COUNT(*) FROM directions GROUP BY status;
 
 ## 2. Stage A：加新列（不删旧列）
 
+已实现脚本（默认 dry-run，`--apply` 前自动备份）：
+
+```bash
+# 先 dry-run 看行数/缺失列/kind 分布
+pnpm --filter @blouck/server migrate:canonical -- --db server/data/blouck.db
+# 确认后执行，自动生成 <db>.bak-<timestamp>
+pnpm --filter @blouck/server migrate:canonical -- --db server/data/blouck.db --apply
+```
+
+脚本只做：
+
 ```sql
 ALTER TABLE edges ADD COLUMN kind_v2 TEXT;
 ALTER TABLE edges ADD COLUMN consumed_v2 INTEGER;
-UPDATE edges SET kind_v2 = CASE kind
-  WHEN 'formal' THEN 'relation'
-  WHEN 'source' THEN 'sequence'
-  WHEN 'suggest' THEN 'hint'
-  WHEN 'direction' THEN 'exploration'
-  ELSE kind END;
+UPDATE edges SET kind_v2 = CASE kind ... END;
 UPDATE edges SET consumed_v2 = consumed;
 ```
 
-- 代码：读 `kind_v2 ?? kind`；写两边。
-- 验证：`SELECT kind, kind_v2, COUNT(*) ... GROUP BY 1,2`。
-- 回滚：`ALTER TABLE edges DROP COLUMN kind_v2`（SQLite 3.35+），代码回旧版本。
+- 幂等；重复 --apply 不会重复加列/不会改已正确值；
+- 不改旧 `kind`、不删列；
+- 测试：`server/src/db/canonical-migrate.test.ts` 用旧 schema 临时库验证映射/幂等。
 
 ## 3. Stage B：读切新列
 
