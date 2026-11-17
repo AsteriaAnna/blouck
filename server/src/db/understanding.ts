@@ -88,9 +88,10 @@ export function recordUnderstandingAttempt(input: {
   explanation: string;
   correct: boolean;
   feedback: string;
+  rubricScore?: number;
 }) {
   db.prepare(
-    "INSERT INTO understanding_attempts(id,task_id,choice,explanation,correct,feedback,at) VALUES(?,?,?,?,?,?,?)",
+    "INSERT INTO understanding_attempts(id,task_id,choice,explanation,correct,feedback,rubric_score,at) VALUES(?,?,?,?,?,?,?,?)",
   ).run(
     uid(),
     input.taskId,
@@ -98,6 +99,7 @@ export function recordUnderstandingAttempt(input: {
     input.explanation,
     input.correct ? 1 : 0,
     input.feedback,
+    input.rubricScore ?? 0,
     now(),
   );
 }

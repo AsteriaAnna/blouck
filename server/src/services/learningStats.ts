@@ -3,7 +3,7 @@ import { auditUnderstandingTask, type QualityReport } from "./understandingQuali
 
 export type LearningStats = {
   tasks: { total: number; lowQuality: number; byKind: Record<string, number> };
-  attempts: { total: number; correct: number; rate: number };
+  attempts: { total: number; correct: number; rate: number; avgExplanationScore: number };
   cards: { nodeOpen: number; relationOpen: number };
   directions: number;
   dungeons: { cleared: number; playable: number; total: number };
@@ -26,11 +26,11 @@ export function learningStats(worldId: string): LearningStats {
   }
   const attempts = db
     .prepare(
-      `SELECT COUNT(*) total, COALESCE(SUM(a.correct),0) correct
+      `SELECT COUNT(*) total, COALESCE(SUM(a.correct),0) correct, COALESCE(AVG(a.rubric_score),0) avg_score
        FROM understanding_attempts a JOIN understanding_tasks t ON t.id=a.task_id
        WHERE t.world_id=?`,
     )
-    .get(worldId) as { total: number; correct: number };
+    .get(worldId) as { total: number; correct: number; avg_score: number };
   const eventCount = (type: string) =>
     (db
       .prepare("SELECT COUNT(*) c FROM events WHERE world_id=? AND type=?")
@@ -45,6 +45,7 @@ export function learningStats(worldId: string): LearningStats {
       total: attempts.total,
       correct: attempts.correct,
       rate: attempts.total ? Number((attempts.correct / attempts.total).toFixed(3)) : 0,
+      avgExplanationScore: Math.round(attempts.avg_score ?? 0),
     },
     cards: { nodeOpen: eventCount("node_card_open"), relationOpen: eventCount("relation_card_open") },
     directions: eventCount("direction_explore"),

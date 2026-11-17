@@ -10,6 +10,7 @@ import {
   type UnderstandingTaskRow,
 } from "../db/understanding.js";
 import type { LLMProvider } from "../providers/types.js";
+import { scoreExplanation } from "./explanationQuality.js";
 
 function findSourceSpan(worldId: string, quote: string): { id: string; text: string } | undefined {
   if (!quote.trim()) return undefined;
@@ -179,7 +180,8 @@ export async function ensureNodeUnderstandingTask(nodeId: string, llm: LLMProvid
   return { status: "ready" as const, task: publicTask(task) };
 }
 
-export async function answerUnderstandingTask(  taskId: string,
+export async function answerUnderstandingTask(
+  taskId: string,
   choice: string,
   explanation: string,
   llm: LLMProvider,
@@ -187,6 +189,7 @@ export async function answerUnderstandingTask(  taskId: string,
   const task = getUnderstandingTask(taskId);
   if (!task) return null;
   const choiceCorrect = choice === task.correct_choice;
+  const rubric = JSON.parse(task.rubric_json || "[]") as string[];
   const source = task.source_span_id
     ? (db.prepare("SELECT text FROM source_spans WHERE id=?").get(task.source_span_id) as
         | { text: string }
@@ -198,23 +201,33 @@ export async function answerUnderstandingTask(  taskId: string,
     const judged = await llm.judge({
       prompt: `${task.stem}\n原文：${source?.text ?? ""}\n用户选择：${choice}\n解释：${explanation}`,
       answer: explanation,
-      reference: JSON.parse(task.rubric_json || "[]").join("；"),
+      reference: rubric.join("；"),
     });
     explanationCorrect = judged.correct;
     explanationFeedback = judged.feedback;
   }
+  const eq = scoreExplanation(explanation, rubric, explanationCorrect);
   const correct = choiceCorrect && explanationCorrect;
   const feedback = !choiceCorrect
     ? `类型判断不对。${task.misconception ? `这道题针对的误解：${task.misconception}` : ""}`
-    : explanationFeedback || "类型正确；补一句原文依据会更稳。";
-  recordUnderstandingAttempt({ taskId, choice, explanation, correct, feedback });
+    : `${explanationFeedback || "类型正确。"} 解释质量 ${eq.score}/100。${eq.feedback}`;
+  recordUnderstandingAttempt({
+    taskId,
+    choice,
+    explanation,
+    correct,
+    feedback,
+    rubricScore: eq.score,
+  });
   return {
     correct,
     choice_correct: choiceCorrect,
     explanation_correct: explanationCorrect,
+    explanation_score: eq.score,
+    explanation_feedback: eq.feedback,
     feedback,
     correct_choice: task.correct_choice,
-    rubric: JSON.parse(task.rubric_json || "[]"),
+    rubric,
     follow_up: task.follow_up,
   };
 }

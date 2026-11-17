@@ -376,3 +376,9 @@ db.exec("CREATE INDEX IF NOT EXISTS idx_understanding_node ON understanding_task
 if (!columnNames("understanding_tasks").includes("task_kind")) {
   db.exec("ALTER TABLE understanding_tasks ADD COLUMN task_kind TEXT NOT NULL DEFAULT 'boundary'");
 }
+
+
+// 解释质量评分
+if (!columnNames("understanding_attempts").includes("rubric_score")) {
+  db.exec("ALTER TABLE understanding_attempts ADD COLUMN rubric_score INTEGER NOT NULL DEFAULT 0");
+}

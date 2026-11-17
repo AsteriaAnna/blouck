@@ -33,6 +33,7 @@ export default function UnderstandingTaskPanel({
   const [feedback, setFeedback] = useState("");
   const [variant, setVariant] = useState("boundary");
   const [quality, setQuality] = useState<{ score: number; flags: string[] } | null>(null);
+  const [explanationScore, setExplanationScore] = useState<number | null>(null);
 
   async function load(nextVariant = "boundary") {
     setLoading(true);
@@ -41,6 +42,7 @@ export default function UnderstandingTaskPanel({
     setChoice("");
     setExplanation("");
     setQuality(null);
+    setExplanationScore(null);
     try {
       const p = await get<TaskPayload>(`${endpoint}?variant=${nextVariant}`);
       setPayload(p);
@@ -67,11 +69,13 @@ export default function UnderstandingTaskPanel({
   async function submit() {
     const task = payload?.task;
     if (!task || !choice) return;
-    const r = await send<{ correct: boolean; feedback: string; follow_up: string }>(
-      `/api/understanding/${task.id}/answer`,
-      "POST",
-      { choice, explanation },
-    );
+    const r = await send<{
+      correct: boolean;
+      feedback: string;
+      follow_up: string;
+      explanation_score: number;
+    }>(`/api/understanding/${task.id}/answer`, "POST", { choice, explanation });
+    setExplanationScore(r.explanation_score);
     setFeedback(
       `${r.correct ? "判断正确" : "再想想"}：${r.feedback}${r.follow_up ? `\n追问：${r.follow_up}` : ""}`,
     );
@@ -145,6 +149,7 @@ export default function UnderstandingTaskPanel({
           {feedback && (
             <div className="hintline" style={{ whiteSpace: "pre-wrap" }}>
               {feedback}
+              {explanationScore !== null ? ` · 解释分 ${explanationScore}/100` : ""}
             </div>
           )}
         </>
