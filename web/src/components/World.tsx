@@ -3,6 +3,7 @@ import World3D from "./World3D";
 import InputBar from "./InputBar";
 import CandidatePanel from "./CandidatePanel";
 import MapControls from "./MapControls";
+import LearningStatsPanel from "./LearningStatsPanel";
 import NodeDrawer from "./NodeDrawer";
 import DungeonDrawer from "./DungeonDrawer";
 import RelationDrawer from "./RelationDrawer";
@@ -27,6 +28,7 @@ export default function World() {
             ← 世界列表
           </button>
           <div className="title">{world.name}</div>
+          <LearningStatsPanel worldId={world.id} />
         </div>
 
         <div className="flow-wrap">
