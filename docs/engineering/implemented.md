@@ -173,6 +173,7 @@ node_docs, relation_docs, node_candidates, generation_jobs
 - 方向：新节点/焦点尽量生成 **4 条 open 方向计划**（LLM 优先，模板补足 4）；地图仍只 materialize 1–2 条；节点卡「全部探索方向」列出全部，每条可「去探索」；`/explore` 支持 `{directionId}`，不依赖地图投影边；从方向探索生成的新节点也会补到 4 条。
 - 副本解锁已有单测：节点 tier>=1 后 domain/flow 从 detected → playable；`short+judge` 都答对 → tier=1 → DOMAIN playable（答题链路）。
 - 关系短练习：`edge_practice`/`edge_attempts`；`GET /api/edges/:id/practice` 从关系卡生成/缓存 3 题（答案不下发），`POST /api/practice/:id/answer` 判题并记录；`RelationDrawer` 有「关系检查」。目前不改变节点 tier，只记录关系练习进度。
+- 指标：`events` 表 + `web/src/telemetry.ts` fire-and-forget；已埋 node_card_open、relation_card_open、direction_explore、candidate_admit/reject、manual_relation_create、relation_practice_start/answer；`GET /api/worlds/:id/events/summary` 汇总。CDP 实测 demo 产生 2 条事件（node/relation card open）。
 
 
 ### nodes 关键字段
@@ -334,7 +335,7 @@ server/src/
   db.ts                  barrel + world/getGraph/recordAttempt/refresh/seed
   db/                    connection/schema/repo（nodes/edges/quizzes/sources/domain/directions/buildings/docs）
   index.ts               express/server/ws 装配 + health（约 71 行）
-  routes/                graph/stream/nodes/edges/worlds/buildings/worldAdmin/dev/docs/candidates/practice
+  routes/                graph/stream/nodes/edges/worlds/buildings/worldAdmin/dev/docs/candidates/practice/events
   services/              directions（物化/消费）、buildings（检测/刷新）、contentDocs（V3 卡片生成）、generationWorker（队列）、hints（提示池）、practice（关系练习）
   stream/session.ts      语音 provisional/focus/关系幂等/commit
   providers/types.ts     LLM/ASR 接口（ExtractResult 可带 warning）
@@ -353,6 +354,7 @@ web/src/
   api.ts                 REST 类型/客户端（re-export shared DTO）
   store.ts               Zustand slices 组合（约 14 行）
   store/                 types/worldSlice/streamSlice/streamText
+  telemetry.ts           本地指标上报
   hooks/useVoiceInput.ts 麦克风/WS/segment/commit 状态机
   components/InputBar.tsx
   components/World3D.tsx / World3DScene.tsx / World3DEdges.tsx

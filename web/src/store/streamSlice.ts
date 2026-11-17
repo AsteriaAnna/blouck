@@ -1,5 +1,6 @@
 import type { StateCreator } from "zustand";
 import { send } from "../api";
+import { track } from "../telemetry";
 import type { State } from "./types";
 
 export type StreamSlice = Pick<
@@ -113,6 +114,11 @@ export const createStreamSlice: StateCreator<State, [], [], StreamSlice> = (set,
       window.setTimeout(() => set({ newNodeIds: [] }), 3800);
       window.setTimeout(() => set({ spawnGhosts: [] }), 3400);
       const created = p.createdNodes?.[0];
+      track("direction_explore", {
+        worldId: getState().world?.id,
+        targetId: edgeId,
+        payload: { source: "edge", created: Boolean(created), warning: p.warning ?? null },
+      });
       getState().showToast(
         typeof p.warning === "string" && p.warning
           ? p.warning
@@ -153,6 +159,11 @@ export const createStreamSlice: StateCreator<State, [], [], StreamSlice> = (set,
       window.setTimeout(() => set({ newNodeIds: [] }), 3800);
       window.setTimeout(() => set({ spawnGhosts: [] }), 3400);
       const created = p.createdNodes?.[0];
+      track("direction_explore", {
+        worldId: getState().world?.id,
+        targetId: directionId,
+        payload: { source: "plan", created: Boolean(created), warning: p.warning ?? null },
+      });
       getState().showToast(
         typeof p.warning === "string" && p.warning
           ? p.warning

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { get, send, type NodeDocPayload } from "../api";
 import { useStore } from "../store";
+import { track } from "../telemetry";
 
 /** 点击节点的理解卡：定义 + 体系位置 + 边界 + 来源 + 下一步 + 笔记。 */
 export default function NodeDrawer() {
@@ -41,6 +42,7 @@ export default function NodeDrawer() {
         if (cancelled) return;
         setPayload(p);
         setNotes(p.notes_md || node.free_md || "");
+        track("node_card_open", { worldId: world?.id, targetId: node.id, payload: { status: p.status } });
       })
       .catch((e) => {
         if (!cancelled) setError(e.message ?? "卡片加载失败");
@@ -109,6 +111,7 @@ export default function NodeDrawer() {
         evidence,
       });
       setRelMsg("已建立关系线");
+      track("manual_relation_create", { worldId: world.id, targetId: node.id, payload: { predicate } });
       await useStore.getState().openWorld(world.id);
     } catch (e: any) {
       setRelMsg(e.message ?? "建立关系失败");

@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import { LINE_TYPE_LABEL, deriveLineFields, type LineType } from "@blouck/shared";
 import { get, send, type RelationDocPayload } from "../api";
 import { useStore } from "../store";
+import { track } from "../telemetry";
 
 const PRED_LABEL: Record<string, string> = {
   kindOf: "归类",
@@ -67,6 +68,7 @@ export default function RelationDrawer() {
         if (cancelled) return;
         setPayload(p);
         setNotes(p.notes_md ?? "");
+        track("relation_card_open", { worldId: edge.world_id, targetId: edge.id, payload: { status: p.status } });
       })
       .catch(() => {
         if (!cancelled) setPayload(null);
@@ -123,6 +125,7 @@ export default function RelationDrawer() {
         progress: { total: number; correct: number };
       }>(`/api/edges/${edge.id}/practice`);
       setPractice(p);
+      track("relation_practice_start", { worldId: edge.world_id, targetId: edge.id, payload: { items: p.items.length } });
     } catch {
       setPractice({ items: [], progress: { total: 0, correct: 0 } });
     } finally {
@@ -138,6 +141,7 @@ export default function RelationDrawer() {
     );
     setFeedback((f) => ({ ...f, [id]: `${r.correct ? "正确" : "再想想"}${r.feedback ? "：" + r.feedback : ""}` }));
     setPractice((p) => (p ? { ...p, progress: r.progress } : p));
+    track("relation_practice_answer", { worldId: edge?.world_id, targetId: id, payload: { correct: r.correct } });
   }
 
   return (

@@ -312,3 +312,17 @@ CREATE TABLE IF NOT EXISTS edge_attempts(
   at INTEGER NOT NULL
 );
 `);
+
+
+/* ---------- V3 指标事件（本地、单用户） ---------- */
+db.exec(`
+CREATE TABLE IF NOT EXISTS events(
+  id TEXT PRIMARY KEY,
+  world_id TEXT,
+  type TEXT NOT NULL,
+  target_id TEXT,
+  payload TEXT NOT NULL DEFAULT '{}',
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_events_world_type ON events(world_id, type, created_at);
+`);

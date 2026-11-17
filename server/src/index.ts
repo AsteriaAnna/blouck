@@ -16,6 +16,7 @@ import { graphRouter } from "./routes/graph.js";
 import { docsRouter } from "./routes/docs.js";
 import { candidatesRouter } from "./routes/candidates.js";
 import { practiceRouter } from "./routes/practice.js";
+import { eventsRouter } from "./routes/events.js";
 import { startGenerationWorker } from "./services/generationWorker.js";
 
 seedDemoIfEmpty();
@@ -33,6 +34,7 @@ app.use(graphRouter);
 app.use(docsRouter);
 app.use(candidatesRouter);
 app.use(practiceRouter);
+app.use(eventsRouter);
 startGenerationWorker(llm);
 
 app.get("/api/health", (_req, res) => {

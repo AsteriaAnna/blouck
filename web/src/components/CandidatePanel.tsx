@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { get, send, type NodeCandidateDTO } from "../api";
 import { useStore } from "../store";
+import { track } from "../telemetry";
 
 /** 未准入候选：用户确认（补语义关系）或忽略。 */
 export default function CandidatePanel() {
@@ -35,6 +36,7 @@ export default function CandidatePanel() {
     try {
       await send(`/api/candidates/${id}/admit`, "POST", { targetNodeId: targetId, predicate });
       setMsg("已确认");
+      track("candidate_admit", { worldId: world.id, targetId: id, payload: { predicate } });
       await refreshWorldData();
       await load();
     } catch (e: any) {
@@ -46,6 +48,7 @@ export default function CandidatePanel() {
     try {
       await send(`/api/candidates/${id}/reject`, "POST");
       setMsg("已忽略");
+      track("candidate_reject", { worldId: world.id, targetId: id });
       await load();
     } catch (e: any) {
       setMsg(e.message ?? "忽略失败");
