@@ -2,6 +2,7 @@
 
 > **这是实现文档，不是需求文档。** 需求口径看 [06-four-line-system.md](06-four-line-system.md)。
 > 当前真正在跑的代码事实以 [03-implemented.md](03-implemented.md) 和源码为准；本文件记录“代码现在是什么、和需求怎么对应、实现前必须定的技术选择”。
+> 锚点优先/关系准入的验证结果与现状坑见 [08-relation-gate-qa.md](08-relation-gate-qa.md)。
 
 ## 1. 当前代码里的四种 `kind`
 
