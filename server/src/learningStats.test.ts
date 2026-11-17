@@ -11,7 +11,7 @@ process.env.DEEPSEEK_API_KEY = "";
 const { addEdge, addNode, createBuilding, createSourceSpan, createWorld, db, setBuildingStatus } =
   await import("./db.js");
 const { ensureUnderstandingTask } = await import("./services/understanding.js");
-const { learningStats } = await import("./services/learningStats.js");
+const { learningStats, learningTrend } = await import("./services/learningStats.js");
 const { trackEvent } = await import("./db/events.js");
 const { mockLLM } = await import("./providers/mock.js");
 const { answerUnderstandingTask } = await import("./services/understanding.js");
@@ -46,6 +46,13 @@ test("学习指标：任务/作答/卡片/方向/副本汇总", async () => {
   assert.equal(s.cards.nodeOpen, 1);
   assert.equal(s.directions, 1);
   assert.equal(s.dungeons.cleared, 1);
+
+  const trend = learningTrend(world.id, 7);
+  assert.equal(trend.length, 7);
+  assert.equal(trend[trend.length - 1].attempts, 1);
+  assert.equal(trend[trend.length - 1].correct, 1);
+  assert.equal(trend[trend.length - 1].tasks, 2);
+  assert.equal(trend[trend.length - 1].nodeCards, 1);
 });
 
 test.after(() => {

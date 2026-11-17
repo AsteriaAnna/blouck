@@ -10,7 +10,75 @@ export type LearningStats = {
   lowQualityTasks: { id: string; score: number; flags: string[] }[];
 };
 
-/** 单世界学习指标：任务质量、作答、卡片、方向、副本。 */
+export type TrendPoint = {
+  day: string;
+  attempts: number;
+  correct: number;
+  avgExplanation: number;
+  tasks: number;
+  nodeCards: number;
+  directions: number;
+};
+
+function localDay(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** 近 N 天趋势（本地时区），没有数据的日期补 0。 */
+export function learningTrend(worldId: string, days = 7): TrendPoint[] {
+  const n = Math.max(1, Math.min(30, days));
+  const keys = Array.from({ length: n }, (_, i) =>
+    localDay(new Date(Date.now() - (n - 1 - i) * 86400000)),
+  );
+  const base = new Map<string, TrendPoint>(
+    keys.map((day) => [
+      day,
+      { day, attempts: 0, correct: 0, avgExplanation: 0, tasks: 0, nodeCards: 0, directions: 0 },
+    ]),
+  );
+  const attempts = db
+    .prepare(
+      `SELECT date(a.at/1000,'unixepoch','localtime') day, COUNT(*) total,
+              COALESCE(SUM(a.correct),0) correct, COALESCE(AVG(a.rubric_score),0) avg
+       FROM understanding_attempts a JOIN understanding_tasks t ON t.id=a.task_id
+       WHERE t.world_id=? GROUP BY day`,
+    )
+    .all(worldId) as { day: string; total: number; correct: number; avg: number }[];
+  for (const a of attempts) {
+    const p = base.get(a.day);
+    if (p) {
+      p.attempts = a.total;
+      p.correct = a.correct;
+      p.avgExplanation = Math.round(a.avg);
+    }
+  }
+  const tasks = db
+    .prepare(
+      "SELECT date(created_at/1000,'unixepoch','localtime') day, COUNT(*) c FROM understanding_tasks WHERE world_id=? GROUP BY day",
+    )
+    .all(worldId) as { day: string; c: number }[];
+  for (const t of tasks) {
+    const p = base.get(t.day);
+    if (p) p.tasks = t.c;
+  }
+  const events = db
+    .prepare(
+      `SELECT date(created_at/1000,'unixepoch','localtime') day, type, COUNT(*) c
+       FROM events WHERE world_id=? AND type IN ('node_card_open','direction_explore') GROUP BY day,type`,
+    )
+    .all(worldId) as { day: string; type: string; c: number }[];
+  for (const e of events) {
+    const p = base.get(e.day);
+    if (!p) continue;
+    if (e.type === "node_card_open") p.nodeCards = e.c;
+    else p.directions = e.c;
+  }
+  return keys.map((k) => base.get(k)!);
+}
+
 export function learningStats(worldId: string): LearningStats {
   const tasks = db
     .prepare("SELECT id, task_kind FROM understanding_tasks WHERE world_id=?")

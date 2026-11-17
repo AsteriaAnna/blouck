@@ -10,18 +10,35 @@ type Stats = {
   lowQualityTasks: { id: string; score: number; flags: string[] }[];
 };
 
+type TrendPoint = {
+  day: string;
+  attempts: number;
+  correct: number;
+  avgExplanation: number;
+  tasks: number;
+  nodeCards: number;
+  directions: number;
+};
+
 /** 学习指标：默认不占主界面，点开才看；避免把地图变成仪表盘。 */
 export default function LearningStatsPanel({ worldId }: { worldId: string }) {
   const [open, setOpen] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [trend, setTrend] = useState<TrendPoint[]>([]);
   const [loading, setLoading] = useState(false);
 
   async function load() {
     setLoading(true);
     try {
-      setStats(await get<Stats>(`/api/worlds/${worldId}/learning/stats`));
+      const [s, t] = await Promise.all([
+        get<Stats>(`/api/worlds/${worldId}/learning/stats`),
+        get<{ days: TrendPoint[] }>(`/api/worlds/${worldId}/learning/trend?days=7`),
+      ]);
+      setStats(s);
+      setTrend(t.days ?? []);
     } catch {
       setStats(null);
+      setTrend([]);
     } finally {
       setLoading(false);
     }
@@ -83,6 +100,43 @@ export default function LearningStatsPanel({ worldId }: { worldId: string }) {
               {stats.tasks.byKind && Object.keys(stats.tasks.byKind).length > 0 && (
                 <div className="hintline" style={{ marginTop: 6 }}>
                   题型：{Object.entries(stats.tasks.byKind).map(([k, v]) => `${k} ${v}`).join(" · ")}
+                </div>
+              )}
+              {trend.length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <div className="hintline">近 7 日</div>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-end",
+                      gap: 4,
+                      height: 32,
+                      margin: "4px 0",
+                    }}
+                  >
+                    {trend.map((d) => {
+                      const max = Math.max(1, ...trend.map((x) => x.attempts));
+                      const h = d.attempts ? Math.max(3, Math.round((d.attempts / max) * 30)) : 2;
+                      return (
+                        <div
+                          key={d.day}
+                          title={`${d.day} 答题 ${d.attempts} · 卡片 ${d.nodeCards} · 方向 ${d.directions}`}
+                          style={{
+                            width: 18,
+                            height: h,
+                            background: d.attempts ? "#6f6252" : "#e6ddcf",
+                            borderRadius: 3,
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                  <div className="hintline">
+                    答题 {trend.reduce((n, d) => n + d.attempts, 0)} · 正确{" "}
+                    {trend.reduce((n, d) => n + d.correct, 0)} · 卡片{" "}
+                    {trend.reduce((n, d) => n + d.nodeCards, 0)} · 方向{" "}
+                    {trend.reduce((n, d) => n + d.directions, 0)}
+                  </div>
                 </div>
               )}
               {stats.lowQualityTasks.length > 0 && (
