@@ -176,6 +176,54 @@ input, textarea { font: inherit; color: inherit; }
 .building-wrap { position: relative; width: 190px; cursor: pointer; animation: bldFloat 7s ease-in-out infinite; }
 @keyframes bldFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
 @media (prefers-reduced-motion: reduce) { .building-wrap { animation: none; } }
+
+/* ---------- 移动端 ---------- */
+@media (max-width: 760px) {
+  .home { padding: 34px 18px 60px; }
+  .home h1 { font-size: 24px; }
+  .top-actions { flex-wrap: wrap; }
+  .topbar { padding: 10px 12px; gap: 8px; }
+  .topbar .title {
+    font-size: 15px; max-width: 42vw; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .flow-wrap { margin-top: -44px; }
+  .legend { display: none; }
+  .inputbar {
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    width: calc(100vw - 20px);
+    padding: 8px;
+    border-radius: 14px;
+  }
+  .inputbar textarea { min-height: 34px; font-size: 16px; }
+  .inputbar .state { display: none; }
+  .drawer {
+    left: 8px; right: 8px; top: auto;
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    width: auto; max-height: min(78vh, 680px);
+    border-radius: 16px 16px 10px 10px;
+  }
+  .drawer header { padding: 12px 14px 10px; }
+  .drawer .body { padding: 10px 14px 14px; -webkit-overflow-scrolling: touch; }
+  .drawer button, .topbar button { min-height: 36px; }
+  .map-controls {
+    right: 8px !important;
+    bottom: calc(112px + env(safe-area-inset-bottom)) !important;
+    max-width: 160px;
+    font-size: 11px !important;
+    padding: 6px 8px !important;
+  }
+  .learning-stats {
+    left: 8px !important;
+    right: 8px !important;
+    top: 52px !important;
+    width: auto !important;
+    max-height: 70vh;
+    overflow: auto;
+  }
+  .md-edit, .quiz textarea { font-size: 16px; }
+}
+
 .building-wrap.locked { opacity: .55; }
 .building-label {
   position: absolute; left: 50%; top: 118px; transform: translateX(-50%);

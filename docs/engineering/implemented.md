@@ -178,6 +178,7 @@ node_docs, relation_docs, node_candidates, generation_jobs
 - 解释质量：作答时 `scoreExplanation` 按长度/推理词/rubric 覆盖/判题通过打分，写入 `understanding_attempts.rubric_score`；回复含 `explanation_score`，面板显示“解释分 N/100”；学习指标含 `avgExplanationScore`。
 - 导航渐进披露：`MapControls` 显示四类线计数；默认只显示提示 `hint_display` top2 + 方向 2 条，点击「展开：显示全部关系」显示全部（含 15 条提示/9 条方向）。`mapExpand` 存在 store，打开世界时重置为 false。CDP 实测计数/展开按钮/状态切换正常，errors=[]。
 - 首屏性能：`App` 对 `World` 做 `React.lazy`；构建从单包 1,338 kB 拆成首页 156.65 kB（gzip 50.64）+ World 1,179 kB（gzip 326.69）。CDP 实测首页无 canvas、进入世界后 map/canvas 正常，errors=[]；World chunk 仍 >500 kB 是 three.js 体量，但不再阻塞首页。
+- 移动端：`@media (max-width:760px)` 下抽屉变底部近全宽、输入台留安全区、地图控制上移避让、图例隐藏、按钮最小触控高度。CDP 390×844 实测 `scrollWidth=390`、drawer 374×836 内、map 控制不与输入台重叠、errors=[]；截图见本地 `_verify/mobile-world.png`（不在仓库）。
 - 按缩放披露：`MapCameraProbe` 在相机高度跨过 720 时写 `mapZoom`；远看提示 top2/方向 2，拉近提示 top6/方向 4。CDP 用可信滚轮输入实测 far→near→far，`镜头拉近：提示 top6 / 方向 4` 文案生效，errors=[]。
 - 方向可探索感：`DirectionEdge` 增加 `TravelingSpark`（沿曲线流动的光点）和 `DirectionSign` 轻微呼吸浮动；headless Chrome 的 canvas 截图帧不更新，视觉动画只能人工/真机确认，代码已通过 typecheck/build。
 - 四类线视觉：关系=粗实线；序列=实线+中途箭头；提示=虚线+路牌；方向=点线+路牌+光点。图例明确写出四种线型；CDP 实测图例含“实线/箭头/虚线/点线”，errors=[]。

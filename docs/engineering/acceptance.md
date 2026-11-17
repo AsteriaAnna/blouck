@@ -78,6 +78,7 @@ hit node label=概念
 | V3 全链路 | ✅ | `server/src/v3Loop.test.ts`：源→关系→辨析→三关副本→cleared→指标 |
 | V3 浏览器 E2E | ✅ | `pnpm e2e:v3`：节点辨析 100/100 → 三关 → 指标 4/4、副本通关 1；需 dev server + Chrome |
 | 首屏体积 | ✅ | 首页 156.65 kB（gzip 50.64）；World 1,179 kB（gzip 326.69）按需加载 |
+| 移动端布局 | ✅ | CDP 390×844：无横向溢出；抽屉 374px 内；地图控制不与输入台重叠 |
 | 2–3 天完成带测试小 PR | ✅ 有测试/CI/小 PR 先例 | 39 tests + CI workflow |
 | 1 周独立改非核心功能 | 🟡 结构已支持，但无真人计时样本 | 前端已拆 hooks/slices/scene；后端 routes/services/db |
 | 2–4 周安全改核心逻辑 | 🟡 canonical/单源已就绪，DB 重命名未执行 | 见 [canonical-state.md](canonical-state.md) Phase 3 |
