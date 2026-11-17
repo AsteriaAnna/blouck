@@ -85,6 +85,27 @@ test("辨析副本：两条关系 → 多误解点 4 关", async () => {
   assert.equal(done.cleared, true);
 });
 
+test("辨析副本：优先选更具辨析价值的关系（类型/证据）", async () => {
+  const world = createWorld("dungeon-rank", "根");
+  const a = addNode(world.id, "A", 0, 0);
+  const b = addNode(world.id, "B", 100, 0);
+  const c = addNode(world.id, "C", 200, 0);
+  createSourceSpan(world.id, "A 是一种 B 的实现，这是一种明确的归类关系。A 与 C 相关。");
+  const weak = addEdge(world.id, a.id, c.id, "formal", "A 与 C 相关", null, "", {
+    predicate: "related",
+    evidence: "A 与 C 相关",
+  });
+  const strong = addEdge(world.id, a.id, b.id, "formal", "A 是一种 B", null, "", {
+    predicate: "kindOf",
+    evidence: "A 是一种 B 的实现，这是一种明确的归类关系",
+  });
+  const building = createBuilding(world.id, "domain", a.id, "领域", "", "", [a.id, b.id, c.id]);
+  const seq = await ensureDungeonSequence(building.id, mockLLM);
+  assert.equal(seq.status, "ready");
+  assert.equal(seq.stages[0].edgeId, strong.id);
+  assert.notEqual(seq.stages[0].edgeId, weak.id);
+});
+
 test.after(() => {
   try {
     db.close();

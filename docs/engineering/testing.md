@@ -10,7 +10,7 @@ pnpm build       # web build（shared/server 只 typecheck）
 
 CI：`.github/workflows/ci.yml`，push main / PR 跑 install → typecheck → test → build。
 
-## 当前覆盖（P1 起步，当前 39 个测试）
+## 当前覆盖（P1 起步，当前 40 个测试）
 
 | 测试 | 文件 | 覆盖 |
 |---|---|---|
@@ -28,7 +28,7 @@ CI：`.github/workflows/ci.yml`，push main / PR 跑 install → typecheck → t
 | V3 提示池 | `server/src/hints.test.ts` | 置信度/新近/热度排序、top-k display、旧边回退 |
 | V3 关系练习 | `server/src/practice.test.ts` | 3 题生成/答案隐藏/缓存/判题记录；无源不生成事实题（旧接口） |
 | V3 辨析任务 | `server/src/understanding.test.ts` | 无源不出题；选择+解释；答案不暴露；节点边界任务；反例/纠错/迁移变体独立缓存 |
-| V3 辨析副本 | `server/src/dungeonSequence.test.ts` | 单关系 3 关；两条关系多误解点 4 关；全过 → cleared |
+| V3 辨析副本 | `server/src/dungeonSequence.test.ts` | 单关系 3 关；两条关系多误解点 4 关；按类型/证据优先选关系；全过 → cleared |
 | V3 题目质量 | `server/src/understandingQuality.test.ts` | 证据/误解/干扰项/比较/非定义题；好题高分、定义题低分 |
 | V3 学习指标 | `server/src/learningStats.test.ts` | 任务/作答/卡片/方向/副本汇总；平均解释分；近 7 日趋势 |
 | V3 解释质量 | `server/src/explanationQuality.test.ts` | 空解释 0；完整解释高分；rubric 覆盖降分 |

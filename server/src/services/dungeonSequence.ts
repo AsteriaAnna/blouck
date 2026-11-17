@@ -9,6 +9,32 @@ import {
 const VARIANTS_ONE = ["boundary", "counterexample", "transfer"] as const;
 const VARIANTS_MANY = ["boundary", "counterexample"] as const;
 
+const TYPE_WEIGHT: Record<string, number> = {
+  kindOf: 18,
+  partOf: 18,
+  prerequisite: 12,
+  contrast: 14,
+  related: 4,
+};
+
+/** 选关系：类型/证据强度/局部易混度/置信度排序，越该辨析越靠前。 */
+export function rankDungeonEdges<T extends { src: string; dst: string; predicate?: string | null; evidence?: string; confidence?: number }>(
+  edges: T[],
+): T[] {
+  const score = (e: T) => {
+    const type = TYPE_WEIGHT[e.predicate ?? ""] ?? 6;
+    const evidence = Math.min(12, Math.round((e.evidence ?? "").length / 4));
+    const degree = edges.filter((x) => x.src === e.src || x.dst === e.dst).length;
+    const local = Math.min(10, degree * 2);
+    const confidence = Math.round((e.confidence ?? 0) * 6);
+    return type + evidence + local + confidence;
+  };
+  return edges
+    .map((e, i) => ({ e, i, s: score(e) }))
+    .sort((a, b) => b.s - a.s || a.i - b.i)
+    .map((x) => x.e);
+}
+
 type StageRow = {
   id: string;
   building_id: string;
@@ -82,7 +108,7 @@ export async function ensureDungeonSequence(buildingId: string, llm: LLMProvider
       message: "这个副本还没有带原文证据的关系；辨析副本需要先有来源。",
     };
   }
-  const picked = candidates.slice(0, 2);
+  const picked = rankDungeonEdges(candidates).slice(0, 2);
   const variants = picked.length >= 2 ? VARIANTS_MANY : VARIANTS_ONE;
   const collected: { edgeId: string; variant: string; taskId: string }[] = [];
   for (const edge of picked) {
