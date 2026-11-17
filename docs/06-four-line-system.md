@@ -143,6 +143,49 @@
 6. **节点 MD**：已按“标题/正文/来源/编辑”实现；还没有“探索方向”列表。
 7. **副本**：当前只读 `formal` 边；如果关系线对应 formal，这条规则可以延续。
 
+## 8.1 附录 A：当前线类型与实现（代码事实，2026-11-17）
+
+> 这一节只描述“现在代码里是什么”，不是目标口径；目标口径见 §1–§7。
+
+### A.1 四种 `kind`
+
+| 当前 kind | 实际角色 | 谁生成 | 关键字段 | 地图渲染 | 点击行为 | 状态转换 |
+|---|---|---|---|---|---|---|
+| `formal` | 正式语义关系 | `/extract` 抽取；手动关系 API；`suggest` 接受；语音 commit 提升；探索落图 | `label/predicate/evidence/confidence/origin/md` | 深色 3D 管状实线（r≈2.8），始终显示 | 一句话关系文档（按 predicate） | 稳定；被 `computeFrontier`/副本检测读取 |
+| `source` | 探索来源/来路 | 语音 `ingestSegment`（parent→new，origin=stream）；`/extract` 给新节点补来路；探索落图 | `label`（多为“本轮探索来源”）、`evidence`、`origin` | 蓝灰 3D 管状实线（r≈2.0）+ 起点圆点，始终显示 | 一句话“探索来源”文档 | 不转 formal；不影响 frontier；不参与副本 |
+| `suggest` | 候选关系/建议 | 语音 `ingestSegment`（origin=stream）；`/extract` 中证据不足/置信度低的关系 | `label/predicate/evidence/confidence/origin` | 统一色虚线（#b08a5f）+ 中点路牌，**所有 open 建议都显示，无 4 条上限** | 一句话建议文档 +「接受为正式关系」 | 接受→`formal`（LLM 补谓词/名称/MD）；语音 commit 时 `origin=stream` 且有 evidence 的 suggest 自动→formal |
+| `direction` | 探索方向 | `/extract` 里的 direction 关系；`suggestDirections`（当前每节点 1 条）；`materializeDirectionEdges` | 自环边（`src=dst`）+ `question`、`frontier_x/y`、`consumed`、`target_*`；`directions` 表存计划 | 只在 **frontier** 节点上显示；点线 + 木柱路牌 + 地面箭头；**每节点最多 2 条**（`materializeDirectionEdges` 的 `used>=2`） | 文档显示问题 + 预先计划的目标节点；「生成「X」」调用 `/api/worlds/:id/explore` 直接落计划节点 | 落图后 `consumed=1`；来源节点变成非 frontier 后，其方向边会被 `materializeDirectionEdges` 删除 |
+
+**没有 `sequence` kind**。
+
+### A.2 语音流实际产生的线
+
+- `ingestSegment` 为每个新 provisional 节点写一条 **`source`**（parent→new，`origin=stream`）；
+- LLM 抽出的关系写成 **`suggest`**（`origin=stream`）；
+- `commitStream` 把 provisional 节点改 committed，并把 `origin=stream` 且有 evidence 的 **`suggest` 全量转 `formal`**；
+- 没有任何表示“节点出现顺序”的独立线；顺序只是靠 `source` 边 + 时间顺序隐含。
+
+### A.3 手动联系关系线（入口现状）
+
+- **后端已有**：`POST /api/worlds/:id/relations`
+  - body：`{ fromNodeId, toNodeId, predicate?, label?, evidence?, md? }`
+  - 若没给合法 `predicate/label`，会调用 `llm.suggestRelation` 让模型补谓词/名称/说明；
+  - 校验：两个节点都存在、属于当前世界、不能自连；同 `src+dst+predicate` 的 formal 已存在则 409；
+  - 创建：`kind=formal`、`origin=manual`、`confidence=0.9`；
+  - 之后 `computeFrontier` + `materializeDirectionEdges`。
+- **前端入口目前没有**：MVP 重写 `NodeDrawer` 时把“手动关联/关系列表”删了，所以现在用户在界面上无法发起手动连线；只有 API 可用。
+- 目标口径里手动连线应该直接产出**关系线**（完整 MD 可编辑），所以合并时要把这个入口恢复到 UI，并保留 `origin=manual` 区分“用户手动建立”。
+
+### A.4 和四类目标口径的对应关系（初步）
+
+| 目标类型 | 最接近的现状 | 合并时的主要问题 |
+|---|---|---|
+| 关系线 | `formal` | 目前只有一句话文档，没有完整 MD；手动入口 UI 缺失 |
+| 探索线 | `direction` | 已有“生成时计划目标节点 + 点击直接落图”；缺 4 条/节点、非外围 MD 列表、外围随机 1–2 条、漩涡/线延伸动画 |
+| 关联提示线 | `suggest` | 缺后台池、地图 ≤4、新节点重算；当前所有 open suggest 都画 |
+| 顺序线 | **无** | 需要新增 `sequence`（或独立的顺序状态）；语音流目前用 source+suggest 代替 |
+| （来源） | `source` | 不属于新四类；要决定并入关系线当元数据，还是保留独立视觉 |
+
 ## 9. 必须拍板的问题
 
 - **Q1 来源线归属**：新的四类里没有“来源线”。现有 `source` 线（蓝灰实线 + 起点圆点）是：并入关系线作为“来源信息/元数据”，还是继续作为独立视觉但不计入四类？
