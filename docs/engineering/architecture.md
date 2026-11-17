@@ -152,7 +152,7 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 ## 6. 已知架构问题
 
 1. `index.ts` 已降到约 78 行：只剩 express/server/ws 装配 + health；业务路由已拆到 `routes/*`。
-2. `db.ts` 约 640 行，已拆出 `db/connection.ts` 与 `db/schema.ts`（schema+迁移）；repo/services 仍与查询函数混在一起。
+2. `db.ts` 约 459 行：已拆出 `db/connection.ts`、`db/schema.ts`、`db/sources.ts`、`db/domain.ts`、`db/directions.ts`、`db/buildings.ts`；剩余 worlds/nodes/edges/quizzes/seed 仍集中。
 3. `stream/session.ts` 混合 LLM/父子启发/DB 写/focus；无事务。
 4. `assetops.ts` 混合建筑位置、方向 frontier、隐藏、导出；名字无意义。
 5. `World3D`、`InputBar`、`store` 过大；P2 拆分。
@@ -166,7 +166,7 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 server/src/
   routes/         stream/nodes/edges/worlds/dev/buildings/worldAdmin/graph（已拆）
   services/       directions/buildings（已拆）；extract/stream/explore/relations/quiz 待拆
-  db/             connection.ts + schema.ts（已拆）；repo/*.ts 待拆
+  db/             connection/schema/sources/domain/directions/buildings（已拆）；worlds/nodes/edges/quizzes/seed 待拆
   providers/      deepseek, doubao, mock, types, active
   domain/         placement, frontier, dungeon-validation
   experiments/    anchorFirst, exploreSim（已隔离）；dev fixtures 已拆到 routes/dev

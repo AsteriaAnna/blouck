@@ -2,6 +2,16 @@ import { randomUUID } from "node:crypto";
 import type { EdgeKind as SharedEdgeKind } from "@blouck/shared";
 import { db } from "./db/connection.js";
 import "./db/schema.js";
+export { createSourceSpan, getFocusStack, setFocusStack } from "./db/sources.js";
+export type { SourceSpanRow } from "./db/sources.js";
+export { createDomainQuestions, listDomainQuestions } from "./db/domain.js";
+export type { DomainQuestionRow } from "./db/domain.js";
+export { addDirection, consumeDirection, listDirections } from "./db/directions.js";
+export type { DirectionRow, DirectionTargetPlan } from "./db/directions.js";
+export { createBuilding, setBuildingStatus, updateBuildingMd } from "./db/buildings.js";
+export type { BuildingRow } from "./db/buildings.js";
+import { createBuilding, setBuildingStatus } from "./db/buildings.js";
+import type { BuildingRow } from "./db/buildings.js";
 
 export { db } from "./db/connection.js";
 
@@ -62,33 +72,6 @@ export type EdgeRow = {
 };
 
 /** 方向的延伸计划：探索时直接落这个节点，而不是拿问题去抽取 */
-export type DirectionTargetPlan = {
-  name: string;
-  type?: string;
-  definition?: string;
-  aliases?: string[];
-  predicate?: string | null;
-  label?: string;
-};
-
-export type BuildingRow = {
-  id: string;
-  world_id: string;
-  kind: "domain" | "flow";
-  anchor: string;
-  title: string;
-  sub: string;
-  md: string;
-  steps: string;
-  status: "detected" | "locked" | "playable" | "cleared" | "stale";
-  version: number;
-  basis: string;
-  fingerprint: string;
-  x: number;
-  y: number;
-  created_at: number;
-};
-
 export type QuizRow = {
   id: string;
   node_id: string;
@@ -255,26 +238,6 @@ export function updateNodeMeta(
   );
 }
 
-export function getFocusStack(worldId: string): string[] {
-  const row = db.prepare("SELECT stack FROM focus_stack WHERE world_id=?").get(worldId) as
-    | { stack: string }
-    | undefined;
-  if (!row) return [];
-  try {
-    const arr = JSON.parse(row.stack);
-    return Array.isArray(arr) ? arr.map(String).slice(0, 12) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function setFocusStack(worldId: string, stack: string[]) {
-  const clean = [...new Set(stack.filter(Boolean))].slice(0, 12);
-  db.prepare(
-    "INSERT INTO focus_stack(world_id,stack,updated_at) VALUES(?,?,?) ON CONFLICT(world_id) DO UPDATE SET stack=excluded.stack, updated_at=excluded.updated_at",
-  ).run(worldId, JSON.stringify(clean), now());
-}
-
 /** 重新计算前沿节点：没有向外知识关系的节点（隐藏节点不算） */
 export function computeFrontier(worldId: string) {
   const nodes = db.prepare("SELECT id FROM nodes WHERE world_id=? AND hidden=0").all(worldId) as {
@@ -366,114 +329,6 @@ export function addEdge(
   return db.prepare("SELECT * FROM edges WHERE id=?").get(id) as EdgeRow;
 }
 
-export type SourceSpanRow = {
-  id: string;
-  world_id: string;
-  text: string;
-  revision: number;
-  created_at: number;
-};
-
-export function createSourceSpan(worldId: string, text: string, revision = 1): SourceSpanRow {
-  const id = uid();
-  db.prepare("INSERT INTO source_spans(id,world_id,text,revision,created_at) VALUES(?,?,?,?,?)").run(
-    id,
-    worldId,
-    text,
-    revision,
-    now(),
-  );
-  return db.prepare("SELECT * FROM source_spans WHERE id=?").get(id) as SourceSpanRow;
-}
-
-export type DirectionRow = {
-  id: string;
-  world_id: string;
-  node_id: string;
-  question: string;
-  reason: string;
-  target_hint: string | null;
-  target_name: string | null;
-  target_type: string | null;
-  target_definition: string | null;
-  target_aliases: string | null;
-  target_predicate: string | null;
-  target_label: string | null;
-  status: "open" | "consumed" | "archived";
-  consumed_span_id: string | null;
-  created_at: number;
-};
-
-export function addDirection(
-  worldId: string,
-  nodeId: string,
-  question: string,
-  reason = "",
-  plan?: DirectionTargetPlan | string | null,
-): DirectionRow {
-  const id = uid();
-  const p = plan && typeof plan === "object" ? plan : null;
-  const legacyHint = typeof plan === "string" ? plan : p?.name ?? null;
-  db.prepare(
-    `INSERT INTO directions(id,world_id,node_id,question,reason,target_hint,target_name,target_type,target_definition,target_aliases,target_predicate,target_label,status,created_at)
-     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,'open',?)`,
-  ).run(
-    id,
-    worldId,
-    nodeId,
-    question,
-    reason,
-    legacyHint,
-    p?.name ?? legacyHint,
-    p?.type ?? null,
-    p?.definition ?? null,
-    p?.aliases ? JSON.stringify(p.aliases) : null,
-    p?.predicate ?? null,
-    p?.label ?? null,
-    now(),
-  );
-  return db.prepare("SELECT * FROM directions WHERE id=?").get(id) as DirectionRow;
-}
-
-export type DomainQuestionRow = {
-  id: string;
-  building_id: string;
-  kind: "fill" | "judge" | "answer";
-  prompt: string;
-  answer: string;
-  aliases: string;
-  day: string;
-  created_at: number;
-};
-
-export function listDomainQuestions(buildingId: string, day: string): DomainQuestionRow[] {
-  return db
-    .prepare("SELECT * FROM domain_questions WHERE building_id=? AND day=? ORDER BY created_at")
-    .all(buildingId, day) as DomainQuestionRow[];
-}
-
-export function createDomainQuestions(
-  buildingId: string,
-  day: string,
-  items: { kind: "fill" | "judge" | "answer"; prompt: string; answer: string; aliases?: string[] }[],
-) {
-  const stmt = db.prepare(
-    "INSERT INTO domain_questions(id,building_id,kind,prompt,answer,aliases,day,created_at) VALUES(?,?,?,?,?,?,?,?)",
-  );
-  for (const it of items)
-    stmt.run(uid(), buildingId, it.kind, it.prompt, it.answer, JSON.stringify(it.aliases ?? []), day, now());
-}
-
-export function listDirections(worldId: string): DirectionRow[] {
-  return db
-    .prepare("SELECT * FROM directions WHERE world_id=? ORDER BY created_at")
-    .all(worldId) as DirectionRow[];
-}
-
-export function consumeDirection(id: string, spanId: string | null = null) {
-  db.prepare("UPDATE directions SET status='consumed', consumed_span_id=? WHERE id=?").run(spanId, id);
-}
-
 export function updateEdgeKind(id: string, kind: EdgeKind) {
   db.prepare("UPDATE edges SET kind=? WHERE id=?").run(kind, id);
 }
@@ -535,54 +390,6 @@ export function recordAttempt(quizId: string, correct: boolean) {
   return null;
 }
 
-export function createBuilding(
-  worldId: string,
-  kind: "domain" | "flow",
-  anchor: string,
-  title: string,
-  sub: string,
-  md: string,
-  steps: string[],
-): BuildingRow {
-  const id = uid();
-  const fingerprint = [...steps].sort().join("|") || `${kind}:${anchor}`;
-  db.prepare(
-    "INSERT INTO buildings(id,world_id,kind,anchor,title,sub,md,steps,status,version,basis,fingerprint,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
-  ).run(
-    id,
-    worldId,
-    kind,
-    anchor,
-    title,
-    sub,
-    md,
-    JSON.stringify(steps),
-    "detected",
-    1,
-    JSON.stringify({ kind, anchor }),
-    fingerprint,
-    now(),
-  );
-  return getBuilding(id)!;
-}
-
-export function setBuildingStatus(id: string, status: BuildingRow["status"]) {
-  db.prepare("UPDATE buildings SET status=? WHERE id=?").run(status, id);
-}
-
-export function updateBuildingMd(id: string, md: string, steps?: string[]) {
-  if (steps) {
-    db.prepare("UPDATE buildings SET md=?, steps=? WHERE id=?").run(
-      md,
-      JSON.stringify(steps),
-      id,
-    );
-  } else {
-    db.prepare("UPDATE buildings SET md=? WHERE id=?").run(md, id);
-  }
-}
-
-/** 节点达到可挑战条件后刷新建筑状态（MVP 简化：相关节点至少 2 个首档） */
 export function refreshBuildingStatus(nodeId: string) {
   const node = getNode(nodeId);
   if (!node) return;
@@ -618,7 +425,6 @@ export function refreshBuildingStatus(nodeId: string) {
   }
 }
 
-/** 示例世界（明确标记 is_demo=1，便于演示，不代表空世界发现率） */
 export function seedDemoIfEmpty() {
   const count = db.prepare("SELECT COUNT(*) c FROM worlds").get() as { c: number };
   if (count.c > 0) return;
