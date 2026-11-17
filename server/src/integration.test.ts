@@ -76,13 +76,22 @@ test("mock 全链路：世界 → extract → stream segment/commit", async () =
   assert.ok(extract.nodes.length >= 1);
   assert.ok(Array.isArray(extract.edges));
 
+  // 每个新节点 4 条方向计划（地图仍只 materialize 1–2）
+  for (const n of extract.createdNodes) {
+    const ds = (extract.directions ?? []).filter((d: any) => d.node_id === n.id && d.status === "open");
+    assert.ok(ds.length >= 4, `node ${n.name} should have 4 directions, got ${ds.length}`);
+  }
+
   // 幂等：同一段文字再抽一次，不应产生重复 (src,dst,kind,predicate) 边
   const extract2 = await api(`/api/worlds/${world.id}/extract`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text: "RAG 包含检索。检索包含向量检索。混合检索用于融合召回。" }),
   });
-  const keys = extract2.edges.map((e: any) => `${e.src}|${e.dst}|${e.kind}|${e.predicate ?? ""}`);
+  const keys = extract2.edges.map(
+    (e: any) =>
+      `${e.src}|${e.dst}|${e.kind}|${e.predicate ?? ""}|${e.kind === "direction" ? e.question ?? "" : ""}`,
+  );
   assert.equal(new Set(keys).size, keys.length, "duplicate edges after repeated extract");
 
   // 方向物化：只给 frontier、每节点最多 2 条

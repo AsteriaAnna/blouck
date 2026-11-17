@@ -533,14 +533,27 @@ graphRouter.post("/api/worlds/:id/extract", async (req, res) => {
     }
   }
 
-  // 每个节点至少一条方向（数据层）；优先用 LLM，失败再模板兜底
+  // 每个节点 4 条方向计划（数据层）；地图只 materialize 1–2 条
   const dirTargets = [focus, ...createdNodes];
-  const haveDirection = new Set(listDirections(world.id).map((d) => d.node_id));
-  const pending = dirTargets.filter((n) => !haveDirection.has(n.id));
+  const dirCount = new Map<string, number>();
+  for (const d of listDirections(world.id)) {
+    dirCount.set(d.node_id, (dirCount.get(d.node_id) ?? 0) + 1);
+  }
+  const pending = dirTargets.filter((n) => (dirCount.get(n.id) ?? 0) < 4);
+  const questionsFor = new Map<string, Set<string>>();
+  const addPlan = (nodeId: string, question: string, reason: string, target: any) => {
+    const used = questionsFor.get(nodeId) ?? new Set<string>();
+    if (used.has(question)) return;
+    if ((dirCount.get(nodeId) ?? 0) >= 4) return;
+    addDirection(world.id, nodeId, question, reason, target);
+    used.add(question);
+    questionsFor.set(nodeId, used);
+    dirCount.set(nodeId, (dirCount.get(nodeId) ?? 0) + 1);
+  };
   if (pending.length) {
     try {
       const suggestions = await llm.suggestDirections({
-        nodes: pending.map((n) => ({
+        nodes: pending.slice(0, 4).map((n) => ({
           name: n.name,
           definition: n.definition,
           evidence: sentenceFor(n.name),
@@ -554,26 +567,38 @@ graphRouter.post("/api/worlds/:id/extract", async (req, res) => {
       });
       for (const sug of suggestions) {
         const n = pending.find((x) => x.name === sug.node);
-        if (!n || haveDirection.has(n.id)) continue;
-        addDirection(world.id, n.id, sug.question, sug.reason, sug.target
-          ? {
-              name: sug.target.name,
-              type: sug.target.type,
-              definition: sug.target.definition,
-              aliases: sug.target.aliases,
-              predicate: sug.predicate ?? null,
-              label: sug.label,
-            }
-          : null);
-        haveDirection.add(n.id);
+        if (!n) continue;
+        addPlan(
+          n.id,
+          sug.question,
+          sug.reason,
+          sug.target
+            ? {
+                name: sug.target.name,
+                type: sug.target.type,
+                definition: sug.target.definition,
+                aliases: sug.target.aliases,
+                predicate: sug.predicate ?? null,
+                label: sug.label,
+              }
+            : null,
+        );
       }
     } catch (err) {
       console.warn("[extract] 方向生成失败，使用模板：", err);
     }
   }
+  const templates = (name: string) => [
+    `「${name}」和哪个概念最容易混淆？`,
+    `「${name}」依赖哪些前置概念？`,
+    `「${name}」由哪些部分组成？`,
+    `「${name}」在什么情况下不成立？`,
+  ];
   for (const n of pending) {
-    if (haveDirection.has(n.id)) continue;
-    addDirection(world.id, n.id, `「${n.name}」还可以往哪一步深入？`, `围绕「${n.name}」的下一步`, null);
+    for (const q of templates(n.name)) {
+      if ((dirCount.get(n.id) ?? 0) >= 4) break;
+      addPlan(n.id, q, `围绕「${n.name}」的下一步`, null);
+    }
   }
 
   // 新节点自动生成题库（后台，最多 3 个，避免一次刷太多模型调用）

@@ -160,7 +160,7 @@ export const deepseekLLM: LLMProvider = {
 - target 必须是当前图里还没有的新概念，不能拿已有概念当 target；
 - question 必须指向 target，用户点击探索后就直接生成这个 target 节点；
 - predicate 用“源节点 → target”的方向：kindOf 具体→上位、partOf 部分→整体、prerequisite 前置→后续、contrast/related 无方向、alternative 旧→新；
-- 每个节点给 1 条，不要泛泛而问。`;
+- 每个节点给 4 条不同方向，target 不能重复；给不够 4 条时只给能确定的，不要硬凑。`;
     const user = `已有节点（不能作为 target）：${existing.join("、") || "（无）"}\n\n${nodes
       .map((n) => `节点：${n.name}\n定义：${n.definition ?? ""}\n邻居：${n.neighbors.join("、")}`)
       .join("\n---\n")}`;

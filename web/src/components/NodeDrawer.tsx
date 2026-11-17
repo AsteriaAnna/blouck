@@ -15,6 +15,7 @@ export default function NodeDrawer() {
   const tier = useStore((s) => s.tier);
   const generateQuiz = useStore((s) => s.generateQuiz);
   const answerQuiz = useStore((s) => s.answerQuiz);
+  const directions = useStore((s) => s.directions);
 
   const node = nodes.find((n) => n.id === (drawer?.kind === "node" ? drawer.id : ""));
   const [payload, setPayload] = useState<NodeDocPayload | null>(null);
@@ -179,6 +180,21 @@ export default function NodeDrawer() {
           <div className="section">
             <h4>下一步</h4>
             <div className="hintline">{doc.next_hint}</div>
+          </div>
+        )}
+
+        {directions.filter((d) => d.node_id === node.id && d.status === "open").length > 0 && (
+          <div className="section">
+            <h4>全部探索方向</h4>
+            <div className="hintline">地图只显示 1–2 条，全部方向在这里。</div>
+            {directions
+              .filter((d) => d.node_id === node.id && d.status === "open")
+              .map((d) => (
+                <div key={d.id} className="hintline">
+                  · {d.question}
+                  {d.target_name ? ` → ${d.target_name}` : ""}
+                </div>
+              ))}
           </div>
         )}
 
