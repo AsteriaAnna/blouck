@@ -151,3 +151,63 @@ export function finishGenerationJob(id: string, error?: string) {
 export function getGenerationJob(id: string): JobRow | undefined {
   return db.prepare("SELECT * FROM generation_jobs WHERE id=?").get(id) as JobRow | undefined;
 }
+
+export type NodeCandidateRow = {
+  id: string;
+  world_id: string;
+  name: string;
+  type: string;
+  definition: string;
+  aliases: string;
+  evidence: string;
+  confidence: number;
+  reason: string;
+  status: string;
+  created_at: number;
+};
+
+/** 软准入：无语义关系的实体只进候选，不直接上地图。 */
+export function addNodeCandidate(
+  worldId: string,
+  data: {
+    name: string;
+    type?: string;
+    definition?: string;
+    aliases?: string[];
+    evidence?: string;
+    confidence?: number;
+    reason?: string;
+  },
+): NodeCandidateRow {
+  const exists = db
+    .prepare("SELECT * FROM node_candidates WHERE world_id=? AND name=? AND status='candidate'")
+    .get(worldId, data.name) as NodeCandidateRow | undefined;
+  if (exists) return exists;
+  const id = uid();
+  db.prepare(
+    "INSERT INTO node_candidates(id,world_id,name,type,definition,aliases,evidence,confidence,reason,status,created_at) VALUES(?,?,?,?,?,?,?,?,?,'candidate',?)",
+  ).run(
+    id,
+    worldId,
+    data.name,
+    data.type ?? "概念",
+    data.definition ?? "",
+    JSON.stringify(data.aliases ?? []),
+    data.evidence ?? "",
+    data.confidence ?? 0.7,
+    data.reason ?? "no_semantic_relation",
+    now(),
+  );
+  return db.prepare("SELECT * FROM node_candidates WHERE id=?").get(id) as NodeCandidateRow;
+}
+
+export function listNodeCandidates(worldId: string, status = "candidate"): NodeCandidateRow[] {
+  return db
+    .prepare("SELECT * FROM node_candidates WHERE world_id=? AND status=? ORDER BY created_at")
+    .all(worldId, status) as NodeCandidateRow[];
+}
+
+export function setNodeCandidateStatus(id: string, status: "candidate" | "admitted" | "rejected") {
+  db.prepare("UPDATE node_candidates SET status=? WHERE id=?").run(status, id);
+}
+

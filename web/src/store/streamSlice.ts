@@ -71,10 +71,15 @@ export const createStreamSlice: StateCreator<State, [], [], StreamSlice> = (set,
       window.setTimeout(() => set({ newNodeIds: [] }), 3800);
       window.setTimeout(() => set({ spawnGhosts: [] }), 3400);
       const n = p.createdNodes?.length ?? newIds.length;
+      const candidates = p.createdCandidates?.length ?? 0;
       getState().showToast(
         n
-          ? `已落图 ${n} 个新节点 · ${p.provider === "mock" ? "mock 抽取" : "DeepSeek 抽取"}`
-          : "这段没有可落图的新实体",
+          ? `已落图 ${n} 个新节点${candidates ? ` · ${candidates} 个进候选` : ""} · ${
+              p.provider === "mock" ? "mock 抽取" : "DeepSeek 抽取"
+            }`
+          : candidates
+            ? `已放入 ${candidates} 个候选（缺少语义关系，未上地图）`
+            : "这段没有可落图的新实体",
       );
     } catch (e: any) {
       set({ busy: false });

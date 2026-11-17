@@ -10,6 +10,11 @@ export default function NodeDrawer() {
   const world = useStore((s) => s.world);
   const openNode = useStore((s) => s.openNode);
   const closeDrawer = useStore((s) => s.closeDrawer);
+  const quizzes = useStore((s) => s.quizzes);
+  const passed = useStore((s) => s.passed);
+  const tier = useStore((s) => s.tier);
+  const generateQuiz = useStore((s) => s.generateQuiz);
+  const answerQuiz = useStore((s) => s.answerQuiz);
 
   const node = nodes.find((n) => n.id === (drawer?.kind === "node" ? drawer.id : ""));
   const [payload, setPayload] = useState<NodeDocPayload | null>(null);
@@ -21,6 +26,7 @@ export default function NodeDrawer() {
   const [predicate, setPredicate] = useState("related");
   const [evidence, setEvidence] = useState("");
   const [relMsg, setRelMsg] = useState("");
+  const [answers, setAnswers] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!node) return;
@@ -175,6 +181,39 @@ export default function NodeDrawer() {
             <div className="hintline">{doc.next_hint}</div>
           </div>
         )}
+
+        <div className="section">
+          <h4>理解检查</h4>
+          <div className="hintline">
+            当前档位：{tier} · 简答 {passed.short} / 判断 {passed.judge}
+          </div>
+          {quizzes.length === 0 ? (
+            <button className="secondary" onClick={() => generateQuiz(node.id)}>
+              生成检查题
+            </button>
+          ) : (
+            quizzes.slice(0, 3).map((q) => (
+              <div key={q.id} className="quiz">
+                <div className="q">{q.prompt}</div>
+                <input
+                  className="md-edit"
+                  style={{ minHeight: 36 }}
+                  value={answers[q.id] ?? ""}
+                  onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
+                  placeholder="写下你的答案"
+                />
+                <button
+                  className="secondary"
+                  style={{ marginTop: 4 }}
+                  onClick={() => answerQuiz(q.id, answers[q.id] ?? "")}
+                  disabled={!answers[q.id]?.trim()}
+                >
+                  提交
+                </button>
+              </div>
+            ))
+          )}
+        </div>
 
         <div className="section">
           <h4>我的笔记</h4>

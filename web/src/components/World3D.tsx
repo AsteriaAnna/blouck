@@ -79,6 +79,17 @@ export default function World3D() {
     return pts;
   }, [nodes, buildings, cx, cy]);
 
+  // 地图克制：提示线最多 2 条（按置信度/新近），其余留在关系池
+  const displayEdges = useMemo(() => {
+    const hints = edges
+      .filter((e) => e.kind === "suggest")
+      .slice()
+      .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
+      .slice(0, 2);
+    const allowed = new Set(hints.map((e) => e.id));
+    return edges.filter((e) => e.kind !== "suggest" || allowed.has(e.id));
+  }, [edges]);
+
   return (
     <div className="world3d">
       <Canvas
@@ -118,7 +129,7 @@ export default function World3D() {
           if (!p) return null;
           return <GhostIsland key={`${g.name}-${i}`} position={p} name={g.name} role={g.role} />;
         })}
-        {edges.map((e) => {
+        {displayEdges.map((e) => {
           if (e.kind === "direction") {
             if (e.consumed) return null;
             const srcNode = nodes.find((n) => n.id === e.src);

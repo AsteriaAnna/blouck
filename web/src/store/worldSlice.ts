@@ -37,6 +37,7 @@ export type WorldSlice = Pick<
   | "openBuilding"
   | "openEdge"
   | "closeDrawer"
+  | "refreshWorldData"
   | "saveMd"
   | "generateQuiz"
   | "answerQuiz"
@@ -131,6 +132,20 @@ export const createWorldSlice: StateCreator<State, [], [], WorldSlice> = (set, g
     set({ drawer: null, challenge: null });
   },
 
+  /** 只刷新图/副本数据，不关闭当前抽屉（答题后解锁副本状态用）。 */
+  async refreshWorldData() {
+    const id = getState().world?.id;
+    if (!id) return;
+    const p = await get<WorldPayload>(`/api/worlds/${id}`);
+    set({
+      world: p.world,
+      nodes: p.nodes,
+      edges: p.edges,
+      buildings: p.buildings,
+      directions: p.directions ?? getState().directions,
+    });
+  },
+
   setFocus: (id) => set({ focusId: id }),
 
   async saveMd(id, md) {
@@ -172,6 +187,8 @@ export const createWorldSlice: StateCreator<State, [], [], WorldSlice> = (set, g
       const qz = await get<any>(`/api/nodes/${node}/quiz`);
       set({ passed: qz.passed, tier: qz.tier, quizzes: qz.quizzes });
     }
+    // 答题会触发服务端 refreshBuildingStatus；刷新副本数据但不关抽屉
+    await getState().refreshWorldData();
   },
 
   async acceptEdge(id) {

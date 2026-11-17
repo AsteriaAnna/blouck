@@ -165,6 +165,9 @@ node_docs, relation_docs, node_candidates, generation_jobs
 - API：`GET /api/nodes/:id/doc`、`POST .../doc/regenerate`、`PATCH .../doc/notes`；edge 同结构。
 - 前端：`NodeDrawer` 显示体系位置/边界/来源/下一步/备注，并提供“关联到已有节点”；`RelationDrawer` 显示依据/辨析/反例/备注。
 - 生成：extract/explore/手动关系会入队 `generation_jobs`；`services/generationWorker.ts` 单进程串行预生成；点击时仍有同步懒生成兜底。
+- 软准入：`/extract` 只让被 `formal/suggest` 语义关系引用的实体上地图；只有 source/direction 或无关系的实体进入 `node_candidates`（`createdCandidates` 返回）。旧数据/根节点不受影响。
+- 地图克制：`World3D` 只显示置信度最高的 2 条 suggest 提示线；方向仍按 frontier + materialize ≤2。
+- 节点卡已接回「理解检查」：显示档位/简答/判断，能生成/提交节点题；答题后 `refreshWorldData` 刷新副本状态，重新打通“答题→tier→副本解锁”链路。
 
 
 ### nodes 关键字段

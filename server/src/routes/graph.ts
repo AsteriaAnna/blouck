@@ -31,6 +31,7 @@ import { llm } from "../providers/active.js";
 import { placeAround } from "../placement.js";
 import { materializeDirectionEdges } from "../services/directions.js";
 import { enqueueGenerationJob } from "../db/docs.js";
+import { addNodeCandidate } from "../db/docs.js";
 import { detectBuildingsLLM, detectBuildingsV2, refreshAllBuildingStatus, refreshStaleBuildings } from "../services/buildings.js";
 import {
   detectDomainCandidates,
@@ -290,8 +291,18 @@ graphRouter.post("/api/worlds/:id/extract", async (req, res) => {
     /^(这个|那个|它|我们|然后|可以|就是|什么|怎么|为什么|如何|是否)|[?？]$/;
   const createdNodes: NodeRow[] = [];
   const createdEdges: unknown[] = [];
+  const createdCandidates: { name: string; evidence: string }[] = [];
   const sourceSpanId = span.id;
   const placed = graph.nodes.map((n) => ({ id: n.id, x: n.x, y: n.y }));
+
+  // 软准入：只有被 formal/suggest 语义关系引用的实体才直接上地图；
+  // 只有 source/direction（来路/方向）或没关系的实体进候选。
+  const semanticNames = new Set<string>();
+  for (const rel of result.relations) {
+    if (rel.type !== "formal" && rel.type !== "suggest") continue;
+    semanticNames.add(norm(rel.target));
+    if (rel.source) semanticNames.add(norm(rel.source));
+  }
 
   // 过程步骤只属于流程副本，不建节点
   const processStepNames = new Set(
@@ -323,6 +334,20 @@ graphRouter.post("/api/worlds/:id/extract", async (req, res) => {
         ],
         sourceSpanId: existingNode.source_span_id ?? sourceSpanId,
       });
+      continue;
+    }
+
+    if (!semanticNames.has(norm(name))) {
+      const candidate = addNodeCandidate(world.id, {
+        name,
+        type,
+        definition: ent.definition ?? "",
+        aliases: [...new Set([...(ent.aliases ?? []), ...normalized.aliases])],
+        evidence,
+        confidence,
+        reason: "no_semantic_relation",
+      });
+      createdCandidates.push({ name: candidate.name, evidence: candidate.evidence });
       continue;
     }
 
@@ -578,6 +603,7 @@ graphRouter.post("/api/worlds/:id/extract", async (req, res) => {
   res.json({
     createdNodes,
     createdEdges,
+    createdCandidates,
     nodes: fresh.nodes.map((n) => ({
       ...n,
       passed: countPassed(n.id),

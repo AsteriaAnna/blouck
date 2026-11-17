@@ -55,6 +55,7 @@ export type State = {
   openBuilding: (id: string) => Promise<void>;
   openEdge: (id: string) => void;
   closeDrawer: () => void;
+  refreshWorldData: () => Promise<void>;
   extract: (text: string, exploreEdgeId?: string) => Promise<void>;
   /** 沿方向线落图：直接创建方向生成时计划好的延伸节点 */
   exploreDirection: (edgeId: string) => Promise<void>;

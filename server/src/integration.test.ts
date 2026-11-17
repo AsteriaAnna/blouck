@@ -132,6 +132,25 @@ test("mock 全链路：世界 → extract → stream segment/commit", async () =
   await fetch(`${base}/api/worlds/${world.id}`, { method: "DELETE" });
 });
 
+test("软准入：无语义关系的实体只进候选，不直接上地图", async () => {
+  const created = await api("/api/worlds", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "admission", rootName: "根" }),
+  });
+  const world = created.world;
+  const extract = await api(`/api/worlds/${world.id}/extract`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: "苹果香蕉橘子" }),
+  });
+  assert.ok(Array.isArray(extract.createdCandidates));
+  assert.ok(extract.createdCandidates.length >= 1, "orphan entity should be candidate");
+  assert.equal(extract.createdNodes.length, 0, "orphan entity must not become node");
+  assert.equal(extract.nodes.length, 1, "only root should remain visible");
+  await fetch(`${base}/api/worlds/${world.id}`, { method: "DELETE" });
+});
+
 test.after(async () => {
   if (child) {
     child.kill("SIGTERM");
