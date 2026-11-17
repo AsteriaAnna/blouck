@@ -103,7 +103,7 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 | docs | GET/POST `.../doc`、`.../doc/regenerate`、PATCH `.../doc/notes`（node/edge） | 6 | V3 节点卡/关系卡懒生成、备注、重生成 |
 | candidates | GET `/api/worlds/:id/candidates`；POST `/api/candidates/:id/admit`、`/reject` | 3 | 软准入候选列表/确认（建节点+formal 关系）/忽略 |
 | practice | GET `/api/edges/:id/practice`；POST `/api/practice/:id/answer` | 2 | 旧关系短练习；UI 已由辨析任务替代 |
-| understanding | GET `/api/nodes/:id/understanding`、`/api/edges/:id/understanding`；POST `/api/understanding/:id/answer`；GET `/api/understanding/:id/quality` | 4 | 节点/关系辨析任务（类型/边界+理由+原文）、质量审计 |
+| understanding | GET `/api/nodes/:id/understanding`、`/api/edges/:id/understanding`；POST `/api/understanding/:id/answer`；GET `.../quality`、`.../reviews`；POST `.../review` | 6 | 节点/关系辨析任务、质量审计、人工反馈 |
 | dungeon-seq | GET `/api/buildings/:id/sequence`；POST `/api/buildings/:id/sequence/complete` | 2 | 单/多误解点 3–4 关；阶段持久化 |
 | learning-stats | GET `/api/learning/overview`；`/api/worlds/:id/learning/stats`、`/learning/trend?days=7`、`/learning/export?days=30` | 4 | 跨世界总览、当前指标、近 N 日趋势、CSV 导出 |
 | events | POST `/api/events`；GET `/api/worlds/:id/events/summary` | 2 | 本地指标上报/汇总 |
@@ -118,7 +118,7 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 
 **注意**：`/api/dev/explore` 的重复注册已在 P1 删除，dev 路由已隔离到 `routes/dev.ts`。
 
-## 4. 数据表归属（13 张核心 + 10 张 V3 卡片/练习/指标）
+## 4. 数据表归属（13 张核心 + 11 张 V3 卡片/练习/指标）
 
 | 表 | 归属 | 关键字段 | 谁写 | 谁读 |
 |---|---|---|---|---|
@@ -144,6 +144,7 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 | `understanding_tasks` | 节点/关系辨析任务 | task_kind/target_type/node_id/edge_id/stem/choices/correct/rubric/evidence | `services/understanding.ts` | 节点卡/关系卡 |
 | `understanding_attempts` | 辨析作答记录 | task_id/choice/explanation/correct/rubric_score | `services/understanding.ts` | 关系卡 |
 | `dungeon_stages` | 副本关卡序列 | building_id/stage/task_id/variant/edge_id | `services/dungeonSequence.ts` | 副本抽屉 |
+| `understanding_task_reviews` | 人工好/差题反馈 | task_id/verdict/note | `db/taskReviews.ts` | 题目面板/学习指标 |
 | `events` | 本地指标 | world_id/type/target_id/payload | `web/src/telemetry.ts` → `/api/events` | events summary |
 
 **表关系**：

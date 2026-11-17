@@ -397,3 +397,16 @@ CREATE TABLE IF NOT EXISTS dungeon_stages(
 );
 CREATE INDEX IF NOT EXISTS idx_dungeon_stages_building ON dungeon_stages(building_id, stage);
 `);
+
+
+/* ---------- 人工题目反馈（校准数据） ---------- */
+db.exec(`
+CREATE TABLE IF NOT EXISTS understanding_task_reviews(
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL,
+  verdict TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_task_reviews_task ON understanding_task_reviews(task_id);
+`);

@@ -7,6 +7,7 @@ type Stats = {
   cards: { nodeOpen: number; relationOpen: number };
   directions: number;
   dungeons: { cleared: number; playable: number; total: number };
+  reviews: { good: number; bad: number };
   lowQualityTasks: { id: string; score: number; flags: string[] }[];
 };
 
@@ -104,6 +105,11 @@ export default function LearningStatsPanel({ worldId }: { worldId: string }) {
                 副本：通关 {stats.dungeons.cleared} · 可挑战 {stats.dungeons.playable} · 共{" "}
                 {stats.dungeons.total}
               </div>
+              {stats.reviews.good + stats.reviews.bad > 0 && (
+                <div className="hintline">
+                  人工反馈：好题 {stats.reviews.good} · 差题 {stats.reviews.bad}
+                </div>
+              )}
               {stats.tasks.byKind && Object.keys(stats.tasks.byKind).length > 0 && (
                 <div className="hintline" style={{ marginTop: 6 }}>
                   题型：{Object.entries(stats.tasks.byKind).map(([k, v]) => `${k} ${v}`).join(" · ")}

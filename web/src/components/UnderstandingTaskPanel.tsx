@@ -34,6 +34,7 @@ export default function UnderstandingTaskPanel({
   const [variant, setVariant] = useState("boundary");
   const [quality, setQuality] = useState<{ score: number; flags: string[] } | null>(null);
   const [explanationScore, setExplanationScore] = useState<number | null>(null);
+  const [reviewed, setReviewed] = useState("");
 
   async function load(nextVariant = "boundary") {
     setLoading(true);
@@ -43,6 +44,7 @@ export default function UnderstandingTaskPanel({
     setExplanation("");
     setQuality(null);
     setExplanationScore(null);
+    setReviewed("");
     try {
       const p = await get<TaskPayload>(`${endpoint}?variant=${nextVariant}`);
       setPayload(p);
@@ -82,6 +84,14 @@ export default function UnderstandingTaskPanel({
     track("understanding_task_answer", { worldId, targetId: task.id, payload: { correct: r.correct } });
   }
 
+  async function review(verdict: "good" | "bad") {
+    const task = payload?.task;
+    if (!task) return;
+    await send(`/api/understanding/${task.id}/review`, "POST", { verdict });
+    setReviewed(verdict);
+    track("understanding_task_review", { worldId, targetId: task.id, payload: { verdict } });
+  }
+
   return (
     <div className="section">
       <h4>辨析任务</h4>
@@ -99,9 +109,23 @@ export default function UnderstandingTaskPanel({
             目标：辨析类型/边界，而不是背定义。
           </div>
           {quality && (
-            <div className="hintline">
-              质量 {quality.score}/100
-              {quality.score < 60 ? ` · 偏低：${quality.flags.join("、")}` : " · 证据/结构合格"}
+            <div className="hintline" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              <span>
+                质量 {quality.score}/100
+                {quality.score < 60 ? ` · 偏低：${quality.flags.join("、")}` : " · 证据/结构合格"}
+              </span>
+              {!reviewed ? (
+                <>
+                  <button className="ghost-btn" onClick={() => review("good")}>
+                    这题好
+                  </button>
+                  <button className="ghost-btn" onClick={() => review("bad")}>
+                    这题差
+                  </button>
+                </>
+              ) : (
+                <span className="hintline">已记录：{reviewed === "good" ? "好题" : "差题"}</span>
+              )}
             </div>
           )}
           {payload.task.misconception && (

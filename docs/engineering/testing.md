@@ -10,7 +10,7 @@ pnpm build       # web build（shared/server 只 typecheck）
 
 CI：`.github/workflows/ci.yml`，push main / PR 跑 install → typecheck → test → build。
 
-## 当前覆盖（P1 起步，当前 43 个测试）
+## 当前覆盖（P1 起步，当前 44 个测试）
 
 | 测试 | 文件 | 覆盖 |
 |---|---|---|
@@ -31,6 +31,7 @@ CI：`.github/workflows/ci.yml`，push main / PR 跑 install → typecheck → t
 | V3 辨析副本 | `server/src/dungeonSequence.test.ts` | 单关系 3 关；两条关系多误解点 4 关；按类型/证据优先选关系；最近正确率高自动强化；全过 → cleared |
 | V3 题目质量 | `server/src/understandingQuality.test.ts` | 证据/误解/干扰项/比较/非定义题；好题高分、定义题低分；真实措辞误判回归 |
 | V3 质量重写 | `server/src/understandingRepair.test.ts` | 关系/节点低分题重写一次；保留高分版本、删低分 |
+| V3 人工反馈 | `server/src/taskReviews.test.ts` | 好题/差题记录、列表、按世界汇总 |
 | 真实 LLM 抽样 | `scripts/quality-sample.mjs` | 本地调 provider，默认 2 关系 × 2 题型并查质量分；非 CI |
 | mock ASR E2E | `scripts/voice-check.mjs` | 浏览器点「试听」→ stream segment/commit → 新节点挂 source_spans；非 CI |
 | V3 学习指标 | `server/src/learningStats.test.ts` | 任务/作答/卡片/方向/副本汇总；平均解释分；近 7 日趋势；CSV；跨世界 overview |

@@ -1,5 +1,6 @@
 import { db } from "../db.js";
 import { auditUnderstandingTask, type QualityReport } from "./understandingQuality.js";
+import { countTaskReviews } from "../db/taskReviews.js";
 
 export type LearningStats = {
   tasks: { total: number; lowQuality: number; byKind: Record<string, number> };
@@ -7,6 +8,7 @@ export type LearningStats = {
   cards: { nodeOpen: number; relationOpen: number };
   directions: number;
   dungeons: { cleared: number; playable: number; total: number };
+  reviews: { good: number; bad: number };
   lowQualityTasks: { id: string; score: number; flags: string[] }[];
 };
 
@@ -173,6 +175,7 @@ export function learningStats(worldId: string): LearningStats {
       playable: statusCount("playable"),
       total: dungeons.reduce((n, d) => n + d.c, 0),
     },
+    reviews: countTaskReviews(worldId),
     lowQualityTasks: lowQualityTasks.slice(0, 20),
   };
 }

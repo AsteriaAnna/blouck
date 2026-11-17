@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "../db.js";
 import { answerUnderstandingTask, ensureNodeUnderstandingTask, ensureUnderstandingTask } from "../services/understanding.js";
 import { auditUnderstandingTask } from "../services/understandingQuality.js";
+import { listTaskReviews, recordTaskReview } from "../db/taskReviews.js";
 import { llm } from "../providers/active.js";
 
 export const understandingRouter = Router();
@@ -10,6 +11,22 @@ understandingRouter.get("/api/understanding/:id/quality", (req, res) => {
   const report = auditUnderstandingTask(req.params.id);
   if (!report) return res.status(404).json({ error: "task not found" });
   res.json(report);
+});
+
+understandingRouter.get("/api/understanding/:id/reviews", (req, res) => {
+  res.json({ reviews: listTaskReviews(req.params.id) });
+});
+
+understandingRouter.post("/api/understanding/:id/review", (req, res) => {
+  const verdict = req.body?.verdict;
+  if (verdict !== "good" && verdict !== "bad") {
+    return res.status(400).json({ error: "verdict must be good/bad" });
+  }
+  if (!auditUnderstandingTask(req.params.id)) {
+    return res.status(404).json({ error: "task not found" });
+  }
+  const review = recordTaskReview(req.params.id, verdict, String(req.body?.note ?? ""));
+  res.json({ ok: true, review });
 });
 
 understandingRouter.get("/api/nodes/:id/understanding", async (req, res) => {
