@@ -15,6 +15,7 @@ import { worldAdminRouter } from "./routes/worldAdmin.js";
 import { graphRouter } from "./routes/graph.js";
 import { docsRouter } from "./routes/docs.js";
 import { candidatesRouter } from "./routes/candidates.js";
+import { practiceRouter } from "./routes/practice.js";
 import { startGenerationWorker } from "./services/generationWorker.js";
 
 seedDemoIfEmpty();
@@ -31,6 +32,7 @@ app.use(worldAdminRouter);
 app.use(graphRouter);
 app.use(docsRouter);
 app.use(candidatesRouter);
+app.use(practiceRouter);
 startGenerationWorker(llm);
 
 app.get("/api/health", (_req, res) => {

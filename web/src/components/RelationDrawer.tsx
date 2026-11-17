@@ -47,6 +47,12 @@ export default function RelationDrawer() {
   const [loading, setLoading] = useState(false);
   const [notes, setNotes] = useState("");
   const [saved, setSaved] = useState("");
+  const [practice, setPractice] = useState<{
+    items: { id: string; kind: string; prompt: string }[];
+    progress: { total: number; correct: number };
+  } | null>(null);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [feedback, setFeedback] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!edge || (edge.kind !== "formal" && edge.kind !== "suggest")) {
@@ -108,6 +114,32 @@ export default function RelationDrawer() {
     }
   }
 
+  async function loadPractice() {
+    if (!edge) return;
+    setLoading(true);
+    try {
+      const p = await get<{
+        items: { id: string; kind: string; prompt: string }[];
+        progress: { total: number; correct: number };
+      }>(`/api/edges/${edge.id}/practice`);
+      setPractice(p);
+    } catch {
+      setPractice({ items: [], progress: { total: 0, correct: 0 } });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function submitPractice(id: string) {
+    const r = await send<{ correct: boolean; feedback: string; progress: { total: number; correct: number } }>(
+      `/api/practice/${id}/answer`,
+      "POST",
+      { answer: answers[id] ?? "" },
+    );
+    setFeedback((f) => ({ ...f, [id]: `${r.correct ? "正确" : "再想想"}${r.feedback ? "：" + r.feedback : ""}` }));
+    setPractice((p) => (p ? { ...p, progress: r.progress } : p));
+  }
+
   return (
     <div className="drawer">
       <header>
@@ -155,6 +187,45 @@ export default function RelationDrawer() {
               </div>
             )}
           </>
+        )}
+
+        {(edge.kind === "formal" || edge.kind === "suggest") && (
+          <div className="section">
+            <h4>关系检查</h4>
+            {!practice ? (
+              <button className="secondary" onClick={loadPractice} disabled={loading}>
+                生成 3 题辨析
+              </button>
+            ) : (
+              <>
+                <div className="hintline">
+                  已答对 {practice.progress.correct} / {practice.progress.total}
+                </div>
+                {practice.items.map((item) => (
+                  <div key={item.id} className="quiz">
+                    <div className="q">{item.prompt}</div>
+                    <input
+                      className="md-edit"
+                      style={{ minHeight: 36 }}
+                      value={answers[item.id] ?? ""}
+                      onChange={(e) => setAnswers((a) => ({ ...a, [item.id]: e.target.value }))}
+                      placeholder="写下你的答案"
+                    />
+                    <div className="row" style={{ marginTop: 4 }}>
+                      <button
+                        className="secondary"
+                        onClick={() => submitPractice(item.id)}
+                        disabled={!answers[item.id]?.trim()}
+                      >
+                        提交
+                      </button>
+                      <span className="hintline">{feedback[item.id]}</span>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
         )}
 
         {(edge.kind === "formal" || edge.kind === "suggest") && (

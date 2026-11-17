@@ -102,6 +102,7 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 | nodes | PATCH `/api/nodes/:id` | 1 | 节点编辑（定义/自由区等） |
 | docs | GET/POST `.../doc`、`.../doc/regenerate`、PATCH `.../doc/notes`（node/edge） | 6 | V3 节点卡/关系卡懒生成、备注、重生成 |
 | candidates | GET `/api/worlds/:id/candidates`；POST `/api/candidates/:id/admit`、`/reject` | 3 | 软准入候选列表/确认（建节点+formal 关系）/忽略 |
+| practice | GET `/api/edges/:id/practice`；POST `/api/practice/:id/answer` | 2 | 关系短练习生成/判题 |
 | quizzes | GET `/api/nodes/:id/quiz`；POST `/api/nodes/:id/quiz/generate`；POST `/api/quiz/:id/answer` | 3 | 节点题/生成/判题 |
 | edges | POST `/api/edges/:id/accept`；PATCH `/api/edges/:id`；POST `/api/edges/:id/consume` | 3 | 接受建议/编辑 MD/消费方向 |
 | relations | POST `/api/worlds/:id/relations` | 1 | 手动关系 |
@@ -113,7 +114,7 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 
 **注意**：`/api/dev/explore` 的重复注册已在 P1 删除，dev 路由已隔离到 `routes/dev.ts`。
 
-## 4. 数据表归属（13 张核心 + 4 张 V3 卡片）
+## 4. 数据表归属（13 张核心 + 6 张 V3 卡片/练习）
 
 | 表 | 归属 | 关键字段 | 谁写 | 谁读 |
 |---|---|---|---|---|
@@ -134,6 +135,8 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 | `relation_docs` | 关系对照卡 | doc_json/notes_md/version/generated_at | `services/contentDocs.ts` | 关系卡 |
 | `node_candidates` | 未准入节点 | name/evidence/confidence/status | 准入（下一阶段） | 候选确认 |
 | `generation_jobs` | 异步生成任务 | type/target_id/status | 生成（下一阶段） | worker/观测 |
+| `edge_practice` | 关系短练习 | edge_id/kind/prompt/answer | `services/practice.ts` | 关系卡 |
+| `edge_attempts` | 关系练习记录 | practice_id/correct | `services/practice.ts` | 关系卡进度 |
 
 **表关系**：
 - `worlds 1—N nodes/edges/buildings/directions/source_spans/focus_stack/hide_batches`；

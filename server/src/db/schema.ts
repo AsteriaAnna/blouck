@@ -291,3 +291,24 @@ CREATE TABLE IF NOT EXISTS generation_jobs(
 );
 CREATE INDEX IF NOT EXISTS idx_generation_jobs_status ON generation_jobs(status, created_at);
 `);
+
+
+/* ---------- V3 Phase 2：关系练习 ---------- */
+db.exec(`
+CREATE TABLE IF NOT EXISTS edge_practice(
+  id TEXT PRIMARY KEY,
+  world_id TEXT NOT NULL,
+  edge_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  prompt TEXT NOT NULL,
+  answer TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_edge_practice_edge ON edge_practice(edge_id);
+CREATE TABLE IF NOT EXISTS edge_attempts(
+  id TEXT PRIMARY KEY,
+  practice_id TEXT NOT NULL,
+  correct INTEGER NOT NULL,
+  at INTEGER NOT NULL
+);
+`);
