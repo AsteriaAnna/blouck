@@ -21,7 +21,11 @@ understandingRouter.get("/api/edges/:id/understanding", async (req, res) => {
   if (edge.kind !== "formal" && edge.kind !== "suggest") {
     return res.status(400).json({ error: "只有语义关系可以做辨析" });
   }
-  res.json(await ensureUnderstandingTask(edge.id, llm));
+  const allowed = ["boundary", "counterexample", "error_correction"] as const;
+  const variant = allowed.includes(String(req.query.variant ?? "") as any)
+    ? (String(req.query.variant) as (typeof allowed)[number])
+    : "boundary";
+  res.json(await ensureUnderstandingTask(edge.id, llm, variant));
 });
 
 understandingRouter.post("/api/understanding/:id/answer", async (req, res) => {

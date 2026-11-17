@@ -370,3 +370,9 @@ for (const [col, ddl] of [
   if (!columnNames("understanding_tasks").includes(col)) db.exec(`ALTER TABLE understanding_tasks ADD COLUMN ${col} ${ddl}`);
 }
 db.exec("CREATE INDEX IF NOT EXISTS idx_understanding_node ON understanding_tasks(node_id)");
+
+
+// 理解任务变体：boundary / counterexample / error_correction
+if (!columnNames("understanding_tasks").includes("task_kind")) {
+  db.exec("ALTER TABLE understanding_tasks ADD COLUMN task_kind TEXT NOT NULL DEFAULT 'boundary'");
+}

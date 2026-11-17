@@ -140,12 +140,14 @@ export type UnderstandingTaskInput = {
   label?: string;
   evidence?: string;
   neighbors: string[];
+  variant?: "boundary" | "counterexample" | "error_correction";
 };
 
 export type NodeUnderstandingInput = {
   sourceText: string;
   node: { name: string; type?: string; definition?: string };
   neighbors: { name: string; predicate?: string | null; evidence?: string }[];
+  variant?: "boundary" | "counterexample" | "error_correction";
 };
 
 export type LLMProvider = {

@@ -9,7 +9,7 @@ process.env.DB_PATH = dbPath;
 process.env.DEEPSEEK_API_KEY = "";
 
 const { addEdge, addNode, createSourceSpan, createWorld, db } = await import("./db.js");
-const { getUnderstandingTaskByEdge, getUnderstandingTaskByNode } = await import("./db/understanding.js");
+const { getUnderstandingTaskByEdge, getUnderstandingTaskByEdgeKind, getUnderstandingTaskByNode } = await import("./db/understanding.js");
 const {
   answerUnderstandingTask,
   ensureNodeUnderstandingTask,
@@ -79,6 +79,26 @@ test("节点辨析：无源不出题；有源生成边界任务", async () => {
   const row = getUnderstandingTaskByNode(a.id)!;
   const result = await answerUnderstandingTask(row.id, row.correct_choice, "依据原文，RAG 包含检索。", mockLLM);
   assert.ok(result);
+});
+
+test("辨析变体：反例题/纠错题独立缓存", async () => {
+  const world = createWorld("understanding-variant", "根");
+  const a = addNode(world.id, "A", 0, 0);
+  const b = addNode(world.id, "B", 100, 0);
+  createSourceSpan(world.id, "A 是一种 B 的实现。");
+  const edge = addEdge(world.id, a.id, b.id, "formal", "A 是一种 B", null, "", {
+    predicate: "kindOf",
+    evidence: "A 是一种 B 的实现",
+  });
+  const counter = await ensureUnderstandingTask(edge.id, mockLLM, "counterexample");
+  assert.equal(counter.status, "ready");
+  assert.ok(getUnderstandingTaskByEdgeKind(edge.id, "counterexample"));
+  const boundary = await ensureUnderstandingTask(edge.id, mockLLM, "boundary");
+  assert.equal(boundary.status, "ready");
+  assert.notEqual(counter.task!.id, boundary.task!.id);
+  const correction = await ensureUnderstandingTask(edge.id, mockLLM, "error_correction");
+  assert.equal(correction.status, "ready");
+  assert.ok(getUnderstandingTaskByEdgeKind(edge.id, "error_correction"));
 });
 
 test.after(() => {

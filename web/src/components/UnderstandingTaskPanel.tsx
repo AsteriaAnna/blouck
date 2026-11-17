@@ -31,14 +31,22 @@ export default function UnderstandingTaskPanel({
   const [choice, setChoice] = useState("");
   const [explanation, setExplanation] = useState("");
   const [feedback, setFeedback] = useState("");
+  const [variant, setVariant] = useState("boundary");
 
-  async function load() {
+  async function load(nextVariant = "boundary") {
     setLoading(true);
     setFeedback("");
+    setVariant(nextVariant);
+    setChoice("");
+    setExplanation("");
     try {
-      const p = await get<TaskPayload>(endpoint);
+      const p = await get<TaskPayload>(`${endpoint}?variant=${nextVariant}`);
       setPayload(p);
-      track("understanding_task_start", { worldId, targetId, payload: { status: p.status } });
+      track("understanding_task_start", {
+        worldId,
+        targetId,
+        payload: { status: p.status, variant: nextVariant },
+      });
     } catch {
       setPayload({ status: "failed", message: "任务生成失败", task: null });
     } finally {
@@ -64,7 +72,7 @@ export default function UnderstandingTaskPanel({
     <div className="section">
       <h4>辨析任务</h4>
       {!payload ? (
-        <button className="secondary" onClick={load} disabled={loading}>
+        <button className="secondary" onClick={() => load("boundary")} disabled={loading}>
           生成一个辨析任务
         </button>
       ) : payload.status === "source_required" ? (
@@ -105,6 +113,15 @@ export default function UnderstandingTaskPanel({
             <button className="primary" onClick={submit} disabled={!choice || explanation.trim().length < 4}>
               提交辨析
             </button>
+          </div>
+          <div className="row" style={{ marginTop: 6, gap: 6 }}>
+            <button className="secondary" onClick={() => load("counterexample")} disabled={loading}>
+              换个反例题
+            </button>
+            <button className="secondary" onClick={() => load("error_correction")} disabled={loading}>
+              换个纠错题
+            </button>
+            <span className="hintline">当前：{variant}</span>
           </div>
           {feedback && (
             <div className="hintline" style={{ whiteSpace: "pre-wrap" }}>

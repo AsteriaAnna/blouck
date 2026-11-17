@@ -199,7 +199,7 @@ export const mockLLM: LLMProvider = {
     return { flows: [], domains: [] };
   },
 
-  async generateUnderstandingTask({ a, b, predicate, evidence }) {
+  async generateUnderstandingTask({ a, b, predicate, evidence, variant = "boundary" }) {
     const types = [
       { id: "kindOf", text: "归类：A 是 B 的一种" },
       { id: "partOf", text: "组成：A 是 B 的一部分" },
@@ -208,6 +208,37 @@ export const mockLLM: LLMProvider = {
       { id: "related", text: "相关：二者只是相关" },
     ];
     const correct = types.some((x) => x.id === (predicate ?? "")) ? predicate! : "related";
+    if (variant === "counterexample") {
+      return {
+        learning_goal: "apply",
+        misconception: "把原文支持的关系套到没有证据的场景",
+        stem: `以下哪一句是对「${a.name}→${b.name}」关系的反例？请选择，并说明原文边界。`,
+        choices: [
+          { id: "counter", text: `原文没有支持「${a.name}」与「${b.name}」关系的证据` },
+          { id: "support", text: `原文明确支持「${a.name}」与「${b.name}」的关系` },
+          { id: "irrelevant", text: `「${a.name}」与「${b.name}」完全无关` },
+        ],
+        correct_choice: "counter",
+        rubric: ["指出反例", "引用原文", "说明边界"],
+        evidence_quote: (evidence || "").slice(0, 200),
+        follow_up: "换一个场景，这个反例还成立吗？",
+      };
+    }
+    if (variant === "error_correction") {
+      return {
+        learning_goal: "explain",
+        misconception: "把关系方向或类型说反",
+        stem: `关于「${a.name}」与「${b.name}」，哪一句是错误表述、需要修正？`,
+        choices: [
+          { id: "wrong", text: `「${b.name}」是「${a.name}」的${predicate ?? "相关"}关系` },
+          { id: "right", text: `「${a.name}」与「${b.name}」是${predicate ?? "相关"}关系` },
+        ],
+        correct_choice: "wrong",
+        rubric: ["指出错误", "给出正确表述", "引用原文"],
+        evidence_quote: (evidence || "").slice(0, 200),
+        follow_up: "正确表述应该怎么写？",
+      };
+    }
     return {
       learning_goal: "discriminate",
       misconception: "把相邻关系类型混用，或忽略关系方向",

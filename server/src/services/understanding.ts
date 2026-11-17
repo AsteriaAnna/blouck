@@ -4,6 +4,7 @@ import {
   createUnderstandingTask,
   getUnderstandingTask,
   getUnderstandingTaskByEdge,
+  getUnderstandingTaskByEdgeKind,
   getUnderstandingTaskByNode,
   recordUnderstandingAttempt,
   type UnderstandingTaskRow,
@@ -33,10 +34,14 @@ function publicTask(t: UnderstandingTaskRow) {
 }
 
 /** 事实辨析任务：必须能回到用户原文；无源不出题。 */
-export async function ensureUnderstandingTask(edgeId: string, llm: LLMProvider) {
+export async function ensureUnderstandingTask(
+  edgeId: string,
+  llm: LLMProvider,
+  variant: "boundary" | "counterexample" | "error_correction" = "boundary",
+) {
   const edge = db.prepare("SELECT * FROM edges WHERE id=?").get(edgeId) as EdgeRow | undefined;
   if (!edge) throw new Error("edge not found");
-  const existing = getUnderstandingTaskByEdge(edgeId);
+  const existing = getUnderstandingTaskByEdgeKind(edgeId, variant);
   if (existing) return { status: "ready" as const, task: publicTask(existing) };
 
   const span = findSourceSpan(edge.world_id, edge.evidence ?? "");
@@ -67,6 +72,7 @@ export async function ensureUnderstandingTask(edgeId: string, llm: LLMProvider) 
     label: edge.label,
     evidence: edge.evidence,
     neighbors,
+    variant,
   });
   if (!draft.choices.length || !draft.correct_choice) {
     return { status: "failed" as const, task: null, message: "任务生成失败，可稍后重试" };
@@ -76,6 +82,7 @@ export async function ensureUnderstandingTask(edgeId: string, llm: LLMProvider) 
     edge_id: edge.id,
     target_type: "edge",
     node_id: null,
+    task_kind: variant,
     learning_goal: draft.learning_goal,
     misconception: draft.misconception,
     stem: draft.stem,
@@ -152,6 +159,7 @@ export async function ensureNodeUnderstandingTask(nodeId: string, llm: LLMProvid
     edge_id: "",
     target_type: "node",
     node_id: node.id,
+    task_kind: "boundary",
     learning_goal: draft.learning_goal,
     misconception: draft.misconception,
     stem: draft.stem,
