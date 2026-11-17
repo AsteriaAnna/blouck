@@ -189,11 +189,15 @@ export default function DungeonDrawer() {
           )}
         </div>
 
-        {building.status === "playable" && challenge?.error && (
-          <div className="section">
-            <div className="hintline">{challenge.error}</div>
-          </div>
-        )}
+        <details className="section">
+          <summary>
+            <b>复习模式</b>（旧题组/流程排序；不替代上面的辨析副本）
+          </summary>
+          {building.status === "playable" && challenge?.error && (
+            <div className="section">
+              <div className="hintline">{challenge.error}</div>
+            </div>
+          )}
 
         {challenge && !challenge.error && building.kind === "flow" && (
           <div className="section">
@@ -262,6 +266,7 @@ export default function DungeonDrawer() {
             <div className="hintline">领域题不改变节点三档，只记录副本通关。</div>
           </div>
         )}
+        </details>
 
         <div className="section">
           <h4>副本 MD（可编辑）</h4>

@@ -172,7 +172,7 @@ node_docs, relation_docs, node_candidates, generation_jobs
 - 提示池：`services/hints.ts refreshHintDisplay` 按 confidence/新近/热度排序，写 `hint_score/hint_display`；地图只显示 `hint_display=1` 的 top-k，旧数据回退到置信度前 2。
 - 方向：新节点/焦点尽量生成 **4 条 open 方向计划**（LLM 优先，模板补足 4）；地图仍只 materialize 1–2 条；节点卡「全部探索方向」列出全部，每条可「去探索」；`/explore` 支持 `{directionId}`，不依赖地图投影边；从方向探索生成的新节点也会补到 4 条。
 - 副本解锁已有单测：节点 tier>=1 后 domain/flow 从 detected → playable；`short+judge` 都答对 → tier=1 → DOMAIN playable（答题链路）。
-- 辨析副本：`GET /api/buildings/:id/sequence` 选一条带原文证据的 formal 关系，生成“边界→反例→迁移”三关；`POST .../sequence/complete` 检查三关是否都答对，全部通过则 building cleared。DungeonDrawer 有「辨析副本 · 误解纠正」（旧 10 题仍保留）。
+- 辨析副本：`GET /api/buildings/:id/sequence` 选一条带原文证据的 formal 关系，生成“边界→反例→迁移”三关；`POST .../sequence/complete` 检查三关是否都答对，全部通过则 building cleared。DungeonDrawer 以「辨析副本 · 误解纠正」为主入口，旧 10 题/流程排序收进默认折叠的「复习模式」，避免双轨抢注意力。
 - 关系辨析（替代“3 题复习”）：`understanding_tasks/understanding_attempts`；`GET /api/edges/:id/understanding?variant=boundary|counterexample|error_correction|transfer` 生成“类型/边界、反例、纠错、迁移 + 选择 + 理由 + 原文引用 + rubric + follow_up”；无源返回 `source_required`；`POST /api/understanding/:id/answer` 判选择+解释并记录。旧 `edge_practice` 接口保留但 UI 已不用。
 - 题目质量审计：`GET /api/understanding/:id/quality`，按 evidence/误解/choices/rubric/非定义题/解释 6 项打分；UI 显示“质量 N/100”和低分 flags。CDP 实测 demo 关系任务质量 100/100。
 - 学习指标：`GET /api/worlds/:id/learning/stats` 汇总任务总数/低质量题/题型、作答正确率、卡片打开、方向探索、副本 cleared/playable；低质量题最多返回 20 条。
