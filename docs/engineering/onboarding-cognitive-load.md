@@ -1,6 +1,6 @@
 # 10 · 新工程师认知成本评估与简化方案
 
-> 2026-11-17 P2 进度：canonical `line_type/line_state` 已派生到 API；`RelationDrawer` 改用 canonical；extract/seed 方向写入收敛到 `addDirection` + materialize；`World3D` 721→185 行（scene 271/edges 278）；`InputBar` 581→104 行，音频/WS 状态机拆到 `useVoiceInput` 489 行。P1 的 shared/routes/db repo/tests/CI 已完成，见 architecture。
+> 2026-11-17 P2 进度：canonical `line_type/line_state` 已派生到 API；`RelationDrawer` 改用 canonical；extract/seed 方向写入收敛到 `addDirection` + materialize；`World3D` 721→185 行（scene 271/edges 278）；`InputBar` 581→104 行（voice hook 489）；`store` 412→14 行（worldSlice 198 + streamSlice 170 + streamText 60）。P1 的 shared/routes/db repo/tests/CI 已完成，见 architecture。
 
 > 评估对象：一个能力很强、但**完全不了解本项目**的工程师，假设明天接手。
 > 目的：不是吐槽，而是给出“从入职到能安全改核心链路”的成本、风险点和最短简化路径。

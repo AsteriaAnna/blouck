@@ -155,7 +155,7 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 2. `db.ts` 约 235 行：已拆出 `db/connection`/`schema`/`sources`/`domain`/`directions`/`buildings`/`nodes`/`edges`/`quizzes`；剩余 worlds/getGraph/recordAttempt/refreshBuildingStatus/seed，作为 barrel + 图读取。
 3. `stream/session.ts` 混合 LLM/父子启发/DB 写/focus；无事务。
 4. `assetops.ts` 混合建筑位置、方向 frontier、隐藏、导出；名字无意义。
-5. `World3D` 185 行（场景组装）；`World3DScene` 271 行（岛/建筑/相机）；`World3DEdges` 278 行（线/路牌）；`InputBar` 104 行（UI）+ `hooks/useVoiceInput` 489 行（音频/WS 状态机）；`store` 仍 412 行，P2 继续拆 slices。
+5. 前端已拆：`World3D` 185（组装）+ `World3DScene` 271（岛/建筑/相机）+ `World3DEdges` 278（线/路牌）；`InputBar` 104（UI）+ `hooks/useVoiceInput` 489（音频/WS）；`store.ts` 14（组合）+ `store/worldSlice` 198 + `store/streamSlice` 170 + `store/streamText` 60。
 6. web/server DTO 已抽到 `packages/shared`；canonical `line_type/line_state` 已由 getGraph 派生；仍有少量 `send<any>`/组件内类型。
 7. 已有 CI；仍无鉴权/静态托管；验收脚本在仓库外。
 8. 方向/来源/suggest 的“源数据 vs 地图投影”没有单一来源；P2 canonical 方案见 `canonical-state.md`。
