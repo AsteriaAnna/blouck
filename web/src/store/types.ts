@@ -52,6 +52,9 @@ export type State = {
   /** 镜头远近：拉近自动多显示一些线索 */
   mapZoom: "far" | "near";
   setMapZoom: (zoom: "far" | "near") => void;
+  /** 自增触发 CameraFit 重新框住全景 */
+  mapFitToken: number;
+  fitMapView: () => void;
 
   loadWorlds: () => Promise<void>;
   createWorld: (name: string, root: string) => Promise<void>;

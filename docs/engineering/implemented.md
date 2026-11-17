@@ -184,6 +184,7 @@ node_docs, relation_docs, node_candidates, generation_jobs
 - 移动端：`@media (max-width:760px)` 下抽屉变底部近全宽、输入台留安全区、地图控制上移避让、图例隐藏、按钮最小触控高度。CDP 390×844 实测 `scrollWidth=390`、drawer 374×836 内、map 控制不与输入台重叠、errors=[]；截图见本地 `_verify/mobile-world.png`（不在仓库）。
 - 横屏/矮屏：`@media (max-width:1000px) and (max-height:560px) and (orientation:landscape)` 下抽屉仍底部近全宽、图例隐藏、地图控制缩放到输入台上方；CDP 844×390 实测 `scrollWidth=844`、drawer 828×374 内、map bottom 294 < input top 304、errors=[]。
 - 触控：`html/body/#root` 禁用 overscroll，`.world3d canvas` 设 `touch-action:none`，避免浏览器抢占捏合/旋转。CDP 390×844 双指捏合实测 `mapZoom far→near`，文案切到「镜头拉近」，errors=[]。
+- 回到全局：`MapControls` 新增按钮，`fitMapView` 自增 `mapFitToken`，`CameraFit` 重新框住全部节点。CDP 实测 near → 点击 → `mapZoom=far`，errors=[]。
 - 按缩放披露：`MapCameraProbe` 在相机高度跨过 720 时写 `mapZoom`；远看提示 top2/方向 2，拉近提示 top6/方向 4。CDP 用可信滚轮输入实测 far→near→far，`镜头拉近：提示 top6 / 方向 4` 文案生效，errors=[]。
 - 方向可探索感：`DirectionEdge` 增加 `TravelingSpark`（沿曲线流动的光点）和 `DirectionSign` 轻微呼吸浮动。**修复：已消费的方向不再占地图 top2 名额**，否则 demo 前两条 consumed 方向被选中后又被渲染层过滤，导致方向线完全不可见。CDP 实测 `frameChanged=true`、`sparkMoved=true`，两帧截图 hash 不同；DEV 下 `__spark` 仅作验收探针。
 - 四类线视觉：关系=粗实线；序列=实线+中途箭头；提示=虚线+路牌；方向=点线+路牌+光点。图例明确写出四种线型；CDP 实测图例含“实线/箭头/虚线/点线”，errors=[]。

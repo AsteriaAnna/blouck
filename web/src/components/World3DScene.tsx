@@ -228,9 +228,11 @@ function Building({
 function CameraFit({
   worldId,
   points,
+  fitToken = 0,
 }: {
   worldId: string | null;
   points: [number, number, number][];
+  fitToken?: number;
 }) {
   const camera = useThree((s) => s.camera);
   const controls = useThree((s) => s.controls) as any;
@@ -274,7 +276,7 @@ function CameraFit({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [worldId, camera, controls]);
+  }, [worldId, camera, controls, fitToken]);
   return null;
 }
 

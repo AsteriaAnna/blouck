@@ -33,6 +33,8 @@ export type WorldSlice = Pick<
   | "toggleMapExpand"
   | "mapZoom"
   | "setMapZoom"
+  | "mapFitToken"
+  | "fitMapView"
   | "loadWorlds"
   | "createWorld"
   | "openWorld"
@@ -70,6 +72,7 @@ export const createWorldSlice: StateCreator<State, [], [], WorldSlice> = (set, g
   challenge: null,
   mapExpand: false,
   mapZoom: "far",
+  mapFitToken: 0,
 
   toggleMapExpand() {
     set({ mapExpand: !getState().mapExpand });
@@ -77,6 +80,10 @@ export const createWorldSlice: StateCreator<State, [], [], WorldSlice> = (set, g
 
   setMapZoom(zoom) {
     set({ mapZoom: zoom });
+  },
+
+  fitMapView() {
+    set({ mapFitToken: getState().mapFitToken + 1 });
   },
 
   async loadWorlds() {
@@ -104,6 +111,7 @@ export const createWorldSlice: StateCreator<State, [], [], WorldSlice> = (set, g
       challenge: null,
       mapExpand: false,
       mapZoom: "far",
+      mapFitToken: 0,
       partial: "",
       streamText: "",
       mentions: [],

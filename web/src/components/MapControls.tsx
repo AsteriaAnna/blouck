@@ -13,6 +13,7 @@ export default function MapControls() {
   const mapExpand = useStore((s) => s.mapExpand);
   const mapZoom = useStore((s) => s.mapZoom);
   const toggleMapExpand = useStore((s) => s.toggleMapExpand);
+  const fitMapView = useStore((s) => s.fitMapView);
   const counts: Record<string, number> = { relation: 0, sequence: 0, hint: 0, exploration: 0 };
   for (const e of edges) {
     const t =
@@ -45,6 +46,9 @@ export default function MapControls() {
       </div>
       <button className="secondary" onClick={toggleMapExpand}>
         {mapExpand ? "收起：只看重点" : "展开：显示全部关系"}
+      </button>
+      <button className="secondary" style={{ marginLeft: 6 }} onClick={fitMapView}>
+        回到全局
       </button>
       <div className="hintline" style={{ marginTop: 4 }}>
         {mapExpand

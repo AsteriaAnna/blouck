@@ -81,6 +81,7 @@ hit node label=概念
 | 移动端布局 | ✅ | CDP 390×844：无横向溢出；抽屉 374px 内；地图控制不与输入台重叠 |
 | 横屏布局 | ✅ | CDP 844×390：无横向溢出；抽屉 828×374 内；map bottom 294 < input top 304 |
 | 触控手势 | ✅ | CDP 触摸双指捏合：`mapZoom far→near`，地图控制切到「镜头拉近」，errors=[] |
+| 回到全局 | ✅ | CDP：near → 点击「回到全局」→ `mapZoom=far`，errors=[] |
 | 指标导出 | ✅ | `learning/export?days=7` 返回 text/csv，8 行含表头；面板「导出 CSV」可按需下载 |
 | 跨世界总览 | ✅ | `GET /api/learning/overview`；CDP 首页显示任务/正确率/通关，errors=[] |
 | 语音→知识层 | ✅ | 集成测试：stream commit 节点至少一个挂 `source_spans`，可回源生成事实题 |

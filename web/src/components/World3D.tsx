@@ -17,6 +17,7 @@ export default function World3D() {
   const openEdge = useStore((s) => s.openEdge);
   const mapExpand = useStore((s) => s.mapExpand);
   const mapZoom = useStore((s) => s.mapZoom);
+  const mapFitToken = useStore((s) => s.mapFitToken);
   const newNodeIds = useStore((s) => s.newNodeIds);
   const mentions = useStore((s) => s.mentions);
   const ghosts = useStore((s) => s.ghosts);
@@ -216,7 +217,7 @@ export default function World3D() {
           maxDistance={2600}
           maxPolarAngle={Math.PI / 2.15}
         />
-        <CameraFit worldId={worldId} points={worldPoints} />
+        <CameraFit worldId={worldId} points={worldPoints} fitToken={mapFitToken} />
       </Canvas>
       <div className="hud3d">
         <div className="badge">3D · 拖拽旋转 · 滚轮缩放 · 点岛查看</div>
