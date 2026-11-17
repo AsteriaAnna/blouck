@@ -199,6 +199,27 @@ export const mockLLM: LLMProvider = {
     return { flows: [], domains: [] };
   },
 
+  async generateUnderstandingTask({ a, b, predicate, evidence }) {
+    const types = [
+      { id: "kindOf", text: "归类：A 是 B 的一种" },
+      { id: "partOf", text: "组成：A 是 B 的一部分" },
+      { id: "prerequisite", text: "前置：A 是 B 的前置" },
+      { id: "contrast", text: "对比：A 与 B 形成对比" },
+      { id: "related", text: "相关：二者只是相关" },
+    ];
+    const correct = types.some((x) => x.id === (predicate ?? "")) ? predicate! : "related";
+    return {
+      learning_goal: "discriminate",
+      misconception: "把相邻关系类型混用，或忽略关系方向",
+      stem: `「${a.name}」与「${b.name}」之间是哪一种关系？请选择，并用原文说明为什么不是相邻类型。`,
+      choices: types,
+      correct_choice: correct,
+      rubric: ["指出正确关系类型", "引用原文证据", "说明为什么不是相邻类型"],
+      evidence_quote: (evidence || "").slice(0, 200),
+      follow_up: "如果把两者的方向反过来，关系还成立吗？",
+    };
+  },
+
   async generateNodeDoc({ name, type, definition, sourceText, neighbors }) {
     return {
       definition: definition || `${name} 是一个${type || "概念"}。`,

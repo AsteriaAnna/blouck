@@ -121,6 +121,27 @@ export type RelationDocInput = {
   evidence?: string;
 };
 
+export type UnderstandingTaskDraft = {
+  learning_goal: "discriminate" | "explain" | "apply" | "transfer";
+  misconception: string;
+  stem: string;
+  choices: { id: string; text: string }[];
+  correct_choice: string;
+  rubric: string[];
+  evidence_quote: string;
+  follow_up: string;
+};
+
+export type UnderstandingTaskInput = {
+  sourceText: string;
+  a: { name: string; definition?: string };
+  b: { name: string; definition?: string };
+  predicate?: string | null;
+  label?: string;
+  evidence?: string;
+  neighbors: string[];
+};
+
 export type LLMProvider = {
   name: string;
   /** 从一段稳定文本里抽取实体与关系（对应 MVP 的“节点生成/关系生成”） */
@@ -159,6 +180,9 @@ export type LLMProvider = {
 
   /** V3：关系对照卡草稿。只依据输入证据，不要编造。 */
   generateRelationDoc(input: RelationDocInput): Promise<RelationDocDraft>;
+
+  /** V3：关系辨析任务（不是定义回忆题）。必须针对一个误解，带原文引用与 rubric。 */
+  generateUnderstandingTask(input: UnderstandingTaskInput): Promise<UnderstandingTaskDraft>;
 };
 
 export type ASREvents = {

@@ -102,7 +102,8 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 | nodes | PATCH `/api/nodes/:id` | 1 | 节点编辑（定义/自由区等） |
 | docs | GET/POST `.../doc`、`.../doc/regenerate`、PATCH `.../doc/notes`（node/edge） | 6 | V3 节点卡/关系卡懒生成、备注、重生成 |
 | candidates | GET `/api/worlds/:id/candidates`；POST `/api/candidates/:id/admit`、`/reject` | 3 | 软准入候选列表/确认（建节点+formal 关系）/忽略 |
-| practice | GET `/api/edges/:id/practice`；POST `/api/practice/:id/answer` | 2 | 关系短练习生成/判题 |
+| practice | GET `/api/edges/:id/practice`；POST `/api/practice/:id/answer` | 2 | 旧关系短练习；UI 已由辨析任务替代 |
+| understanding | GET `/api/edges/:id/understanding`；POST `/api/understanding/:id/answer` | 2 | 关系辨析任务（类型/边界+理由+原文） |
 | events | POST `/api/events`；GET `/api/worlds/:id/events/summary` | 2 | 本地指标上报/汇总 |
 | quizzes | GET `/api/nodes/:id/quiz`；POST `/api/nodes/:id/quiz/generate`；POST `/api/quiz/:id/answer` | 3 | 节点题/生成/判题 |
 | edges | POST `/api/edges/:id/accept`；PATCH `/api/edges/:id`；POST `/api/edges/:id/consume` | 3 | 接受建议/编辑 MD/消费方向 |
@@ -115,7 +116,7 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 
 **注意**：`/api/dev/explore` 的重复注册已在 P1 删除，dev 路由已隔离到 `routes/dev.ts`。
 
-## 4. 数据表归属（13 张核心 + 7 张 V3 卡片/练习/指标）
+## 4. 数据表归属（13 张核心 + 9 张 V3 卡片/练习/指标）
 
 | 表 | 归属 | 关键字段 | 谁写 | 谁读 |
 |---|---|---|---|---|
@@ -138,6 +139,8 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 | `generation_jobs` | 异步生成任务 | type/target_id/status | 生成（下一阶段） | worker/观测 |
 | `edge_practice` | 关系短练习 | edge_id/kind/prompt/answer | `services/practice.ts` | 关系卡 |
 | `edge_attempts` | 关系练习记录 | practice_id/correct | `services/practice.ts` | 关系卡进度 |
+| `understanding_tasks` | 关系辨析任务 | stem/choices/correct/rubric/evidence | `services/understanding.ts` | 关系卡 |
+| `understanding_attempts` | 辨析作答记录 | task_id/choice/explanation/correct | `services/understanding.ts` | 关系卡 |
 | `events` | 本地指标 | world_id/type/target_id/payload | `web/src/telemetry.ts` → `/api/events` | events summary |
 
 **表关系**：

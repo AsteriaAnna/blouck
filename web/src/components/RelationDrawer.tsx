@@ -48,15 +48,22 @@ export default function RelationDrawer() {
   const [loading, setLoading] = useState(false);
   const [notes, setNotes] = useState("");
   const [saved, setSaved] = useState("");
-  const [practice, setPractice] = useState<{
-    items: { id: string; kind: string; prompt: string }[];
-    progress: { total: number; correct: number };
-    status?: string;
+  const [taskPayload, setTaskPayload] = useState<{
+    status: string;
     message?: string;
-    evidence_quote?: string;
+    task: {
+      id: string;
+      stem: string;
+      misconception: string;
+      choices: { id: string; text: string }[];
+      rubric: string[];
+      evidence_quote: string;
+      follow_up: string;
+    } | null;
   } | null>(null);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [feedback, setFeedback] = useState<Record<string, string>>({});
+  const [choice, setChoice] = useState("");
+  const [explanation, setExplanation] = useState("");
+  const [taskFeedback, setTaskFeedback] = useState("");
 
   useEffect(() => {
     if (!edge || (edge.kind !== "formal" && edge.kind !== "suggest")) {
@@ -119,35 +126,41 @@ export default function RelationDrawer() {
     }
   }
 
-  async function loadPractice() {
+  async function loadTask() {
     if (!edge) return;
     setLoading(true);
+    setTaskFeedback("");
     try {
-      const p = await get<{
-        items: { id: string; kind: string; prompt: string }[];
-        progress: { total: number; correct: number };
-        status?: string;
-        message?: string;
-        evidence_quote?: string;
-      }>(`/api/edges/${edge.id}/practice`);
-      setPractice(p);
-      track("relation_practice_start", { worldId: edge.world_id, targetId: edge.id, payload: { items: p.items.length } });
+      const p = await get<NonNullable<typeof taskPayload>>(`/api/edges/${edge.id}/understanding`);
+      setTaskPayload(p);
+      track("understanding_task_start", {
+        worldId: edge.world_id,
+        targetId: edge.id,
+        payload: { status: p.status },
+      });
     } catch {
-      setPractice({ items: [], progress: { total: 0, correct: 0 } });
+      setTaskPayload({ status: "failed", message: "任务生成失败", task: null });
     } finally {
       setLoading(false);
     }
   }
 
-  async function submitPractice(id: string) {
-    const r = await send<{ correct: boolean; feedback: string; progress: { total: number; correct: number } }>(
-      `/api/practice/${id}/answer`,
-      "POST",
-      { answer: answers[id] ?? "" },
+  async function submitTask() {
+    const task = taskPayload?.task;
+    if (!edge || !task || !choice) return;
+    const r = await send<{
+      correct: boolean;
+      feedback: string;
+      follow_up: string;
+    }>(`/api/understanding/${task.id}/answer`, "POST", { choice, explanation });
+    setTaskFeedback(
+      `${r.correct ? "判断正确" : "再想想"}：${r.feedback}${r.follow_up ? `\n追问：${r.follow_up}` : ""}`,
     );
-    setFeedback((f) => ({ ...f, [id]: `${r.correct ? "正确" : "再想想"}${r.feedback ? "：" + r.feedback : ""}` }));
-    setPractice((p) => (p ? { ...p, progress: r.progress } : p));
-    track("relation_practice_answer", { worldId: edge?.world_id, targetId: id, payload: { correct: r.correct } });
+    track("understanding_task_answer", {
+      worldId: edge.world_id,
+      targetId: task.id,
+      payload: { correct: r.correct },
+    });
   }
 
   return (
@@ -201,46 +214,57 @@ export default function RelationDrawer() {
 
         {(edge.kind === "formal" || edge.kind === "suggest") && (
           <div className="section">
-            <h4>关系检查</h4>
-            {!practice ? (
-              <button className="secondary" onClick={loadPractice} disabled={loading}>
-                生成 3 题辨析
+            <h4>辨析任务</h4>
+            {!taskPayload ? (
+              <button className="secondary" onClick={loadTask} disabled={loading}>
+                生成一个辨析任务
               </button>
+            ) : taskPayload.status === "source_required" ? (
+              <div className="hintline">{taskPayload.message}</div>
+            ) : taskPayload.status !== "ready" || !taskPayload.task ? (
+              <div className="hintline">{taskPayload.message ?? "任务生成失败"}</div>
             ) : (
               <>
-                {practice.status === "source_required" && (
-                  <div className="hintline" style={{ marginBottom: 6 }}>
-                    {practice.message}
-                  </div>
-                )}
-                {practice.evidence_quote && (
-                  <blockquote style={{ marginBottom: 6 }}>依据：{practice.evidence_quote}</blockquote>
-                )}
-                <div className="hintline">
-                  已答对 {practice.progress.correct} / {practice.progress.total}
+                <div className="hintline" style={{ marginBottom: 6 }}>
+                  目标：辨析关系类型/边界，而不是背定义。
                 </div>
-                {practice.items.map((item) => (
-                  <div key={item.id} className="quiz">
-                    <div className="q">{item.prompt}</div>
+                {taskPayload.task.misconception && (
+                  <div className="hintline">易错点：{taskPayload.task.misconception}</div>
+                )}
+                {taskPayload.task.evidence_quote && (
+                  <blockquote>依据：{taskPayload.task.evidence_quote}</blockquote>
+                )}
+                <div className="q" style={{ marginTop: 6 }}>
+                  {taskPayload.task.stem}
+                </div>
+                {taskPayload.task.choices.map((c) => (
+                  <label key={c.id} className="hintline" style={{ display: "block", marginTop: 4 }}>
                     <input
-                      className="md-edit"
-                      style={{ minHeight: 36 }}
-                      value={answers[item.id] ?? ""}
-                      onChange={(e) => setAnswers((a) => ({ ...a, [item.id]: e.target.value }))}
-                      placeholder="写下你的答案"
-                    />
-                    <div className="row" style={{ marginTop: 4 }}>
-                      <button
-                        className="secondary"
-                        onClick={() => submitPractice(item.id)}
-                        disabled={!answers[item.id]?.trim()}
-                      >
-                        提交
-                      </button>
-                      <span className="hintline">{feedback[item.id]}</span>
-                    </div>
-                  </div>
+                      type="radio"
+                      name={`choice-${taskPayload.task!.id}`}
+                      checked={choice === c.id}
+                      onChange={() => setChoice(c.id)}
+                    />{" "}
+                    {c.text}
+                  </label>
                 ))}
+                <textarea
+                  className="md-edit"
+                  style={{ marginTop: 6 }}
+                  value={explanation}
+                  onChange={(e) => setExplanation(e.target.value)}
+                  placeholder="用原文说明为什么是这个类型、为什么不是相邻类型…"
+                />
+                <div className="row" style={{ marginTop: 6 }}>
+                  <button
+                    className="primary"
+                    onClick={submitTask}
+                    disabled={!choice || explanation.trim().length < 4}
+                  >
+                    提交辨析
+                  </button>
+                </div>
+                {taskFeedback && <div className="hintline" style={{ whiteSpace: "pre-wrap" }}>{taskFeedback}</div>}
               </>
             )}
           </div>

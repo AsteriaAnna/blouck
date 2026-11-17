@@ -329,3 +329,34 @@ CREATE TABLE IF NOT EXISTS events(
 );
 CREATE INDEX IF NOT EXISTS idx_events_world_type ON events(world_id, type, created_at);
 `);
+
+
+/* ---------- V3 理解任务（辨析，不是复习） ---------- */
+db.exec(`
+CREATE TABLE IF NOT EXISTS understanding_tasks(
+  id TEXT PRIMARY KEY,
+  world_id TEXT NOT NULL,
+  edge_id TEXT NOT NULL,
+  learning_goal TEXT NOT NULL DEFAULT 'discriminate',
+  misconception TEXT NOT NULL DEFAULT '',
+  stem TEXT NOT NULL,
+  answer_type TEXT NOT NULL DEFAULT 'choice_explain',
+  choices_json TEXT NOT NULL DEFAULT '[]',
+  correct_choice TEXT NOT NULL DEFAULT '',
+  rubric_json TEXT NOT NULL DEFAULT '[]',
+  evidence_quote TEXT NOT NULL DEFAULT '',
+  source_span_id TEXT,
+  follow_up TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_understanding_edge ON understanding_tasks(edge_id);
+CREATE TABLE IF NOT EXISTS understanding_attempts(
+  id TEXT PRIMARY KEY,
+  task_id TEXT NOT NULL,
+  choice TEXT NOT NULL,
+  explanation TEXT NOT NULL DEFAULT '',
+  correct INTEGER NOT NULL,
+  feedback TEXT NOT NULL DEFAULT '',
+  at INTEGER NOT NULL
+);
+`);

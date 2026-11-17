@@ -307,4 +307,58 @@ B：${b.name}（${b.definition ?? ""}）
       return mockLLM.generateRelationDoc({ a, b, predicate, label, evidence });
     }
   },
+
+  async generateUnderstandingTask({ sourceText, a, b, predicate, label, evidence, neighbors }) {
+    const system = `你是知识辨析教练，不是出定义题。只输出 JSON：
+{"learning_goal":"discriminate","misconception":"这道题针对的一个具体误解","stem":"题干：让用户判断关系类型/方向/边界，必须比较相邻类型","choices":[{"id":"kindOf","text":"..."},{"id":"partOf","text":"..."},{"id":"prerequisite","text":"..."}],"correct_choice":"kindOf","rubric":["评分点1","评分点2"],"evidence_quote":"原文连续子串","follow_up":"进一步追问"}
+规则：
+- 不要问“A 是什么”这种定义回忆题；
+- 必须有一个明确误解，干扰项要像真的；
+- evidence_quote 必须来自 sourceText，没有就空字符串；
+- 题干要求用户说明理由，而不是只选字母。`;
+    const user = `原文：${sourceText.slice(0, 2000)}
+A：${a.name}（${a.definition ?? ""}）
+B：${b.name}（${b.definition ?? ""}）
+当前关系：${predicate ?? "related"} / ${label ?? ""}
+关系证据：${evidence ?? ""}
+邻近概念：${neighbors.join("、")}`;
+    try {
+      const raw = await chat(system, user);
+      const parsed = JSON.parse(raw) as any;
+      const choices = Array.isArray(parsed.choices)
+        ? parsed.choices
+            .filter((x: any) => x && x.id && x.text)
+            .slice(0, 5)
+            .map((x: any) => ({ id: String(x.id), text: String(x.text).slice(0, 80) }))
+        : [];
+      const correct = choices.some((x: any) => x.id === parsed.correct_choice)
+        ? String(parsed.correct_choice)
+        : "";
+      if (!correct) throw new Error("invalid correct choice");
+      return {
+        learning_goal: "discriminate",
+        misconception: String(parsed.misconception ?? ""),
+        stem: String(parsed.stem ?? ""),
+        choices,
+        correct_choice: correct,
+        rubric: Array.isArray(parsed.rubric) ? parsed.rubric.map(String).slice(0, 5) : [],
+        evidence_quote:
+          typeof parsed.evidence_quote === "string" && sourceText.includes(parsed.evidence_quote)
+            ? parsed.evidence_quote
+            : "",
+        follow_up: String(parsed.follow_up ?? ""),
+      };
+    } catch (err) {
+      console.warn("[llm] deepseek 辨析任务失败：", err);
+      return mockLLM.generateUnderstandingTask({
+        sourceText,
+        a,
+        b,
+        predicate,
+        label,
+        evidence,
+        neighbors,
+      });
+    }
+  },
 };
