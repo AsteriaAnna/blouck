@@ -270,6 +270,9 @@ function CameraFit({
         controls.target.set(cx, 0, cz);
         controls.update?.();
       }
+      useStore
+        .getState()
+        .setMapBaseDistance(camera.position.distanceTo(new THREE.Vector3(cx, 0, cz)));
     };
     timer = window.setTimeout(fit, 1000);
     return () => {

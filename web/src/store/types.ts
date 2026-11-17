@@ -52,6 +52,9 @@ export type State = {
   /** 镜头远近：拉近自动多显示一些线索 */
   mapZoom: "far" | "near";
   setMapZoom: (zoom: "far" | "near") => void;
+  /** CameraFit 后的相机-目标距离，用于区分“缩放”与“旋转” */
+  mapBaseDistance: number;
+  setMapBaseDistance: (distance: number) => void;
   /** 自增触发 CameraFit 重新框住全景 */
   mapFitToken: number;
   fitMapView: () => void;
