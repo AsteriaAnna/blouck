@@ -176,6 +176,7 @@ node_docs, relation_docs, node_candidates, generation_jobs
 - 关系辨析（替代“3 题复习”）：`understanding_tasks/understanding_attempts`；`GET /api/edges/:id/understanding?variant=boundary|counterexample|error_correction|transfer` 生成“类型/边界、反例、纠错、迁移 + 选择 + 理由 + 原文引用 + rubric + follow_up”；无源返回 `source_required`；`POST /api/understanding/:id/answer` 判选择+解释并记录。旧 `edge_practice` 接口保留但 UI 已不用。
 - 题目质量审计：`GET /api/understanding/:id/quality`，按 evidence/误解/choices/rubric/非定义题/解释 6 项打分；UI 显示“质量 N/100”和低分 flags。CDP 实测 demo 关系任务质量 100/100。
 - 解释质量：作答时 `scoreExplanation` 按长度/推理词/rubric 覆盖/判题通过打分，写入 `understanding_attempts.rubric_score`；回复含 `explanation_score`，面板显示“解释分 N/100”；学习指标含 `avgExplanationScore`。
+- 导航渐进披露：`MapControls` 显示四类线计数；默认只显示提示 `hint_display` top2 + 方向 2 条，点击「展开：显示全部关系」显示全部（含 15 条提示/9 条方向）。`mapExpand` 存在 store，打开世界时重置为 false。CDP 实测计数/展开按钮/状态切换正常，errors=[]。
 - 学习指标：`GET /api/worlds/:id/learning/stats` 汇总任务总数/低质量题/题型、作答正确率与平均解释分、卡片打开、方向探索、副本 cleared/playable；低质量题最多返回 20 条。
 - 节点辨析：`GET /api/nodes/:id/understanding`，任务目标为体系位置/边界；节点无 `source_span_id` 时 `source_required`。节点卡与关系卡都使用 `UnderstandingTaskPanel`，关系卡不再维护内联任务状态。
 - 指标：`events` 表 + `web/src/telemetry.ts` fire-and-forget；已埋 node_card_open、relation_card_open、direction_explore、candidate_admit/reject、manual_relation_create、relation_practice_start/answer；`GET /api/worlds/:id/events/summary` 汇总。CDP 实测 demo 产生 2 条事件（node/relation card open）。

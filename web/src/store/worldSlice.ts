@@ -29,6 +29,8 @@ export type WorldSlice = Pick<
   | "tier"
   | "quizStatus"
   | "challenge"
+  | "mapExpand"
+  | "toggleMapExpand"
   | "loadWorlds"
   | "createWorld"
   | "openWorld"
@@ -64,6 +66,11 @@ export const createWorldSlice: StateCreator<State, [], [], WorldSlice> = (set, g
   tier: 0,
   quizStatus: "idle",
   challenge: null,
+  mapExpand: false,
+
+  toggleMapExpand() {
+    set({ mapExpand: !getState().mapExpand });
+  },
 
   async loadWorlds() {
     const r = await get<{ worlds: World[] }>("/api/worlds");
@@ -88,6 +95,7 @@ export const createWorldSlice: StateCreator<State, [], [], WorldSlice> = (set, g
       focusId: p.world.root_node_id,
       drawer: null,
       challenge: null,
+      mapExpand: false,
       partial: "",
       streamText: "",
       mentions: [],

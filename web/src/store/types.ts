@@ -46,6 +46,9 @@ export type State = {
   newNodeIds: string[];
   toast: string;
   busy: boolean;
+  /** 渐进披露：默认只显示提示 top2/方向少量；展开后显示全部关系 */
+  mapExpand: boolean;
+  toggleMapExpand: () => void;
 
   loadWorlds: () => Promise<void>;
   createWorld: (name: string, root: string) => Promise<void>;
