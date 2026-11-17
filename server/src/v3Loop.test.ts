@@ -56,6 +56,7 @@ test("V3 全链路：源→关系→辨析→三关副本→指标", async () =>
   assert.equal(seq.status, "ready");
   assert.equal(seq.stages.length, 3);
   for (const stage of seq.stages) {
+    assert.ok(stage.task);
     const row = db
       .prepare("SELECT correct_choice FROM understanding_tasks WHERE id=?")
       .get(stage.task.id) as { correct_choice: string };
@@ -67,7 +68,7 @@ test("V3 全链路：源→关系→辨析→三关副本→指标", async () =>
     );
     assert.ok(r);
   }
-  const done = completeDungeonSequence(building.id, edge.id);
+  const done = completeDungeonSequence(building.id);
   assert.equal(done.cleared, true);
   assert.equal(getBuilding(building.id)?.status, "cleared");
 

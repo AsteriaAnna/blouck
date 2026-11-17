@@ -9,6 +9,5 @@ dungeonSequenceRouter.get("/api/buildings/:id/sequence", async (req, res) => {
 });
 
 dungeonSequenceRouter.post("/api/buildings/:id/sequence/complete", (req, res) => {
-  const edgeId = req.body?.edgeId ? String(req.body.edgeId) : undefined;
-  res.json(completeDungeonSequence(req.params.id, edgeId));
+  res.json(completeDungeonSequence(req.params.id));
 });

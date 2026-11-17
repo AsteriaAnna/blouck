@@ -104,7 +104,7 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 | candidates | GET `/api/worlds/:id/candidates`；POST `/api/candidates/:id/admit`、`/reject` | 3 | 软准入候选列表/确认（建节点+formal 关系）/忽略 |
 | practice | GET `/api/edges/:id/practice`；POST `/api/practice/:id/answer` | 2 | 旧关系短练习；UI 已由辨析任务替代 |
 | understanding | GET `/api/nodes/:id/understanding`、`/api/edges/:id/understanding`；POST `/api/understanding/:id/answer`；GET `/api/understanding/:id/quality` | 4 | 节点/关系辨析任务（类型/边界+理由+原文）、质量审计 |
-| dungeon-seq | GET `/api/buildings/:id/sequence`；POST `/api/buildings/:id/sequence/complete` | 2 | 边界→反例→迁移误解纠正序列 |
+| dungeon-seq | GET `/api/buildings/:id/sequence`；POST `/api/buildings/:id/sequence/complete` | 2 | 单/多误解点 3–4 关；阶段持久化 |
 | learning-stats | GET `/api/worlds/:id/learning/stats` | 1 | 任务质量/作答/卡片/方向/副本汇总 |
 | events | POST `/api/events`；GET `/api/worlds/:id/events/summary` | 2 | 本地指标上报/汇总 |
 | quizzes | GET `/api/nodes/:id/quiz`；POST `/api/nodes/:id/quiz/generate`；POST `/api/quiz/:id/answer` | 3 | 节点题/生成/判题 |
@@ -118,7 +118,7 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 
 **注意**：`/api/dev/explore` 的重复注册已在 P1 删除，dev 路由已隔离到 `routes/dev.ts`。
 
-## 4. 数据表归属（13 张核心 + 9 张 V3 卡片/练习/指标）
+## 4. 数据表归属（13 张核心 + 10 张 V3 卡片/练习/指标）
 
 | 表 | 归属 | 关键字段 | 谁写 | 谁读 |
 |---|---|---|---|---|
@@ -142,7 +142,8 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 | `edge_practice` | 关系短练习 | edge_id/kind/prompt/answer | `services/practice.ts` | 关系卡 |
 | `edge_attempts` | 关系练习记录 | practice_id/correct | `services/practice.ts` | 关系卡进度 |
 | `understanding_tasks` | 节点/关系辨析任务 | task_kind/target_type/node_id/edge_id/stem/choices/correct/rubric/evidence | `services/understanding.ts` | 节点卡/关系卡 |
-| `understanding_attempts` | 辨析作答记录 | task_id/choice/explanation/correct | `services/understanding.ts` | 关系卡 |
+| `understanding_attempts` | 辨析作答记录 | task_id/choice/explanation/correct/rubric_score | `services/understanding.ts` | 关系卡 |
+| `dungeon_stages` | 副本关卡序列 | building_id/stage/task_id/variant/edge_id | `services/dungeonSequence.ts` | 副本抽屉 |
 | `events` | 本地指标 | world_id/type/target_id/payload | `web/src/telemetry.ts` → `/api/events` | events summary |
 
 **表关系**：

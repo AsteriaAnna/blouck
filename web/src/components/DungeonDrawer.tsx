@@ -139,8 +139,18 @@ export default function DungeonDrawer() {
           ) : (
             <>
               <div className="hintline">
-                进度：{Math.min(stage + 1, sequence.stages.length)} / {sequence.stages.length} ·
-                边界 → 反例 → 迁移
+                进度：{Math.min(stage + 1, sequence.stages.length)} / {sequence.stages.length} ·{" "}
+                {sequence.stages
+                  .map((s: any) =>
+                    s.variant === "boundary"
+                      ? "边界"
+                      : s.variant === "counterexample"
+                        ? "反例"
+                        : s.variant === "transfer"
+                          ? "迁移"
+                          : "纠错",
+                  )
+                  .join(" → ")}
               </div>
               {taskFeedback && (
                 <div className="hintline" style={{ marginBottom: 6 }}>

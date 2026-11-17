@@ -382,3 +382,18 @@ if (!columnNames("understanding_tasks").includes("task_kind")) {
 if (!columnNames("understanding_attempts").includes("rubric_score")) {
   db.exec("ALTER TABLE understanding_attempts ADD COLUMN rubric_score INTEGER NOT NULL DEFAULT 0");
 }
+
+
+/* ---------- 副本三关/多关序列持久化 ---------- */
+db.exec(`
+CREATE TABLE IF NOT EXISTS dungeon_stages(
+  id TEXT PRIMARY KEY,
+  building_id TEXT NOT NULL,
+  stage INTEGER NOT NULL,
+  task_id TEXT NOT NULL,
+  variant TEXT NOT NULL,
+  edge_id TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_dungeon_stages_building ON dungeon_stages(building_id, stage);
+`);

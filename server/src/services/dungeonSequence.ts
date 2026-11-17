@@ -1,13 +1,68 @@
+import { randomUUID } from "node:crypto";
 import { db, getBuilding, setBuildingStatus } from "../db.js";
 import type { LLMProvider } from "../providers/types.js";
-import { ensureUnderstandingTask, getUnderstandingTaskForClient } from "./understanding.js";
+import {
+  ensureUnderstandingTask,
+  getUnderstandingTaskForClient,
+} from "./understanding.js";
 
-const STAGES = ["boundary", "counterexample", "transfer"] as const;
+const VARIANTS_ONE = ["boundary", "counterexample", "transfer"] as const;
+const VARIANTS_MANY = ["boundary", "counterexample"] as const;
 
-/** 选一条 relation（两节点都在副本 steps 里），生成“边界→反例→迁移”误解纠正序列。 */
+type StageRow = {
+  id: string;
+  building_id: string;
+  stage: number;
+  task_id: string;
+  variant: string;
+  edge_id: string;
+  created_at: number;
+};
+
+function stagePayload(rows: StageRow[]) {
+  return rows
+    .map((r) => ({
+      stage: r.stage,
+      variant: r.variant,
+      edgeId: r.edge_id,
+      task: getUnderstandingTaskForClient(r.task_id),
+    }))
+    .filter((s) => s.task);
+}
+
+function correctCount(taskIds: string[]) {
+  return taskIds.filter(
+    (id) =>
+      (db
+        .prepare("SELECT 1 FROM understanding_attempts WHERE task_id=? AND correct=1 LIMIT 1")
+        .get(id) as any) !== undefined,
+  ).length;
+}
+
+/**
+ * 辨析副本：
+ * - 一个副本里最多选 2 条带原文证据的 formal 关系；
+ * - 单一误解 → 边界/反例/迁移 3 关；
+ * - 多个误解 → 每条关系 边界/反例 2 关（最多 4 关）。
+ */
 export async function ensureDungeonSequence(buildingId: string, llm: LLMProvider) {
   const building = getBuilding(buildingId);
   if (!building) return { status: "not_found" as const, stages: [], progress: { done: 0, total: 3 } };
+  const existing = db
+    .prepare("SELECT * FROM dungeon_stages WHERE building_id=? ORDER BY stage")
+    .all(buildingId) as StageRow[];
+  if (existing.length > 0) {
+    const stages = stagePayload(existing);
+    const done = correctCount(stages.map((s) => s.task!.id));
+    return {
+      status: "ready" as const,
+      buildingId,
+      edgeId: stages[0]?.edgeId,
+      stages,
+      progress: { done, total: stages.length },
+    };
+  }
+
   let steps: string[] = [];
   try {
     steps = JSON.parse(building.steps || "[]");
@@ -15,8 +70,10 @@ export async function ensureDungeonSequence(buildingId: string, llm: LLMProvider
   const edges = db
     .prepare("SELECT * FROM edges WHERE world_id=? AND kind='formal'")
     .all(building.world_id) as any[];
-  const edge = edges.find((e) => steps.includes(e.src) && steps.includes(e.dst) && e.evidence);
-  if (!edge) {
+  const candidates = edges.filter(
+    (e) => steps.includes(e.src) && steps.includes(e.dst) && e.evidence,
+  );
+  if (candidates.length === 0) {
     return {
       status: "source_required" as const,
       buildingId,
@@ -25,63 +82,58 @@ export async function ensureDungeonSequence(buildingId: string, llm: LLMProvider
       message: "这个副本还没有带原文证据的关系；辨析副本需要先有来源。",
     };
   }
-  const tasks: any[] = [];
-  for (const variant of STAGES) {
-    const p = await ensureUnderstandingTask(edge.id, llm, variant);
-    if (p.status !== "ready" || !p.task) continue;
-    tasks.push({ stage: tasks.length + 1, variant, task: p.task });
+  const picked = candidates.slice(0, 2);
+  const variants = picked.length >= 2 ? VARIANTS_MANY : VARIANTS_ONE;
+  const collected: { edgeId: string; variant: string; taskId: string }[] = [];
+  for (const edge of picked) {
+    for (const variant of variants) {
+      const p = await ensureUnderstandingTask(edge.id, llm, variant);
+      if (p.status === "ready" && p.task) {
+        collected.push({ edgeId: edge.id, variant, taskId: p.task.id });
+      }
+    }
   }
-  if (tasks.length < 3) {
+  if (collected.length < 2) {
     return {
       status: "source_required" as const,
       buildingId,
-      edgeId: edge.id,
-      stages: tasks,
+      stages: [],
       progress: { done: 0, total: 3 },
-      message: "关系证据不足以生成三关辨析。",
+      message: "关系证据不足以生成辨析关卡。",
     };
   }
+  const insert = db.prepare(
+    "INSERT INTO dungeon_stages(id,building_id,stage,task_id,variant,edge_id,created_at) VALUES(?,?,?,?,?,?,?)",
+  );
+  const now = Date.now();
+  collected.forEach((s, i) => insert.run(randomUUID(), buildingId, i + 1, s.taskId, s.variant, s.edgeId, now));
+  const rows = db
+    .prepare("SELECT * FROM dungeon_stages WHERE building_id=? ORDER BY stage")
+    .all(buildingId) as StageRow[];
+  const stages = stagePayload(rows);
   return {
     status: "ready" as const,
     buildingId,
-    edgeId: edge.id,
-    stages: tasks,
-    progress: { done: 0, total: 3 },
+    edgeId: stages[0]?.edgeId,
+    stages,
+    progress: { done: 0, total: stages.length },
   };
 }
 
-export function completeDungeonSequence(buildingId: string, edgeId?: string) {
+export function completeDungeonSequence(buildingId: string) {
   const building = getBuilding(buildingId);
   if (!building) return { status: "not_found" as const };
-  let steps: string[] = [];
-  try {
-    steps = JSON.parse(building.steps || "[]");
-  } catch {}
-  const edges = db
-    .prepare("SELECT * FROM edges WHERE world_id=? AND kind='formal'")
-    .all(building.world_id) as any[];
-  const edge =
-    (edgeId ? edges.find((e) => e.id === edgeId) : undefined) ??
-    edges.find((e) => steps.includes(e.src) && steps.includes(e.dst) && e.evidence);
-  const ids = edge
-    ? (
-        db
-          .prepare("SELECT id FROM understanding_tasks WHERE edge_id=?")
-          .all(edge.id) as { id: string }[]
-      ).map((x) => x.id)
-    : [];
-  const correct = ids.filter(
-    (id) =>
-      (db
-        .prepare("SELECT 1 FROM understanding_attempts WHERE task_id=? AND correct=1 LIMIT 1")
-        .get(id) as any) !== undefined,
-  ).length;
-  const cleared = ids.length >= 3 && correct >= 3;
+  const stages = db
+    .prepare("SELECT * FROM dungeon_stages WHERE building_id=? ORDER BY stage")
+    .all(buildingId) as StageRow[];
+  const ids = stages.map((s) => s.task_id);
+  const done = correctCount(ids);
+  const cleared = ids.length > 0 && done === ids.length;
   if (cleared) setBuildingStatus(building.id, "cleared");
   return {
     status: "ok" as const,
-    edgeId: edge?.id ?? null,
+    edgeId: stages[0]?.edge_id ?? null,
     cleared,
-    progress: { done: correct, total: Math.max(3, ids.length) },
+    progress: { done, total: Math.max(1, ids.length) },
   };
 }
