@@ -164,8 +164,12 @@ function DirectionSign({
     shape.closePath();
     return shape;
   }, []);
+  const groupRef = useRef<THREE.Group>(null);
+  useFrame(({ clock }) => {
+    if (groupRef.current) groupRef.current.position.y = Math.sin(clock.elapsedTime * 1.4) * 1.2;
+  });
   return (
-    <group position={position}>
+    <group ref={groupRef} position={position}>
       <SignPost position={[0, 0, 0]} label={label || "下一步方向"} onOpen={onOpen} />
       <group rotation={[0, -angle, 0]}>
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[8, 1.5, 0]}>
@@ -247,7 +251,26 @@ function Edge({
   );
 }
 
-/** 方向线：点线 + 末端童话指路牌（木柱 + 箭头牌 + 可读文字牌） */
+/** 方向线上的流动光点：让“可探索”可感知，而不是只看颜色。 */
+function TravelingSpark({ curve, color }: { curve: THREE.Curve<THREE.Vector3>; color: string }) {
+  const ref = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    const t = (clock.elapsedTime * 0.16) % 1;
+    const p = curve.getPointAt(t);
+    ref.current.position.set(p.x, p.y + 7 + Math.sin(clock.elapsedTime * 3) * 2, p.z);
+    const s = 1 + Math.sin(clock.elapsedTime * 4) * 0.18;
+    ref.current.scale.setScalar(s);
+  });
+  return (
+    <mesh ref={ref}>
+      <sphereGeometry args={[4.5, 12, 12]} />
+      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.9} />
+    </mesh>
+  );
+}
+
+/** 方向线：点线 + 流动光点 + 末端童话指路牌（木柱 + 箭头牌 + 可读文字牌） */
 function DirectionEdge({
   a,
   b,
@@ -278,6 +301,7 @@ function DirectionEdge({
         gapSize={10}
       />
       <HitTube curve={curve} onOpen={onOpen} radius={12} />
+      <TravelingSpark curve={curve} color={EDGE_COLORS.direction} />
       <DirectionSign position={[b.x, 0, b.z]} angle={angle} label={label} onOpen={onOpen} />
     </group>
   );
