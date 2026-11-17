@@ -7,8 +7,8 @@
 3. [03-implemented.md](03-implemented.md)：**当前代码真正实现、正在使用的措施。找 bug 以这份和代码为准。**
 4. [04-problems.md](04-problems.md)：在基线之上提出的使用问题、思考过程、备选方案与采纳/实施情况。**过程记录，不是实现依据；其中“已实施”的结论以 03 和源码为准。**
 5. [05-line-system-draft.md](05-line-system-draft.md)：线系统的早期设计草稿（v0，研究与算法约束记录）。**不是当前需求口径。**
-6. [06-four-line-system.md](06-four-line-system.md)：**四类线需求口径（v1.2，2026-11-17 用户口述整理，未实现）**；只写需求/用户体验，含副本需求；未确认问题见文末 Q1–Q7。
-7. [07-line-implementation-notes.md](07-line-implementation-notes.md)：**四类线的当前实现与实现笔记（不是需求）**；四种 kind 现状、需求映射、DB/API/迁移选项与风险。
+6. [06-four-line-system.md](06-four-line-system.md)：**四类线的体验与设计口径（v2.0，2026-11-17）**；只写用户感受/视觉/交互/设计思路，含关系 MD、节点 MD、副本体验；未确认问题见文末 Q1–Q7。
+7. [07-line-implementation-notes.md](07-line-implementation-notes.md)：**四类线的当前实现与实现笔记（不是需求）**；四种 kind 现状、节点生成是否关系优先的真实差异、需求映射、DB/API/迁移选项与风险。
 
 阅读规则：
 

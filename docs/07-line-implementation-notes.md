@@ -21,6 +21,14 @@
 - `commitStream` 把 provisional 节点改 committed，并把 `origin=stream` 且有 evidence 的 **`suggest` 全量转 `formal`**；
 - `source` 保持 source，**不会转 formal**；所以“顺序线→关系线”目前没有实现。
 
+### 2.1 当前节点生成不是“关系优先”（与需求期望的差异）
+
+- `/extract`：先遍历 `result.entities` 建节点（只要有 evidence 且 confidence≥0.6），之后才处理 `result.relations`；节点不要求必须有一条语义关系。
+- 语音 `ingestSegment`：同样先按 entities 建 provisional 节点并写 `source`，再单独写 `suggest` 关系；关系缺失/失败时节点仍然存在。
+- 探索落图 `/explore` 是例外：它按计划直接建节点，同时创建 `source` + `formal` 关系，属于“关系随节点一起创建”。
+- 真实数据：对默认库 `server/data/mvp.db` 做只读查询，排除根节点后，存在 **16 个没有任何 `formal/suggest` 语义边的可见节点**（示例世界里如 `文档解析/Rerank/混合检索/BM25/向量召回/交叉编码器/权衡`），它们只有 `source` 来路或 `direction` 方向边。
+- 结论：需求里的“新节点必须在识别出语义关系后才生成/出现”目前**没有被代码强制**；如果要按需求落地，需要在“实体→节点”这一步增加关系校验/过滤，或把无关系节点降级为后台候选。这个差异会直接影响顺序线的意义（见 06 §3/Q1）。
+
 ## 3. 手动联系关系线（入口现状）
 
 - **后端已有**：`POST /api/worlds/:id/relations`

@@ -15,7 +15,7 @@
 - 之前尝试/推断过的措施：[docs/02-reasoning.md](docs/02-reasoning.md)（历史，不是实现依据）
 - 使用问题与探索记录：[docs/04-problems.md](docs/04-problems.md)（过程记录，不是实现依据）
 - 线系统设计草稿：[docs/05-line-system-draft.md](docs/05-line-system-draft.md)（早期研究，不是当前口径）
-- **四类线需求口径（v1.2，未实现）**：[docs/06-four-line-system.md](docs/06-four-line-system.md)（只写需求/用户体验，含副本需求，Q1–Q7 待确认）
+- **四类线体验与设计口径（v2.0，未实现）**：[docs/06-four-line-system.md](docs/06-four-line-system.md)（只写用户感受/视觉/交互/设计思路，含关系 MD、节点 MD、副本体验，Q1–Q7 待确认）
 - **四类线实现笔记（当前代码/迁移选项）**：[docs/07-line-implementation-notes.md](docs/07-line-implementation-notes.md)（不是需求）
 - 索引：[docs/00-index.md](docs/00-index.md)
 
