@@ -1,7 +1,17 @@
 import { Router } from "express";
-import { learningCsv, learningOverview, learningStats, learningTrend } from "../services/learningStats.js";
+import {
+  calibrationReport,
+  learningCsv,
+  learningOverview,
+  learningStats,
+  learningTrend,
+} from "../services/learningStats.js";
 
 export const learningStatsRouter = Router();
+
+learningStatsRouter.get("/api/worlds/:id/learning/calibration", (req, res) => {
+  res.json(calibrationReport(req.params.id));
+});
 
 learningStatsRouter.get("/api/learning/overview", (_req, res) => {
   res.json({ worlds: learningOverview() });

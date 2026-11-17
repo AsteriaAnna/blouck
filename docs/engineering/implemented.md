@@ -177,7 +177,7 @@ node_docs, relation_docs, node_candidates, generation_jobs
 - 题目质量审计：`GET /api/understanding/:id/quality`，7 项：证据可回查 25、误解具体 15、选项含干扰项 15、rubric 15、非定义题 10、含比较/边界/反例/迁移 10、要求解释 10；UI 显示“质量 N/100”和低分 flags。生成 prompt 同步要求“不得是可抄定义；必须有干扰项和比较/边界/反例/迁移”。
 - 真实 LLM 抽样（`pnpm quality:sample`，默认 2 条关系 × 2 种题型）：实测 4/4 均 100/100；抽样暴露并修正 3 个启发式误判：“到底是什么关系”不算定义题，“错在哪里/错误/修正”算辨析，“换到/比较/怎么判断”算迁移辨析。测试增加对应回归。
 - 质量自检重写：关系/节点任务首次生成后审计，<60 会带缺失 flags 让 LLM 重写一次；只有重写分更高才替换并删除低分题，否则保留原题。测试用 fake provider 验证 2 次调用、输出 ≥80、低分题被删。
-- 人工反馈：题目面板「这题好/这题差」写 `understanding_task_reviews`（POST `/api/understanding/:id/review`，GET `.../reviews`）；学习指标汇总 reviews.good/bad 并显示。CDP 实测点击后显示「已记录：好题」，errors=[]。
+- 人工反馈：题目面板「这题好/这题差」写 `understanding_task_reviews`（POST `/api/understanding/:id/review`，GET `.../reviews`）；学习指标汇总 reviews.good/bad 并显示。`GET /api/worlds/:id/learning/calibration` 对比人工标签与启发式分：好题均分/差题均分、高分差题/低分好题数量、flag 频次与样例；面板显示校准行。CDP 实测「已记录：好题」与校准行，errors=[]。
 - 解释质量：作答时 `scoreExplanation` 按长度/推理词/rubric 覆盖/判题通过打分，写入 `understanding_attempts.rubric_score`；回复含 `explanation_score`，面板显示“解释分 N/100”；学习指标含 `avgExplanationScore`。
 - 导航渐进披露：`MapControls` 显示四类线计数；默认只显示提示 `hint_display` top2 + 方向 2 条，点击「展开：显示全部关系」显示全部（含 15 条提示/9 条方向）。`mapExpand` 存在 store，打开世界时重置为 false。CDP 实测计数/展开按钮/状态切换正常，errors=[]。
 - 语音→知识层：语音 final 走 `stream/segment` + `stream/commit`（不是 `/extract`）；新节点仍写 `source_span_id` 且边带 evidence，所以后续事实题能回源。集成测试新增断言：commit 的节点至少一个挂到 source_spans。`pnpm voice:check` 用 mock ASR 在浏览器实测：空世界 1→4 节点、3 个带 source_span、streamText 正常、errors=[]。

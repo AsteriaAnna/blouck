@@ -21,25 +21,38 @@ type TrendPoint = {
   directions: number;
 };
 
+type Calibration = {
+  good: number;
+  bad: number;
+  avgGood: number;
+  avgBad: number;
+  mismatchGoodLow: number;
+  mismatchBadHigh: number;
+};
+
 /** 学习指标：默认不占主界面，点开才看；避免把地图变成仪表盘。 */
 export default function LearningStatsPanel({ worldId }: { worldId: string }) {
   const [open, setOpen] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [trend, setTrend] = useState<TrendPoint[]>([]);
+  const [cal, setCal] = useState<Calibration | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function load() {
     setLoading(true);
     try {
-      const [s, t] = await Promise.all([
+      const [s, t, c] = await Promise.all([
         get<Stats>(`/api/worlds/${worldId}/learning/stats`),
         get<{ days: TrendPoint[] }>(`/api/worlds/${worldId}/learning/trend?days=7`),
+        get<Calibration>(`/api/worlds/${worldId}/learning/calibration`),
       ]);
       setStats(s);
       setTrend(t.days ?? []);
+      setCal(c);
     } catch {
       setStats(null);
       setTrend([]);
+      setCal(null);
     } finally {
       setLoading(false);
     }
@@ -108,6 +121,13 @@ export default function LearningStatsPanel({ worldId }: { worldId: string }) {
               {stats.reviews.good + stats.reviews.bad > 0 && (
                 <div className="hintline">
                   人工反馈：好题 {stats.reviews.good} · 差题 {stats.reviews.bad}
+                </div>
+              )}
+              {cal && cal.good + cal.bad > 0 && (
+                <div className="hintline">
+                  校准：好题均分 {cal.avgGood} · 差题均分 {cal.avgBad}
+                  {cal.mismatchBadHigh > 0 ? ` · 高分差题 ${cal.mismatchBadHigh}` : ""}
+                  {cal.mismatchGoodLow > 0 ? ` · 低分好题 ${cal.mismatchGoodLow}` : ""}
                 </div>
               )}
               {stats.tasks.byKind && Object.keys(stats.tasks.byKind).length > 0 && (

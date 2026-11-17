@@ -11,7 +11,7 @@ process.env.DEEPSEEK_API_KEY = "";
 const { addEdge, addNode, createSourceSpan, createWorld, db } = await import("./db.js");
 const { ensureUnderstandingTask } = await import("./services/understanding.js");
 const { countTaskReviews, listTaskReviews, recordTaskReview } = await import("./db/taskReviews.js");
-const { learningStats } = await import("./services/learningStats.js");
+const { calibrationReport, learningStats } = await import("./services/learningStats.js");
 const { mockLLM } = await import("./providers/mock.js");
 
 test("人工反馈：好题/差题记录并汇总", async () => {
@@ -29,6 +29,12 @@ test("人工反馈：好题/差题记录并汇总", async () => {
   assert.equal(listTaskReviews(task.task!.id).length, 2);
   assert.deepEqual(countTaskReviews(world.id), { good: 1, bad: 1 });
   assert.deepEqual(learningStats(world.id).reviews, { good: 1, bad: 1 });
+
+  const cal = calibrationReport(world.id);
+  assert.equal(cal.good, 1);
+  assert.equal(cal.bad, 1);
+  assert.ok(cal.avgGood >= 80);
+  assert.equal(cal.examples.length, 2);
 });
 
 test.after(() => {

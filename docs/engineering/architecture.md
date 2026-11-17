@@ -105,7 +105,7 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 | practice | GET `/api/edges/:id/practice`；POST `/api/practice/:id/answer` | 2 | 旧关系短练习；UI 已由辨析任务替代 |
 | understanding | GET `/api/nodes/:id/understanding`、`/api/edges/:id/understanding`；POST `/api/understanding/:id/answer`；GET `.../quality`、`.../reviews`；POST `.../review` | 6 | 节点/关系辨析任务、质量审计、人工反馈 |
 | dungeon-seq | GET `/api/buildings/:id/sequence`；POST `/api/buildings/:id/sequence/complete` | 2 | 单/多误解点 3–4 关；阶段持久化 |
-| learning-stats | GET `/api/learning/overview`；`/api/worlds/:id/learning/stats`、`/learning/trend?days=7`、`/learning/export?days=30` | 4 | 跨世界总览、当前指标、近 N 日趋势、CSV 导出 |
+| learning-stats | GET `/api/learning/overview`；`/api/worlds/:id/learning/stats`、`/trend?days=7`、`/export?days=30`、`/calibration` | 5 | 跨世界总览、当前指标、趋势、CSV、人工标签校准 |
 | events | POST `/api/events`；GET `/api/worlds/:id/events/summary` | 2 | 本地指标上报/汇总 |
 | quizzes | GET `/api/nodes/:id/quiz`；POST `/api/nodes/:id/quiz/generate`；POST `/api/quiz/:id/answer` | 3 | 节点题/生成/判题 |
 | edges | POST `/api/edges/:id/accept`；PATCH `/api/edges/:id`；POST `/api/edges/:id/consume` | 3 | 接受建议/编辑 MD/消费方向 |

@@ -97,6 +97,72 @@ export type WorldOverview = {
   directions: number;
 };
 
+export type CalibrationExample = {
+  taskId: string;
+  verdict: "good" | "bad";
+  score: number;
+  flags: string[];
+  stem: string;
+};
+
+export type CalibrationReport = {
+  good: number;
+  bad: number;
+  avgGood: number;
+  avgBad: number;
+  mismatchGoodLow: number;
+  mismatchBadHigh: number;
+  flagCounts: Record<string, number>;
+  examples: CalibrationExample[];
+};
+
+/** 人工标签 vs 启发式质量分的校准报告。 */
+export function calibrationReport(worldId: string): CalibrationReport {
+  const rows = db
+    .prepare(
+      `SELECT r.task_id taskId, r.verdict, t.stem
+       FROM understanding_task_reviews r JOIN understanding_tasks t ON t.id=r.task_id
+       WHERE t.world_id=? ORDER BY r.created_at DESC`,
+    )
+    .all(worldId) as { taskId: string; verdict: "good" | "bad"; stem: string }[];
+  const goodScores: number[] = [];
+  const badScores: number[] = [];
+  const flagCounts: Record<string, number> = {};
+  const examples: CalibrationExample[] = [];
+  let mismatchGoodLow = 0;
+  let mismatchBadHigh = 0;
+  for (const r of rows) {
+    const audit = auditUnderstandingTask(r.taskId);
+    if (!audit) continue;
+    if (r.verdict === "good") {
+      goodScores.push(audit.score);
+      if (audit.score < 60) mismatchGoodLow++;
+    } else {
+      badScores.push(audit.score);
+      if (audit.score >= 80) mismatchBadHigh++;
+    }
+    for (const f of audit.flags) flagCounts[f] = (flagCounts[f] ?? 0) + 1;
+    examples.push({
+      taskId: r.taskId,
+      verdict: r.verdict,
+      score: audit.score,
+      flags: audit.flags,
+      stem: r.stem.slice(0, 120),
+    });
+  }
+  const avg = (xs: number[]) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : 0);
+  return {
+    good: goodScores.length,
+    bad: badScores.length,
+    avgGood: avg(goodScores),
+    avgBad: avg(badScores),
+    mismatchGoodLow,
+    mismatchBadHigh,
+    flagCounts,
+    examples: examples.slice(0, 20),
+  };
+}
+
 /** 跨世界总览：首页/总览用，按创建时间倒序。 */
 export function learningOverview(): WorldOverview[] {
   const worlds = db
