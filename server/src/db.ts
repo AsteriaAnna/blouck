@@ -12,8 +12,24 @@ export { createBuilding, setBuildingStatus, updateBuildingMd } from "./db/buildi
 export type { BuildingRow } from "./db/buildings.js";
 import { createBuilding, setBuildingStatus } from "./db/buildings.js";
 import type { BuildingRow } from "./db/buildings.js";
+export { addNode, getNode, setNodeHidden, setNodePosition, setNodesStatus, setNodeStatus, setNodeTier, updateNodeMd, updateNodeMeta } from "./db/nodes.js";
+export type { NodeRow } from "./db/nodes.js";
+import { addNode, getNode, setNodeTier } from "./db/nodes.js";
+import type { NodeRow } from "./db/nodes.js";
+export { addEdge, commitStreamEdges, computeFrontier, updateEdgeKind, updateEdgeMd } from "./db/edges.js";
+export type { EdgeKind, EdgeRow } from "./db/edges.js";
+import { addEdge, computeFrontier } from "./db/edges.js";
+import type { EdgeKind } from "./db/edges.js";
+import type { EdgeRow } from "./db/edges.js";
+export { computeTier, countPassed, createQuizzes, listQuizzes } from "./db/quizzes.js";
+export type { QuizRow } from "./db/quizzes.js";
+import { computeTier } from "./db/quizzes.js";
+import type { QuizRow } from "./db/quizzes.js";
 
 export { db } from "./db/connection.js";
+
+const now = () => Date.now();
+const uid = () => randomUUID();
 
 export type World = {
   id: string;
@@ -22,68 +38,6 @@ export type World = {
   is_demo: number;
   created_at: number;
 };
-
-export type NodeRow = {
-  id: string;
-  world_id: string;
-  name: string;
-  x: number;
-  y: number;
-  free_md: string;
-  hidden: number;
-  tier: number;
-  type: string;
-  definition: string;
-  aliases: string;
-  source_span_id: string | null;
-  frontier: number;
-  status: "provisional" | "committed";
-  created_at: number;
-};
-
-export type EdgeKind = SharedEdgeKind;
-
-export type EdgeRow = {
-  id: string;
-  world_id: string;
-  src: string;
-  dst: string;
-  kind: EdgeKind;
-  label: string;
-  md: string;
-  question: string | null;
-  frontier_x: number | null;
-  frontier_y: number | null;
-  consumed: number;
-  predicate: string | null;
-  evidence: string;
-  confidence: number;
-  origin: string;
-  claim_status: string;
-  revision: number;
-  /** 方向线在生成时预先计划好的“延伸节点” */
-  target_name: string | null;
-  target_type: string | null;
-  target_definition: string | null;
-  target_aliases: string | null;
-  target_predicate: string | null;
-  target_label: string | null;
-  created_at: number;
-};
-
-/** 方向的延伸计划：探索时直接落这个节点，而不是拿问题去抽取 */
-export type QuizRow = {
-  id: string;
-  node_id: string;
-  kind: "short" | "judge";
-  prompt: string;
-  answer: string;
-  ai_generated: number;
-  created_at: number;
-};
-
-const now = () => Date.now();
-const uid = () => randomUUID();
 
 export function listWorlds(): World[] {
   return db.prepare("SELECT * FROM worlds ORDER BY created_at DESC").all() as World[];
@@ -159,10 +113,6 @@ export function getGraph(worldId: string) {
   return { nodes, edges };
 }
 
-export function getNode(id: string): NodeRow | undefined {
-  return db.prepare("SELECT * FROM nodes WHERE id=?").get(id) as NodeRow | undefined;
-}
-
 export function listBuildings(worldId: string): BuildingRow[] {
   return db
     .prepare("SELECT * FROM buildings WHERE world_id=? ORDER BY created_at")
@@ -173,202 +123,6 @@ export function getBuilding(id: string): BuildingRow | undefined {
   return db.prepare("SELECT * FROM buildings WHERE id=?").get(id) as
     | BuildingRow
     | undefined;
-}
-
-export function addNode(
-  worldId: string,
-  name: string,
-  x: number,
-  y: number,
-  freeMd = "",
-  meta: {
-    type?: string;
-    definition?: string;
-    aliases?: string[];
-    sourceSpanId?: string | null;
-    status?: "provisional" | "committed";
-  } = {},
-): NodeRow {
-  const id = uid();
-  db.prepare(
-    "INSERT INTO nodes(id,world_id,name,x,y,free_md,hidden,tier,type,definition,aliases,source_span_id,frontier,status,created_at) VALUES(?,?,?,?,?,?,0,0,?,?,?,?,0,?,?)",
-  ).run(
-    id,
-    worldId,
-    name,
-    x,
-    y,
-    freeMd,
-    meta.type ?? "概念",
-    meta.definition ?? "",
-    JSON.stringify(meta.aliases ?? []),
-    meta.sourceSpanId ?? null,
-    meta.status ?? "committed",
-    now(),
-  );
-  return getNode(id)!;
-}
-
-export function setNodeStatus(id: string, status: "provisional" | "committed") {
-  db.prepare("UPDATE nodes SET status=? WHERE id=?").run(status, id);
-}
-
-export function setNodesStatus(ids: string[], status: "provisional" | "committed") {
-  for (const id of ids) setNodeStatus(id, status);
-}
-
-export function commitStreamEdges(worldId: string) {
-  db.prepare(
-    "UPDATE edges SET kind='formal' WHERE world_id=? AND origin='stream' AND kind='suggest' AND evidence<>''",
-  ).run(worldId);
-}
-
-export function updateNodeMeta(
-  id: string,
-  patch: { type?: string; definition?: string; aliases?: string[]; sourceSpanId?: string | null },
-) {
-  const cur = getNode(id);
-  if (!cur) return;
-  db.prepare("UPDATE nodes SET type=?, definition=?, aliases=?, source_span_id=? WHERE id=?").run(
-    patch.type ?? cur.type,
-    patch.definition || cur.definition,
-    JSON.stringify(patch.aliases ?? (JSON.parse(cur.aliases || "[]") as string[])),
-    patch.sourceSpanId ?? cur.source_span_id,
-    id,
-  );
-}
-
-/** 重新计算前沿节点：没有向外知识关系的节点（隐藏节点不算） */
-export function computeFrontier(worldId: string) {
-  const nodes = db.prepare("SELECT id FROM nodes WHERE world_id=? AND hidden=0").all(worldId) as {
-    id: string;
-  }[];
-  const hasOut = new Set(
-    (
-      db
-        .prepare(
-          "SELECT DISTINCT src FROM edges WHERE world_id=? AND kind='formal' AND src<>dst",
-        )
-        .all(worldId) as { src: string }[]
-    ).map((r) => r.src),
-  );
-  const update = db.prepare("UPDATE nodes SET frontier=? WHERE id=?");
-  for (const n of nodes) update.run(hasOut.has(n.id) ? 0 : 1, n.id);
-}
-
-export function updateNodeMd(id: string, freeMd: string) {
-  db.prepare("UPDATE nodes SET free_md=? WHERE id=?").run(freeMd, id);
-}
-
-export function setNodePosition(id: string, x: number, y: number) {
-  db.prepare("UPDATE nodes SET x=?, y=? WHERE id=?").run(x, y, id);
-}
-
-export function updateEdgeMd(id: string, md: string, label?: string) {
-  if (typeof label === "string") {
-    db.prepare("UPDATE edges SET md=?, label=? WHERE id=?").run(md, label, id);
-  } else {
-    db.prepare("UPDATE edges SET md=? WHERE id=?").run(md, id);
-  }
-}
-
-export function setNodeHidden(id: string, hidden: number) {
-  db.prepare("UPDATE nodes SET hidden=? WHERE id=?").run(hidden, id);
-}
-
-export function setNodeTier(id: string, tier: number) {
-  db.prepare("UPDATE nodes SET tier=? WHERE id=?").run(tier, id);
-}
-
-export function addEdge(
-  worldId: string,
-  src: string,
-  dst: string,
-  kind: EdgeKind,
-  label = "",
-  question: string | null = null,
-  md = "",
-  meta: {
-    predicate?: string | null;
-    evidence?: string;
-    confidence?: number;
-    origin?: string;
-    /** 方向线：预先计划好的延伸节点 */
-    target_name?: string | null;
-    target_type?: string | null;
-    target_definition?: string | null;
-    target_aliases?: string | null;
-    target_predicate?: string | null;
-    target_label?: string | null;
-  } = {},
-): EdgeRow {
-  const id = uid();
-  db.prepare(
-    "INSERT INTO edges(id,world_id,src,dst,kind,label,md,question,predicate,evidence,confidence,origin,target_name,target_type,target_definition,target_aliases,target_predicate,target_label,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-  ).run(
-    id,
-    worldId,
-    src,
-    dst,
-    kind,
-    label,
-    md,
-    question,
-    meta.predicate ?? null,
-    meta.evidence ?? "",
-    meta.confidence ?? 1,
-    meta.origin ?? "auto",
-    meta.target_name ?? null,
-    meta.target_type ?? null,
-    meta.target_definition ?? null,
-    meta.target_aliases ?? null,
-    meta.target_predicate ?? null,
-    meta.target_label ?? null,
-    now(),
-  );
-  return db.prepare("SELECT * FROM edges WHERE id=?").get(id) as EdgeRow;
-}
-
-export function updateEdgeKind(id: string, kind: EdgeKind) {
-  db.prepare("UPDATE edges SET kind=? WHERE id=?").run(kind, id);
-}
-
-export function listQuizzes(nodeId: string): QuizRow[] {
-  return db
-    .prepare("SELECT * FROM quizzes WHERE node_id=? ORDER BY kind, created_at")
-    .all(nodeId) as QuizRow[];
-}
-
-export function createQuizzes(
-  nodeId: string,
-  items: { kind: "short" | "judge"; prompt: string; answer: string }[],
-) {
-  const stmt = db.prepare(
-    "INSERT INTO quizzes(id,node_id,kind,prompt,answer,ai_generated,created_at) VALUES(?,?,?,?,?,1,?)",
-  );
-  for (const it of items) stmt.run(uid(), nodeId, it.kind, it.prompt, it.answer, now());
-}
-
-export function countPassed(nodeId: string) {
-  const rows = db
-    .prepare(
-      `SELECT q.kind AS kind, COUNT(DISTINCT a.quiz_id) AS c
-       FROM attempts a JOIN quizzes q ON q.id = a.quiz_id
-       WHERE q.node_id=? AND a.correct=1 GROUP BY q.kind`,
-    )
-    .all(nodeId) as { kind: string; c: number }[];
-  const short = rows.find((r) => r.kind === "short")?.c ?? 0;
-  const judge = rows.find((r) => r.kind === "judge")?.c ?? 0;
-  return { short, judge };
-}
-
-/** 三档：1/1、3/5、5/10 同时满足 */
-export function computeTier(nodeId: string): number {
-  const { short, judge } = countPassed(nodeId);
-  if (short >= 5 && judge >= 10) return 3;
-  if (short >= 3 && judge >= 5) return 2;
-  if (short >= 1 && judge >= 1) return 1;
-  return 0;
 }
 
 export function recordAttempt(quizId: string, correct: boolean) {
