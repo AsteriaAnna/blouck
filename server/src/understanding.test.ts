@@ -99,6 +99,10 @@ test("辨析变体：反例题/纠错题独立缓存", async () => {
   const correction = await ensureUnderstandingTask(edge.id, mockLLM, "error_correction");
   assert.equal(correction.status, "ready");
   assert.ok(getUnderstandingTaskByEdgeKind(edge.id, "error_correction"));
+  const transfer = await ensureUnderstandingTask(edge.id, mockLLM, "transfer");
+  assert.equal(transfer.status, "ready");
+  assert.ok(getUnderstandingTaskByEdgeKind(edge.id, "transfer"));
+  assert.notEqual(transfer.task!.id, counter.task!.id);
 });
 
 test.after(() => {

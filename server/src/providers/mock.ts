@@ -199,7 +199,7 @@ export const mockLLM: LLMProvider = {
     return { flows: [], domains: [] };
   },
 
-  async generateUnderstandingTask({ a, b, predicate, evidence, variant = "boundary" }) {
+  async generateUnderstandingTask({ a, b, predicate, evidence, variant = "boundary", neighbors }) {
     const types = [
       { id: "kindOf", text: "归类：A 是 B 的一种" },
       { id: "partOf", text: "组成：A 是 B 的一部分" },
@@ -208,6 +208,23 @@ export const mockLLM: LLMProvider = {
       { id: "related", text: "相关：二者只是相关" },
     ];
     const correct = types.some((x) => x.id === (predicate ?? "")) ? predicate! : "related";
+    if (variant === "transfer") {
+      const other = neighbors[0] ?? "相近概念";
+      return {
+        learning_goal: "transfer",
+        misconception: "把一条关系的适用范围无限扩大",
+        stem: `把「${a.name}」换成一个更宽泛的近邻「${other}」后，「${b.name}」与它的关系还成立吗？请说明边界。`,
+        choices: [
+          { id: "no", text: `不成立，需要重新判断「${other}」与「${b.name}」的关系` },
+          { id: "yes", text: `成立，因为「${a.name}」和「${other}」差不多` },
+          { id: "same", text: `成立，关系与概念无关` },
+        ],
+        correct_choice: "no",
+        rubric: ["判断是否成立", "说明边界", "引用原文"],
+        evidence_quote: (evidence || "").slice(0, 200),
+        follow_up: "还有哪个场景会让这条关系失效？",
+      };
+    }
     if (variant === "counterexample") {
       return {
         learning_goal: "apply",

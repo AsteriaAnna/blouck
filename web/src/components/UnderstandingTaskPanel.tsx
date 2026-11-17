@@ -121,6 +121,9 @@ export default function UnderstandingTaskPanel({
             <button className="secondary" onClick={() => load("error_correction")} disabled={loading}>
               换个纠错题
             </button>
+            <button className="secondary" onClick={() => load("transfer")} disabled={loading}>
+              换个迁移题
+            </button>
             <span className="hintline">当前：{variant}</span>
           </div>
           {feedback && (

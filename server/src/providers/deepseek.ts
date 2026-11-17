@@ -311,7 +311,7 @@ B：${b.name}（${b.definition ?? ""}）
   async generateUnderstandingTask({ sourceText, a, b, predicate, label, evidence, neighbors, variant = "boundary" }) {
     const system = `你是知识辨析教练，不是出定义题。只输出 JSON：
 {"learning_goal":"discriminate","misconception":"这道题针对的一个具体误解","stem":"题干：让用户判断关系类型/方向/边界，必须比较相邻类型","choices":[{"id":"kindOf","text":"..."},{"id":"partOf","text":"..."},{"id":"prerequisite","text":"..."}],"correct_choice":"kindOf","rubric":["评分点1","评分点2"],"evidence_quote":"原文连续子串","follow_up":"进一步追问"}
-题型：${variant === "counterexample" ? "反例题：让用户找反例/边界" : variant === "error_correction" ? "纠错题：给错误表述，让用户修正" : "辨析题：判断关系类型/方向/边界"}
+题型：${variant === "counterexample" ? "反例题：让用户找反例/边界" : variant === "error_correction" ? "纠错题：给错误表述，让用户修正" : variant === "transfer" ? "迁移题：换一个场景/近邻，判断关系是否仍成立" : "辨析题：判断关系类型/方向/边界"}
 规则：
 - 不要问“A 是什么”这种定义回忆题；
 - 必须有一个明确误解，干扰项要像真的；

@@ -37,7 +37,7 @@ function publicTask(t: UnderstandingTaskRow) {
 export async function ensureUnderstandingTask(
   edgeId: string,
   llm: LLMProvider,
-  variant: "boundary" | "counterexample" | "error_correction" = "boundary",
+  variant: "boundary" | "counterexample" | "error_correction" | "transfer" = "boundary",
 ) {
   const edge = db.prepare("SELECT * FROM edges WHERE id=?").get(edgeId) as EdgeRow | undefined;
   if (!edge) throw new Error("edge not found");
