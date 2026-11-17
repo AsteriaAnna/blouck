@@ -28,6 +28,7 @@ type Calibration = {
   avgBad: number;
   mismatchGoodLow: number;
   mismatchBadHigh: number;
+  suggestedThreshold: number;
 };
 
 /** 学习指标：默认不占主界面，点开才看；避免把地图变成仪表盘。 */
@@ -128,6 +129,7 @@ export default function LearningStatsPanel({ worldId }: { worldId: string }) {
                   校准：好题均分 {cal.avgGood} · 差题均分 {cal.avgBad}
                   {cal.mismatchBadHigh > 0 ? ` · 高分差题 ${cal.mismatchBadHigh}` : ""}
                   {cal.mismatchGoodLow > 0 ? ` · 低分好题 ${cal.mismatchGoodLow}` : ""}
+                  {` · 建议阈值 ${cal.suggestedThreshold}`}
                 </div>
               )}
               {stats.tasks.byKind && Object.keys(stats.tasks.byKind).length > 0 && (

@@ -13,6 +13,7 @@ import {
 import type { LLMProvider } from "../providers/types.js";
 import { scoreExplanation } from "./explanationQuality.js";
 import { auditUnderstandingTask } from "./understandingQuality.js";
+import { qualityThresholdForWorld } from "./learningStats.js";
 
 function findSourceSpan(worldId: string, quote: string): { id: string; text: string } | undefined {
   if (!quote.trim()) return undefined;
@@ -154,7 +155,8 @@ export async function ensureUnderstandingTask(
   }
   let task = createEdgeTask(edge, span.id, variant, draft);
   const firstAudit = auditUnderstandingTask(task.id);
-  if (firstAudit && firstAudit.score < 60) {
+  const threshold = qualityThresholdForWorld(edge.world_id);
+  if (firstAudit && firstAudit.score < threshold) {
     try {
       const repaired = await llm.generateUnderstandingTask({
         sourceText: span.text,
@@ -243,7 +245,8 @@ export async function ensureNodeUnderstandingTask(nodeId: string, llm: LLMProvid
   }
   let task = createNodeTask(node, span, draft);
   const firstAudit = auditUnderstandingTask(task.id);
-  if (firstAudit && firstAudit.score < 60) {
+  const threshold = qualityThresholdForWorld(node.world_id);
+  if (firstAudit && firstAudit.score < threshold) {
     try {
       const repaired = await llm.generateNodeUnderstandingTask({
         sourceText: span.text,

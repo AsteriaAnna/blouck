@@ -11,7 +11,7 @@ process.env.DEEPSEEK_API_KEY = "";
 const { addEdge, addNode, createSourceSpan, createWorld, db } = await import("./db.js");
 const { ensureUnderstandingTask } = await import("./services/understanding.js");
 const { countTaskReviews, listTaskReviews, recordTaskReview } = await import("./db/taskReviews.js");
-const { calibrationReport, learningStats } = await import("./services/learningStats.js");
+const { calibrationReport, learningStats, suggestThreshold } = await import("./services/learningStats.js");
 const { mockLLM } = await import("./providers/mock.js");
 
 test("人工反馈：好题/差题记录并汇总", async () => {
@@ -35,6 +35,19 @@ test("人工反馈：好题/差题记录并汇总", async () => {
   assert.equal(cal.bad, 1);
   assert.ok(cal.avgGood >= 80);
   assert.equal(cal.examples.length, 2);
+  assert.equal(cal.suggestedThreshold, 60, "样本 <4 时用默认阈值");
+});
+
+test("阈值建议：标签足够时按好坏分分离", () => {
+  assert.equal(suggestThreshold([]), 60);
+  const labels = [
+    { verdict: "good" as const, score: 90 },
+    { verdict: "good" as const, score: 85 },
+    { verdict: "bad" as const, score: 40 },
+    { verdict: "bad" as const, score: 50 },
+  ];
+  const t = suggestThreshold(labels);
+  assert.ok(t > 50 && t <= 85, `threshold ${t}`);
 });
 
 test.after(() => {

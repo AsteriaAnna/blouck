@@ -105,6 +105,27 @@ export type CalibrationExample = {
   stem: string;
 };
 
+export type LabeledScore = { verdict: "good" | "bad"; score: number };
+
+/** 用人工标签找“好题分≥t、差题分<t”准确率最高的阈值；默认 60。 */
+export function suggestThreshold(examples: LabeledScore[]): number {
+  if (examples.length < 4) return 60;
+  let best = 60;
+  let bestScore = -1;
+  for (let t = 20; t <= 95; t += 5) {
+    let ok = 0;
+    for (const e of examples) {
+      if (e.verdict === "good" ? e.score >= t : e.score < t) ok++;
+    }
+    if (ok > bestScore) {
+      bestScore = ok;
+      best = t;
+    }
+  }
+  return best;
+}
+
+/** 校准报告；suggestedThreshold 只有在样本 ≥4 时才脱离默认 60。 */
 export type CalibrationReport = {
   good: number;
   bad: number;
@@ -112,9 +133,27 @@ export type CalibrationReport = {
   avgBad: number;
   mismatchGoodLow: number;
   mismatchBadHigh: number;
+  suggestedThreshold: number;
   flagCounts: Record<string, number>;
   examples: CalibrationExample[];
 };
+
+/** 世界当前生效的质量阈值：人工标签足够时用校准建议。 */
+export function qualityThresholdForWorld(worldId: string): number {
+  const rows = db
+    .prepare(
+      `SELECT r.verdict, r.task_id taskId
+       FROM understanding_task_reviews r JOIN understanding_tasks t ON t.id=r.task_id
+       WHERE t.world_id=?`,
+    )
+    .all(worldId) as { verdict: "good" | "bad"; taskId: string }[];
+  const labeled: LabeledScore[] = [];
+  for (const r of rows) {
+    const a = auditUnderstandingTask(r.taskId);
+    if (a) labeled.push({ verdict: r.verdict, score: a.score });
+  }
+  return suggestThreshold(labeled);
+}
 
 /** 人工标签 vs 启发式质量分的校准报告。 */
 export function calibrationReport(worldId: string): CalibrationReport {
@@ -151,6 +190,10 @@ export function calibrationReport(worldId: string): CalibrationReport {
     });
   }
   const avg = (xs: number[]) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : 0);
+  const labeled: LabeledScore[] = [
+    ...goodScores.map((score) => ({ verdict: "good" as const, score })),
+    ...badScores.map((score) => ({ verdict: "bad" as const, score })),
+  ];
   return {
     good: goodScores.length,
     bad: badScores.length,
@@ -158,6 +201,7 @@ export function calibrationReport(worldId: string): CalibrationReport {
     avgBad: avg(badScores),
     mismatchGoodLow,
     mismatchBadHigh,
+    suggestedThreshold: suggestThreshold(labeled),
     flagCounts,
     examples: examples.slice(0, 20),
   };
