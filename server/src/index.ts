@@ -18,6 +18,7 @@ import { candidatesRouter } from "./routes/candidates.js";
 import { practiceRouter } from "./routes/practice.js";
 import { eventsRouter } from "./routes/events.js";
 import { understandingRouter } from "./routes/understanding.js";
+import { dungeonSequenceRouter } from "./routes/dungeonSequence.js";
 import { startGenerationWorker } from "./services/generationWorker.js";
 
 seedDemoIfEmpty();
@@ -37,6 +38,7 @@ app.use(candidatesRouter);
 app.use(practiceRouter);
 app.use(eventsRouter);
 app.use(understandingRouter);
+app.use(dungeonSequenceRouter);
 startGenerationWorker(llm);
 
 app.get("/api/health", (_req, res) => {

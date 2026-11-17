@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import { get, send } from "../api";
 import { useStore } from "../store";
 
 /** 副本抽屉：领域副本（每日 10 题）/ 流程副本（排序连线），MD 可编辑 */
@@ -17,6 +18,12 @@ export default function DungeonDrawer() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [md, setMd] = useState("");
   const [saved, setSaved] = useState("");
+  const [sequence, setSequence] = useState<any>(null);
+  const [stage, setStage] = useState(0);
+  const [choice, setChoice] = useState("");
+  const [explanation, setExplanation] = useState("");
+  const [taskFeedback, setTaskFeedback] = useState("");
+  const [seqLoading, setSeqLoading] = useState(false);
 
   useEffect(() => {
     setOrder([]);
@@ -62,6 +69,44 @@ export default function DungeonDrawer() {
     setOrder((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
+  async function loadSequence() {
+    if (!building) return;
+    setSeqLoading(true);
+    setTaskFeedback("");
+    try {
+      const p = await get<any>(`/api/buildings/${building.id}/sequence`);
+      setSequence(p);
+      setStage(0);
+      setChoice("");
+      setExplanation("");
+    } finally {
+      setSeqLoading(false);
+    }
+  }
+
+  async function submitStage() {
+    const task = sequence?.stages?.[stage]?.task;
+    if (!task || !choice || !building) return;
+    const r = await send<{ correct: boolean; feedback: string }>(
+      `/api/understanding/${task.id}/answer`,
+      "POST",
+      { choice, explanation },
+    );
+    setTaskFeedback(`${r.correct ? "本关通过" : "再想想"}：${r.feedback}`);
+    if (!r.correct) return;
+    if (stage + 1 < sequence.stages.length) {
+      setStage(stage + 1);
+      setChoice("");
+      setExplanation("");
+    } else {
+      const done = await send<any>(`/api/buildings/${building.id}/sequence/complete`, "POST", {
+        edgeId: sequence.edgeId,
+      });
+      setTaskFeedback(done.cleared ? "三关通过：这个误解已纠正" : "三关完成，但还有题未通过");
+      await useStore.getState().refreshWorldData();
+    }
+  }
+
   return (
     <div className="drawer">
       <header>
@@ -82,6 +127,67 @@ export default function DungeonDrawer() {
             </div>
           </div>
         )}
+
+        <div className="section">
+          <h4>辨析副本 · 误解纠正</h4>
+          {!sequence ? (
+            <button className="primary" onClick={loadSequence} disabled={seqLoading}>
+              开始辨析副本
+            </button>
+          ) : sequence.status === "source_required" ? (
+            <div className="hintline">{sequence.message}</div>
+          ) : (
+            <>
+              <div className="hintline">
+                进度：{Math.min(stage + 1, sequence.stages.length)} / {sequence.stages.length} ·
+                边界 → 反例 → 迁移
+              </div>
+              {taskFeedback && (
+                <div className="hintline" style={{ marginBottom: 6 }}>
+                  {taskFeedback}
+                </div>
+              )}
+              {sequence.stages[stage]?.task && (
+                <>
+                  {sequence.stages[stage].task.misconception && (
+                    <div className="hintline">易错点：{sequence.stages[stage].task.misconception}</div>
+                  )}
+                  {sequence.stages[stage].task.evidence_quote && (
+                    <blockquote>依据：{sequence.stages[stage].task.evidence_quote}</blockquote>
+                  )}
+                  <div className="q">{sequence.stages[stage].task.stem}</div>
+                  {sequence.stages[stage].task.choices.map((c: any) => (
+                    <label key={c.id} className="hintline" style={{ display: "block", marginTop: 4 }}>
+                      <input
+                        type="radio"
+                        name={`dungeon-choice-${stage}`}
+                        checked={choice === c.id}
+                        onChange={() => setChoice(c.id)}
+                      />{" "}
+                      {c.text}
+                    </label>
+                  ))}
+                  <textarea
+                    className="md-edit"
+                    style={{ marginTop: 6 }}
+                    value={explanation}
+                    onChange={(e) => setExplanation(e.target.value)}
+                    placeholder="说明你的判断和边界，并引用原文…"
+                  />
+                  <div className="row" style={{ marginTop: 6 }}>
+                    <button
+                      className="primary"
+                      onClick={submitStage}
+                      disabled={!choice || explanation.trim().length < 4}
+                    >
+                      提交本关
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
 
         {building.status === "playable" && challenge?.error && (
           <div className="section">

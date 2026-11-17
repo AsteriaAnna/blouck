@@ -33,6 +33,11 @@ function publicTask(t: UnderstandingTaskRow) {
   };
 }
 
+export function getUnderstandingTaskForClient(taskId: string) {
+  const t = getUnderstandingTask(taskId);
+  return t ? publicTask(t) : null;
+}
+
 /** 事实辨析任务：必须能回到用户原文；无源不出题。 */
 export async function ensureUnderstandingTask(
   edgeId: string,

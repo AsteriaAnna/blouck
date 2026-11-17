@@ -10,7 +10,7 @@ pnpm build       # web build（shared/server 只 typecheck）
 
 CI：`.github/workflows/ci.yml`，push main / PR 跑 install → typecheck → test → build。
 
-## 当前覆盖（P1 起步，当前 33 个测试）
+## 当前覆盖（P1 起步，当前 34 个测试）
 
 | 测试 | 文件 | 覆盖 |
 |---|---|---|
@@ -28,6 +28,7 @@ CI：`.github/workflows/ci.yml`，push main / PR 跑 install → typecheck → t
 | V3 提示池 | `server/src/hints.test.ts` | 置信度/新近/热度排序、top-k display、旧边回退 |
 | V3 关系练习 | `server/src/practice.test.ts` | 3 题生成/答案隐藏/缓存/判题记录；无源不生成事实题（旧接口） |
 | V3 辨析任务 | `server/src/understanding.test.ts` | 无源不出题；选择+解释；答案不暴露；节点边界任务；反例/纠错/迁移变体独立缓存 |
+| V3 辨析副本 | `server/src/dungeonSequence.test.ts` | 边界→反例→迁移三关；三关通过后 cleared |
 | V3 指标事件 | `server/src/events.test.ts` | 写入、world 过滤、type 汇总 |
 | mock 集成 | `server/src/integration.test.ts` | 起临时 server + 临时 DB：世界创建、extract、stream segment/commit、重复抽取不重复建边、方向物化只给 frontier/≤2、seed demo 方向投影 |
 
