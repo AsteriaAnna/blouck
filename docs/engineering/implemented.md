@@ -174,7 +174,8 @@ node_docs, relation_docs, node_candidates, generation_jobs
 - 副本解锁已有单测：节点 tier>=1 后 domain/flow 从 detected → playable；`short+judge` 都答对 → tier=1 → DOMAIN playable（答题链路）。
 - 辨析副本：`dungeon_stages` 持久化关卡；一个副本最多选 2 条带原文证据关系：单关系 → 边界/反例/迁移 3 关；两条关系 → 每条边界/反例 2 关，共 4 关。选关系按 `rankDungeonEdges`：类型权重（kindOf/partOf 高、related 低）+ 证据长度 + 局部易混度 + 置信度。`POST .../sequence/complete` 按持久化阶段检查，全部答对 → cleared。DungeonDrawer 以「辨析副本 · 误解纠正」为主入口，旧 10 题/流程排序收进默认折叠的「复习模式」。E2E 实测单关系 3 关通关。
 - 关系辨析（替代“3 题复习”）：`understanding_tasks/understanding_attempts`；`GET /api/edges/:id/understanding?variant=boundary|counterexample|error_correction|transfer` 生成“类型/边界、反例、纠错、迁移 + 选择 + 理由 + 原文引用 + rubric + follow_up”；无源返回 `source_required`；`POST /api/understanding/:id/answer` 判选择+解释并记录。旧 `edge_practice` 接口保留但 UI 已不用。
-- 题目质量审计：`GET /api/understanding/:id/quality`，7 项：证据可回查 25、误解具体 15、选项含干扰项 15、rubric 15、非定义题 10、含比较/边界/反例/迁移 10、要求解释 10；UI 显示“质量 N/100”和低分 flags。生成 prompt 同步要求“不得是可抄定义；必须有干扰项和比较/边界/反例/迁移”。CDP 实测 demo 关系任务质量 100/100。
+- 题目质量审计：`GET /api/understanding/:id/quality`，7 项：证据可回查 25、误解具体 15、选项含干扰项 15、rubric 15、非定义题 10、含比较/边界/反例/迁移 10、要求解释 10；UI 显示“质量 N/100”和低分 flags。生成 prompt 同步要求“不得是可抄定义；必须有干扰项和比较/边界/反例/迁移”。
+- 质量自检重写：关系任务首次生成后审计，<60 会带缺失 flags 让 LLM 重写一次；只有重写分更高才替换并删除低分题，否则保留原题。测试用 fake provider 验证 2 次调用、输出 ≥80、低分题被删。
 - 解释质量：作答时 `scoreExplanation` 按长度/推理词/rubric 覆盖/判题通过打分，写入 `understanding_attempts.rubric_score`；回复含 `explanation_score`，面板显示“解释分 N/100”；学习指标含 `avgExplanationScore`。
 - 导航渐进披露：`MapControls` 显示四类线计数；默认只显示提示 `hint_display` top2 + 方向 2 条，点击「展开：显示全部关系」显示全部（含 15 条提示/9 条方向）。`mapExpand` 存在 store，打开世界时重置为 false。CDP 实测计数/展开按钮/状态切换正常，errors=[]。
 - 首屏性能：`App` 对 `World` 做 `React.lazy`；构建从单包 1,338 kB 拆成首页 156.65 kB（gzip 50.64）+ World 1,179 kB（gzip 326.69）。CDP 实测首页无 canvas、进入世界后 map/canvas 正常，errors=[]；World chunk 仍 >500 kB 是 three.js 体量，但不再阻塞首页。

@@ -141,6 +141,8 @@ export type UnderstandingTaskInput = {
   evidence?: string;
   neighbors: string[];
   variant?: "boundary" | "counterexample" | "error_correction" | "transfer";
+  /** 质检失败后的重写提示：缺了什么、为什么不合格 */
+  repair?: string;
 };
 
 export type NodeUnderstandingInput = {
@@ -148,6 +150,7 @@ export type NodeUnderstandingInput = {
   node: { name: string; type?: string; definition?: string };
   neighbors: { name: string; predicate?: string | null; evidence?: string }[];
   variant?: "boundary" | "counterexample" | "error_correction" | "transfer";
+  repair?: string;
 };
 
 export type LLMProvider = {

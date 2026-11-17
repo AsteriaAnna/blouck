@@ -308,7 +308,7 @@ B：${b.name}（${b.definition ?? ""}）
     }
   },
 
-  async generateUnderstandingTask({ sourceText, a, b, predicate, label, evidence, neighbors, variant = "boundary" }) {
+  async generateUnderstandingTask({ sourceText, a, b, predicate, label, evidence, neighbors, variant = "boundary", repair }) {
     const system = `你是知识辨析教练，不是出定义题。只输出 JSON：
 {"learning_goal":"discriminate","misconception":"这道题针对的一个具体误解","stem":"题干：让用户判断关系类型/方向/边界，必须比较相邻类型","choices":[{"id":"kindOf","text":"..."},{"id":"partOf","text":"..."},{"id":"prerequisite","text":"..."}],"correct_choice":"kindOf","rubric":["评分点1","评分点2"],"evidence_quote":"原文连续子串","follow_up":"进一步追问"}
 题型：${variant === "counterexample" ? "反例题：让用户找反例/边界" : variant === "error_correction" ? "纠错题：给错误表述，让用户修正" : variant === "transfer" ? "迁移题：换一个场景/近邻，判断关系是否仍成立" : "辨析题：判断关系类型/方向/边界"}
@@ -318,7 +318,7 @@ B：${b.name}（${b.definition ?? ""}）
 - 题干必须包含比较/边界/反例/迁移之一（为什么、区别、不是、换场景等）；
 - 至少 2 个选项，且必须有错误干扰项；
 - evidence_quote 必须来自 sourceText，没有就空字符串；
-- 题干要求用户说明理由，而不是只选字母。`;
+- 题干要求用户说明理由，而不是只选字母。${repair ? `\n- 这是重写：${repair}` : ""}`;
     const user = `原文：${sourceText.slice(0, 2000)}
 A：${a.name}（${a.definition ?? ""}）
 B：${b.name}（${b.definition ?? ""}）

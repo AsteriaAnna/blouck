@@ -2,6 +2,7 @@ import { db } from "../db.js";
 import type { EdgeRow } from "../db/edges.js";
 import {
   createUnderstandingTask,
+  deleteUnderstandingTask,
   getUnderstandingTask,
   getUnderstandingTaskByEdge,
   getUnderstandingTaskByEdgeKind,
@@ -11,6 +12,7 @@ import {
 } from "../db/understanding.js";
 import type { LLMProvider } from "../providers/types.js";
 import { scoreExplanation } from "./explanationQuality.js";
+import { auditUnderstandingTask } from "./understandingQuality.js";
 
 function findSourceSpan(worldId: string, quote: string): { id: string; text: string } | undefined {
   if (!quote.trim()) return undefined;
@@ -37,6 +39,40 @@ function publicTask(t: UnderstandingTaskRow) {
 export function getUnderstandingTaskForClient(taskId: string) {
   const t = getUnderstandingTask(taskId);
   return t ? publicTask(t) : null;
+}
+
+function createEdgeTask(
+  edge: EdgeRow,
+  spanId: string,
+  variant: string,
+  draft: {
+    learning_goal: string;
+    misconception: string;
+    stem: string;
+    choices: { id: string; text: string }[];
+    correct_choice: string;
+    rubric: string[];
+    evidence_quote: string;
+    follow_up: string;
+  },
+) {
+  return createUnderstandingTask({
+    world_id: edge.world_id,
+    edge_id: edge.id,
+    target_type: "edge",
+    node_id: null,
+    task_kind: variant,
+    learning_goal: draft.learning_goal,
+    misconception: draft.misconception,
+    stem: draft.stem,
+    answer_type: "choice_explain",
+    choices_json: JSON.stringify(draft.choices),
+    correct_choice: draft.correct_choice,
+    rubric_json: JSON.stringify(draft.rubric),
+    evidence_quote: draft.evidence_quote || edge.evidence,
+    source_span_id: spanId,
+    follow_up: draft.follow_up,
+  });
 }
 
 /** 事实辨析任务：必须能回到用户原文；无源不出题。 */
@@ -83,23 +119,35 @@ export async function ensureUnderstandingTask(
   if (!draft.choices.length || !draft.correct_choice) {
     return { status: "failed" as const, task: null, message: "任务生成失败，可稍后重试" };
   }
-  const task = createUnderstandingTask({
-    world_id: edge.world_id,
-    edge_id: edge.id,
-    target_type: "edge",
-    node_id: null,
-    task_kind: variant,
-    learning_goal: draft.learning_goal,
-    misconception: draft.misconception,
-    stem: draft.stem,
-    answer_type: "choice_explain",
-    choices_json: JSON.stringify(draft.choices),
-    correct_choice: draft.correct_choice,
-    rubric_json: JSON.stringify(draft.rubric),
-    evidence_quote: draft.evidence_quote || edge.evidence,
-    source_span_id: span.id,
-    follow_up: draft.follow_up,
-  });
+  let task = createEdgeTask(edge, span.id, variant, draft);
+  const firstAudit = auditUnderstandingTask(task.id);
+  if (firstAudit && firstAudit.score < 60) {
+    try {
+      const repaired = await llm.generateUnderstandingTask({
+        sourceText: span.text,
+        a,
+        b,
+        predicate: edge.predicate,
+        label: edge.label,
+        evidence: edge.evidence,
+        neighbors,
+        variant,
+        repair: `上一次题目质检不合格（${firstAudit.flags.join("、")}）。请重写：必须引用原文、有具体误解、含错误干扰项，并且题干要求比较/边界/反例/迁移。`,
+      });
+      if (repaired.choices.length && repaired.correct_choice) {
+        const repairedTask = createEdgeTask(edge, span.id, variant, repaired);
+        const repairedAudit = auditUnderstandingTask(repairedTask.id);
+        if (repairedAudit && repairedAudit.score > firstAudit.score) {
+          deleteUnderstandingTask(task.id);
+          task = repairedTask;
+        } else {
+          deleteUnderstandingTask(repairedTask.id);
+        }
+      }
+    } catch (err) {
+      console.warn("[understanding] 质量重写失败，保留原题：", err);
+    }
+  }
   return { status: "ready" as const, task: publicTask(task) };
 }
 

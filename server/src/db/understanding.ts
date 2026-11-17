@@ -53,6 +53,10 @@ export function getUnderstandingTask(id: string): UnderstandingTaskRow | undefin
     | undefined;
 }
 
+export function deleteUnderstandingTask(id: string) {
+  db.prepare("DELETE FROM understanding_tasks WHERE id=?").run(id);
+}
+
 export function createUnderstandingTask(
   input: Omit<UnderstandingTaskRow, "id" | "created_at">,
 ): UnderstandingTaskRow {
