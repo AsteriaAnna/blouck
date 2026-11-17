@@ -224,6 +224,45 @@ input, textarea { font: inherit; color: inherit; }
   .md-edit, .quiz textarea { font-size: 16px; }
 }
 
+/* ---------- 横屏手机 / 矮屏平板 ---------- */
+@media (max-width: 1000px) and (max-height: 560px) and (orientation: landscape) {
+  .topbar { padding: 6px 10px; gap: 8px; }
+  .topbar .title {
+    font-size: 14px; max-width: 40vw; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .flow-wrap { margin-top: -36px; }
+  .legend { display: none; }
+  .drawer {
+    left: 8px; right: 8px; top: auto; bottom: 8px;
+    width: auto; max-height: calc(100vh - 16px);
+    border-radius: 12px;
+  }
+  .drawer header { padding: 8px 12px 6px; }
+  .drawer header h2 { font-size: 16px; margin: 4px 0 2px; }
+  .drawer .body { padding: 8px 12px 12px; }
+  .inputbar { bottom: 8px; width: calc(100vw - 16px); padding: 6px; }
+  .inputbar textarea { min-height: 28px; font-size: 15px; }
+  .inputbar .state { display: none; }
+  .map-controls {
+    right: 8px !important;
+    bottom: 96px !important;
+    font-size: 10.5px !important;
+    padding: 5px 7px !important;
+    max-width: 150px;
+    transform: scale(0.92);
+    transform-origin: bottom right;
+  }
+  .learning-stats {
+    left: 8px !important;
+    right: 8px !important;
+    top: 44px !important;
+    width: auto !important;
+    max-height: 62vh;
+    overflow: auto;
+  }
+}
+
 .building-wrap.locked { opacity: .55; }
 .building-label {
   position: absolute; left: 50%; top: 118px; transform: translateX(-50%);

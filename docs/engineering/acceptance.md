@@ -79,6 +79,7 @@ hit node label=概念
 | V3 浏览器 E2E | ✅ | `pnpm e2e:v3`：节点辨析 100/100 → 三关 → 指标 4/4、副本通关 1；需 dev server + Chrome |
 | 首屏体积 | ✅ | 首页 156.65 kB（gzip 50.64）；World 1,179 kB（gzip 326.69）按需加载 |
 | 移动端布局 | ✅ | CDP 390×844：无横向溢出；抽屉 374px 内；地图控制不与输入台重叠 |
+| 横屏布局 | ✅ | CDP 844×390：无横向溢出；抽屉 828×374 内；map bottom 294 < input top 304 |
 | 指标导出 | ✅ | `learning/export?days=7` 返回 text/csv，8 行含表头；面板「导出 CSV」可按需下载 |
 | 方向动画 | ✅ | 修复 consumed 方向占名额后：两帧截图 hash 不同、`sparkMoved=true` |
 | 2–3 天完成带测试小 PR | ✅ 有测试/CI/小 PR 先例 | 42 tests + CI workflow |
