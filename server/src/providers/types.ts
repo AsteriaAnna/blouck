@@ -1,6 +1,12 @@
 /** 服务端 Provider 抽象：DeepSeek（语言）与豆包（流式 ASR）的预留位 */
 
-import type { EdgeKind, NodeType, RelationPredicate } from "@blouck/shared";
+import type {
+  EdgeKind,
+  NodeDoc,
+  NodeType,
+  RelationDoc,
+  RelationPredicate,
+} from "@blouck/shared";
 export type { NodeType, RelationPredicate };
 
 export type ExtractEntity = {
@@ -90,6 +96,31 @@ export type QuizItem = {
   answer: string;
 };
 
+export type NodeDocDraft = Omit<NodeDoc, "generated_at">;
+export type RelationDocDraft = Omit<RelationDoc, "generated_at">;
+
+export type NodeDocInput = {
+  name: string;
+  type?: string;
+  definition?: string;
+  sourceText?: string;
+  neighbors: {
+    id: string;
+    name: string;
+    predicate?: string | null;
+    label?: string;
+    evidence?: string;
+  }[];
+};
+
+export type RelationDocInput = {
+  a: { id: string; name: string; definition?: string };
+  b: { id: string; name: string; definition?: string };
+  predicate?: string | null;
+  label?: string;
+  evidence?: string;
+};
+
 export type LLMProvider = {
   name: string;
   /** 从一段稳定文本里抽取实体与关系（对应 MVP 的“节点生成/关系生成”） */
@@ -122,6 +153,12 @@ export type LLMProvider = {
     nodes: { name: string; type?: string; definition?: string }[];
     edges: { src: string; dst: string; predicate?: string | null; label?: string; evidence?: string }[];
   }): Promise<DungeonSuggestions>;
+
+  /** V3：节点理解卡草稿。只依据输入证据，不要编造。 */
+  generateNodeDoc(input: NodeDocInput): Promise<NodeDocDraft>;
+
+  /** V3：关系对照卡草稿。只依据输入证据，不要编造。 */
+  generateRelationDoc(input: RelationDocInput): Promise<RelationDocDraft>;
 };
 
 export type ASREvents = {

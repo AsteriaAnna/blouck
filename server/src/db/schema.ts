@@ -231,3 +231,59 @@ FROM edges;
 DROP VIEW IF EXISTS dungeons;
 CREATE VIEW dungeons AS SELECT * FROM buildings;
 `);
+
+
+/* ---------- V3 Phase 0：理解卡 / 候选 / 生成任务 ---------- */
+db.exec(`
+CREATE TABLE IF NOT EXISTS node_docs(
+  node_id TEXT PRIMARY KEY,
+  world_id TEXT NOT NULL,
+  doc_json TEXT NOT NULL DEFAULT '{}',
+  notes_md TEXT NOT NULL DEFAULT '',
+  version INTEGER NOT NULL DEFAULT 1,
+  content_hash TEXT NOT NULL DEFAULT '',
+  generated_at INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_node_docs_world ON node_docs(world_id);
+
+CREATE TABLE IF NOT EXISTS relation_docs(
+  edge_id TEXT PRIMARY KEY,
+  world_id TEXT NOT NULL,
+  doc_json TEXT NOT NULL DEFAULT '{}',
+  notes_md TEXT NOT NULL DEFAULT '',
+  version INTEGER NOT NULL DEFAULT 1,
+  content_hash TEXT NOT NULL DEFAULT '',
+  generated_at INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_relation_docs_world ON relation_docs(world_id);
+
+CREATE TABLE IF NOT EXISTS node_candidates(
+  id TEXT PRIMARY KEY,
+  world_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT '概念',
+  definition TEXT NOT NULL DEFAULT '',
+  aliases TEXT NOT NULL DEFAULT '[]',
+  evidence TEXT NOT NULL DEFAULT '',
+  confidence REAL NOT NULL DEFAULT 0,
+  reason TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'candidate',
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_node_candidates_world ON node_candidates(world_id, status);
+
+CREATE TABLE IF NOT EXISTS generation_jobs(
+  id TEXT PRIMARY KEY,
+  world_id TEXT NOT NULL,
+  type TEXT NOT NULL,
+  target_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  attempts INTEGER NOT NULL DEFAULT 0,
+  error TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_generation_jobs_status ON generation_jobs(status, created_at);
+`);

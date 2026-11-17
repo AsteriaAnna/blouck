@@ -148,10 +148,24 @@ DeepSeek 抽取失败/超时时：本段不落图，返回空结果并在响应�
 `server/src/db/schema.ts` 中实际存在的表：
 
 ```text
+核心 13：
 worlds, nodes, edges, buildings, quizzes, attempts,
 meta, source_spans, focus_stack, directions,
 domain_questions, hide_batches, daily_domain
+
+V3 Phase 0：
+node_docs, relation_docs, node_candidates, generation_jobs
 ```
+
+### V3 理解卡事实（2026-11-17 起）
+
+- `node_docs` / `relation_docs`：懒生成，`doc_json` + 独立 `notes_md`；重新生成不覆盖备注。
+- 生成入口：`services/contentDocs.ts`；provider 接口 `generateNodeDoc/generateRelationDoc`（DeepSeek + mock）。
+- 校验：节点卡 `position.node_id` 必须属于邻居；`source_quote` 必须来自 source span；关系卡 `evidence_quote` 必须来自 edge.evidence；失败用模板兜底，不 500。
+- API：`GET /api/nodes/:id/doc`、`POST .../doc/regenerate`、`PATCH .../doc/notes`；edge 同结构。
+- 前端：`NodeDrawer` 显示体系位置/边界/来源/下一步/备注；`RelationDrawer` 显示依据/辨析/反例/备注。
+- 生成仍是**同步懒生成**（点击时等待），异步 job 队列下一阶段接入。
+
 
 ### nodes 关键字段
 
@@ -243,8 +257,8 @@ parent 选择顺序（新节点挂到谁）：
 - `web/src/store.ts` 只做 slices 组合；`store/streamText.ts` 是 `splitCumulativeText` / `sentenceKey` / `pickNewSentences` 纯函数（累计文本切句与去重）；`store/streamSlice.ts` 的 `ingestSegment` / `commitStream` 更新 nodes/edges/focus，失败 toast，`warning` 防御式读取后 toast；`store/worldSlice.ts` 管世界/抽屉/题目/副本。
 - `web/src/components/World3D.tsx`：场景组装；`World3DScene.tsx`：岛/建筑/相机；`World3DEdges.tsx`：节点、关系、建筑、方向线。四种线按类型分美术：正式关系=深色 3D 管状实线（半径约 2.8）、探索来源=蓝灰管状实线 + 起点圆点（半径约 2.0）、待确认建议=统一色虚线 + 中点圆珠、方向=点线 + 末端「旧版木柱路牌 + 地面方向箭头」。所有线都带透明命中管，点击可打开关系/方向文档。
 - 世界页顶栏只保留「← 世界列表 + 世界名」；示例数据标记、节点/关系/副本统计、LLM/ASR、3D 视图、重排、撤回隐藏、导出、操作提示均已从 UI 移除（后端对应接口仍在，MVP 无入口）。
-- 点节点显示**节点文档**：标题（节点名）、正文（`definition` + `free_md`，ReactMarkdown 渲染）、来源 blockquote（来自 `source_text/source_at`）、以及「编辑」自由区；MVP 暂不展示答题/档位/关系列表/手动关联/继续探索/隐藏面板。
-- 点线显示**一句话文档**（按语义类型）：正式/来源/建议线用 predicate 关系类型（归类/组成/前置/对比/替代/相关；来源线为“探索来源”）；建议线额外提供「接受为正式关系」，方向线提供「去探索」。MVP 不再展示证据/置信度/关系 MD 编辑器。
+- 点节点显示**理解卡**：定义、体系位置（可跳转）、边界/易混、来源、下一步、我的笔记；由 `/api/nodes/:id/doc` 懒生成，失败降级。
+- 点关系显示**关系卡**：一句话定位、依据、辨析、反例、我的备注；由 `/api/edges/:id/doc` 懒生成；建议线仍可接受，方向线仍可探索。
 - 题目/答题：后端 quizzes 接口仍在，但 MVP 前端不展示题目区，也不展示节点 tier。
 - 抽屉（.drawer）`z-index: 100`；3D HTML 标签的 `zIndexRange` 被限制在 30 以下（副本标题 20 以下），避免副本标题/节点标签穿透打开中的 MD 文档。
 - 关系路牌：`suggest`（建议标签）与 `direction`（方向问题）在 3D 里有木柱路牌（旧版样式：Canvas 文字、始终面向相机、可点击）；`source` 只画起点圆点、不立牌。方向线末端用「木柱路牌 + 地面方向箭头」表示探索方向。
@@ -310,10 +324,10 @@ pnpm build
 server/src/
   env.ts                 环境变量/provider
   db.ts                  barrel + world/getGraph/recordAttempt/refresh/seed
-  db/                    connection/schema/repo（nodes/edges/quizzes/sources/domain/directions/buildings）
+  db/                    connection/schema/repo（nodes/edges/quizzes/sources/domain/directions/buildings/docs）
   index.ts               express/server/ws 装配 + health（约 71 行）
-  routes/                graph/stream/nodes/edges/worlds/buildings/worldAdmin/dev
-  services/              directions（物化/消费）、buildings（检测/刷新）
+  routes/                graph/stream/nodes/edges/worlds/buildings/worldAdmin/dev/docs
+  services/              directions（物化/消费）、buildings（检测/刷新）、contentDocs（V3 卡片生成）
   stream/session.ts      语音 provisional/focus/关系幂等/commit
   providers/types.ts     LLM/ASR 接口（ExtractResult 可带 warning）
   providers/deepseek.ts  DeepSeek（20s 超时；抽取失败不降级 mock）
@@ -336,8 +350,8 @@ web/src/
   components/World3D.tsx / World3DScene.tsx / World3DEdges.tsx
   components/Home.tsx
   components/World.tsx
-  components/NodeDrawer.tsx
-  components/RelationDrawer.tsx
+  components/NodeDrawer.tsx（V3 理解卡）
+  components/RelationDrawer.tsx（V3 关系卡）
   components/DungeonDrawer.tsx（产品名；API/DB 仍 building）
   models3d.ts
   styles.css / styles3d.css

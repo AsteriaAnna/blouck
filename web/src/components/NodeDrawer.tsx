@@ -1,26 +1,48 @@
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import { get, send, type NodeDocPayload } from "../api";
 import { useStore } from "../store";
 
-/** 点击节点的文档：名称 + 正文 + 来源（沿用早期样片的 MD 结构：标题 / 正文 / 来源引用） */
+/** 点击节点的理解卡：定义 + 体系位置 + 边界 + 来源 + 下一步 + 笔记。 */
 export default function NodeDrawer() {
   const drawer = useStore((s) => s.drawer);
   const nodes = useStore((s) => s.nodes);
-  const saveMd = useStore((s) => s.saveMd);
+  const openNode = useStore((s) => s.openNode);
   const closeDrawer = useStore((s) => s.closeDrawer);
 
   const node = nodes.find((n) => n.id === (drawer?.kind === "node" ? drawer.id : ""));
-  const [editing, setEditing] = useState(false);
-  const [md, setMd] = useState("");
+  const [payload, setPayload] = useState<NodeDocPayload | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saved, setSaved] = useState("");
 
   useEffect(() => {
     if (!node) return;
-    setMd(node.free_md ?? "");
-    setEditing(false);
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+    setSaved("");
+    get<NodeDocPayload>(`/api/nodes/${node.id}/doc`)
+      .then((p) => {
+        if (cancelled) return;
+        setPayload(p);
+        setNotes(p.notes_md || node.free_md || "");
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e.message ?? "卡片加载失败");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [node?.id]);
 
   if (!node) return null;
 
+  const doc = payload?.doc;
   const aliases = (() => {
     try {
       const list = JSON.parse(node.aliases || "[]") as string[];
@@ -29,7 +51,7 @@ export default function NodeDrawer() {
       return [];
     }
   })();
-  const body = [node.definition, md].filter((x) => x && x.trim()).join("\n\n");
+  const legacyBody = [node.definition, node.free_md].filter((x) => x && x.trim()).join("\n\n");
   const source = node.source_at
     ? `来源：${new Date(node.source_at).toLocaleString("zh-CN", {
         year: "numeric",
@@ -41,6 +63,27 @@ export default function NodeDrawer() {
     : node.source_text
       ? `来源：${node.source_text.slice(0, 120)}`
       : "";
+
+  async function saveNotes() {
+    if (!node) return;
+    await send(`/api/nodes/${node.id}/doc/notes`, "PATCH", { notes });
+    setSaved("已保存 " + new Date().toLocaleTimeString());
+  }
+
+  async function regenerate() {
+    if (!node) return;
+    setLoading(true);
+    setError("");
+    try {
+      const p = await send<NodeDocPayload>(`/api/nodes/${node.id}/doc/regenerate`, "POST");
+      setPayload(p);
+      setSaved("已重新生成");
+    } catch (e: any) {
+      setError(e.message ?? "重新生成失败");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="drawer">
@@ -55,45 +98,80 @@ export default function NodeDrawer() {
         </button>
       </header>
       <div className="body">
+        {loading && <div className="hintline">正在整理理解卡…</div>}
+        {error && (
+          <div className="hintline">
+            {error}
+            <button className="secondary" style={{ marginLeft: 8 }} onClick={regenerate}>
+              重试
+            </button>
+          </div>
+        )}
+
         <div className="md-preview node-doc">
           <h3>{node.name}</h3>
-          {body ? <ReactMarkdown>{body}</ReactMarkdown> : null}
-          {source ? <blockquote>{source}</blockquote> : null}
+          {doc?.definition ? (
+            <ReactMarkdown>{doc.definition}</ReactMarkdown>
+          ) : legacyBody ? (
+            <ReactMarkdown>{legacyBody}</ReactMarkdown>
+          ) : null}
+          {source || doc?.source_quote ? (
+            <blockquote>{doc?.source_quote || source}</blockquote>
+          ) : null}
         </div>
-        {editing ? (
-          <div style={{ marginTop: 12 }}>
-            <textarea
-              className="md-edit"
-              value={md}
-              onChange={(e) => setMd(e.target.value)}
-              placeholder="写下你的理解…"
-            />
-            <div className="row" style={{ marginTop: 8 }}>
-              <button
-                className="primary"
-                onClick={async () => {
-                  await saveMd(node.id, md);
-                  setEditing(false);
-                }}
-              >
-                保存
-              </button>
-              <button
-                className="secondary"
-                onClick={() => {
-                  setMd(node.free_md ?? "");
-                  setEditing(false);
-                }}
-              >
-                取消
-              </button>
-            </div>
+
+        {doc && doc.position.length > 0 && (
+          <div className="section">
+            <h4>体系位置</h4>
+            {doc.position.map((p) => {
+              const target = nodes.find((n) => n.id === p.node_id);
+              return (
+                <button
+                  key={`${p.node_id}-${p.predicate}`}
+                  className="step-btn"
+                  style={{ display: "block", width: "100%", textAlign: "left", marginBottom: 4 }}
+                  onClick={() => openNode(p.node_id)}
+                >
+                  {target?.name ?? p.node_id} · {p.predicate ?? "相关"}
+                  {p.why ? <span className="hintline"> — {p.why}</span> : null}
+                </button>
+              );
+            })}
           </div>
-        ) : (
-          <button className="ghost-btn" style={{ marginTop: 12 }} onClick={() => setEditing(true)}>
-            编辑
-          </button>
         )}
+
+        {doc?.boundary && (
+          <div className="section">
+            <h4>边界 / 易混</h4>
+            <div className="hintline">{doc.boundary}</div>
+          </div>
+        )}
+
+        {doc?.next_hint && (
+          <div className="section">
+            <h4>下一步</h4>
+            <div className="hintline">{doc.next_hint}</div>
+          </div>
+        )}
+
+        <div className="section">
+          <h4>我的笔记</h4>
+          <textarea
+            className="md-edit"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="写下你的理解…"
+          />
+          <div className="row" style={{ marginTop: 8 }}>
+            <button className="primary" onClick={saveNotes}>
+              保存
+            </button>
+            <button className="secondary" onClick={regenerate} disabled={loading}>
+              重新生成理解卡
+            </button>
+            <span className="hintline">{saved}</span>
+          </div>
+        </div>
       </div>
     </div>
   );

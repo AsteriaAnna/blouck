@@ -10,7 +10,7 @@ pnpm build       # web build（shared/server 只 typecheck）
 
 CI：`.github/workflows/ci.yml`，push main / PR 跑 install → typecheck → test → build。
 
-## 当前覆盖（P1 起步，当前 18 个测试）
+## 当前覆盖（P1 起步，当前 20 个测试）
 
 | 测试 | 文件 | 覆盖 |
 |---|---|---|
@@ -20,6 +20,7 @@ CI：`.github/workflows/ci.yml`，push main / PR 跑 install → typecheck → t
 | 方向物化/消费 | `server/src/directions.test.ts` | 每节点最多 2 条、重复执行幂等、非 frontier 删除、consume 以 directions 为源 |
 | DB 迁移 Stage A | `server/src/db/canonical-migrate.test.ts` | 旧 schema 临时库：kind→line_type 回填、consumed 回填、重复执行幂等 |
 | 旧库启动迁移 | `server/src/legacy-boot.test.ts` | 旧 edges schema 起真实 server：自动加列/trigger、旧行回填、canonical API 正常 |
+| V3 理解卡 | `server/src/contentDocs.test.ts` | 节点卡位置/来源、关系卡证据、备注不覆盖、方向/来源不生成 MD |
 | mock 集成 | `server/src/integration.test.ts` | 起临时 server + 临时 DB：世界创建、extract、stream segment/commit、重复抽取不重复建边、方向物化只给 frontier/≤2、seed demo 方向投影 |
 
 ## 已知缺口

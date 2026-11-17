@@ -227,4 +227,84 @@ export const deepseekLLM: LLMProvider = {
       return { flows: [], domains: [] };
     }
   },
+
+  async generateNodeDoc({ name, type, definition, sourceText, neighbors }) {
+    const system = `你是知识卡的编辑，不是作者。只输出 JSON：
+{"definition":"一句话定义","position":[{"node_id":"邻居 id","predicate":"kindOf|partOf|prerequisite|contrast|alternative|related","why":"依据"}],"boundary":"它不是什么/容易和谁混","source_quote":"原文证据","next_hint":"下一步建议"}
+规则：
+- position 只能使用输入的 neighbors id；不得新增节点。
+- source_quote 必须是 sourceText 的连续子串；没有就空字符串。
+- 没有证据的内容留空，不要编造。
+- definition 优先使用输入 definition，不要改写成空话。`;
+    const user = `节点：${name}（${type ?? "概念"}）
+定义：${definition ?? ""}
+来源原文：${sourceText ?? ""}
+邻居：
+${neighbors.map((n) => `- id=${n.id} name=${n.name} predicate=${n.predicate ?? "related"} label=${n.label ?? ""} evidence=${n.evidence ?? ""}`).join("\n")}`;
+    try {
+      const raw = await chat(system, user);
+      const parsed = JSON.parse(raw) as any;
+      const allowed = new Set(neighbors.map((n) => n.id));
+      return {
+        definition: String(parsed.definition ?? definition ?? ""),
+        position: Array.isArray(parsed.position)
+          ? parsed.position
+              .filter((x: any) => x && typeof x.node_id === "string" && allowed.has(x.node_id))
+              .slice(0, 6)
+              .map((x: any) => ({
+                node_id: x.node_id,
+                predicate: x.predicate ?? "related",
+                why: String(x.why ?? ""),
+              }))
+          : [],
+        boundary: String(parsed.boundary ?? ""),
+        source_quote:
+          typeof parsed.source_quote === "string" &&
+          sourceText &&
+          sourceText.includes(parsed.source_quote)
+            ? parsed.source_quote
+            : "",
+        next_hint: String(parsed.next_hint ?? ""),
+      };
+    } catch (err) {
+      console.warn("[llm] deepseek 节点卡失败：", err);
+      return mockLLM.generateNodeDoc({ name, type, definition, sourceText, neighbors });
+    }
+  },
+
+  async generateRelationDoc({ a, b, predicate, label, evidence }) {
+    const system = `你是知识卡编辑。只输出 JSON：
+{"one_line":"一句话定位","predicate":"kindOf|partOf|prerequisite|contrast|alternative|related","evidence_quote":"原文证据","compare":{"same":[],"different":[],"boundary":[]},"counterexample":"容易混淆/不成立的情况"}
+规则：
+- 只依据输入证据；evidence_quote 必须是 evidence 的连续子串，没有就空字符串。
+- 没有证据的对比/反例留空，不要编造。
+- 不要写“二者密切相关”这类空话。`;
+    const user = `A：${a.name}（${a.definition ?? ""}）
+B：${b.name}（${b.definition ?? ""}）
+谓词：${predicate ?? "related"}
+标签：${label ?? ""}
+证据：${evidence ?? ""}`;
+    try {
+      const raw = await chat(system, user);
+      const parsed = JSON.parse(raw) as any;
+      const cmp = parsed.compare ?? {};
+      return {
+        one_line: String(parsed.one_line ?? label ?? ""),
+        predicate: parsed.predicate ?? predicate ?? "related",
+        evidence_quote:
+          typeof parsed.evidence_quote === "string" && evidence && evidence.includes(parsed.evidence_quote)
+            ? parsed.evidence_quote
+            : "",
+        compare: {
+          same: Array.isArray(cmp.same) ? cmp.same.map(String).slice(0, 6) : [],
+          different: Array.isArray(cmp.different) ? cmp.different.map(String).slice(0, 6) : [],
+          boundary: Array.isArray(cmp.boundary) ? cmp.boundary.map(String).slice(0, 6) : [],
+        },
+        counterexample: String(parsed.counterexample ?? ""),
+      };
+    } catch (err) {
+      console.warn("[llm] deepseek 关系卡失败：", err);
+      return mockLLM.generateRelationDoc({ a, b, predicate, label, evidence });
+    }
+  },
 };

@@ -194,6 +194,36 @@ export const mockLLM: LLMProvider = {
   async detectDungeons() {
     return { flows: [], domains: [] };
   },
+
+  async generateNodeDoc({ name, type, definition, sourceText, neighbors }) {
+    return {
+      definition: definition || `${name} 是一个${type || "概念"}。`,
+      position: neighbors.slice(0, 4).map((n) => ({
+        node_id: n.id,
+        predicate: n.predicate ?? "related",
+        why: n.evidence || n.label || `与「${n.name}」相关`,
+      })),
+      boundary: `「${name}」的边界还需要更多材料来确认。`,
+      source_quote: (sourceText || "").slice(0, 160),
+      next_hint: neighbors[0]
+        ? `继续追问「${name}」与「${neighbors[0].name}」的区别。`
+        : `继续补充「${name}」的上下文。`,
+    };
+  },
+
+  async generateRelationDoc({ a, b, predicate, label, evidence }) {
+    return {
+      one_line: label || `「${a.name}」与「${b.name}」存在${predicate ?? "相关"}关系。`,
+      predicate: predicate ?? "related",
+      evidence_quote: (evidence || "").slice(0, 200),
+      compare: {
+        same: [`都与「${a.name}」「${b.name}」的上下文相关`],
+        different: [`需要更多材料确认两者的具体差异`],
+        boundary: [],
+      },
+      counterexample: "",
+    };
+  },
 };
 
 /** mock 流式 ASR：按句式逐段吐 partial，用于前端联调 */

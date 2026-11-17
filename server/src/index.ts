@@ -13,6 +13,7 @@ import { devRouter } from "./routes/dev.js";
 import { buildingsRouter } from "./routes/buildings.js";
 import { worldAdminRouter } from "./routes/worldAdmin.js";
 import { graphRouter } from "./routes/graph.js";
+import { docsRouter } from "./routes/docs.js";
 
 seedDemoIfEmpty();
 
@@ -26,6 +27,7 @@ app.use(devRouter);
 app.use(buildingsRouter);
 app.use(worldAdminRouter);
 app.use(graphRouter);
+app.use(docsRouter);
 
 app.get("/api/health", (_req, res) => {
   res.json({

@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { LINE_TYPE_LABEL, deriveLineFields, type LineType } from "@blouck/shared";
+import { get, send, type RelationDocPayload } from "../api";
 import { useStore } from "../store";
 
 const PRED_LABEL: Record<string, string> = {
@@ -11,7 +13,6 @@ const PRED_LABEL: Record<string, string> = {
   related: "相关",
 };
 
-/** 用一句话说明两个节点是什么关系（按设计好的关系类型） */
 function relationSentence(lineType: LineType, predicate: string | null, from: string, to: string) {
   if (lineType === "sequence") return `顺序线：「${to}」是从「${from}」生成的来路。`;
   const type = predicate ?? "related";
@@ -32,7 +33,7 @@ function relationSentence(lineType: LineType, predicate: string | null, from: st
   }
 }
 
-/** 点击线：展示这条线的说明文档；建议线额外提供“接受”动作 */
+/** 点击线：展示关系理解卡；建议线提供“接受”，方向线提供“探索”。 */
 export default function RelationDrawer() {
   const drawer = useStore((s) => s.drawer);
   const edges = useStore((s) => s.edges);
@@ -42,6 +43,36 @@ export default function RelationDrawer() {
   const closeDrawer = useStore((s) => s.closeDrawer);
 
   const edge = edges.find((e) => e.id === (drawer?.kind === "edge" ? drawer.id : ""));
+  const [payload, setPayload] = useState<RelationDocPayload | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [notes, setNotes] = useState("");
+  const [saved, setSaved] = useState("");
+
+  useEffect(() => {
+    if (!edge || (edge.kind !== "formal" && edge.kind !== "suggest")) {
+      setPayload(null);
+      setNotes("");
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    get<RelationDocPayload>(`/api/edges/${edge.id}/doc`)
+      .then((p) => {
+        if (cancelled) return;
+        setPayload(p);
+        setNotes(p.notes_md ?? "");
+      })
+      .catch(() => {
+        if (!cancelled) setPayload(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [edge?.id]);
+
   if (!edge) return null;
   const from = nodes.find((n) => n.id === edge.src)?.name ?? "?";
   const to = nodes.find((n) => n.id === edge.dst)?.name ?? "?";
@@ -52,11 +83,30 @@ export default function RelationDrawer() {
   const plannedName = edge.target_name?.trim() || "";
   const plannedDef = edge.target_definition?.trim() || "";
   const sentence = isDirection
-    ? `探索方向：「${from}」的下一个问题是：${edge.question || edge.label || "还可以往哪里深入？"}` +
+    ? `探索方向：「${from}」的下一个问题：${edge.question || edge.label || "还可以往哪里深入？"}` +
       (plannedName
         ? `\n\n点「去探索」会直接生成预先规划好的节点：**${plannedName}**${plannedDef ? `——${plannedDef}` : ""}`
         : `\n\n这条方向是旧数据，点「去探索」时会先规划延伸节点，再落图。`)
     : relationSentence(lineType, edge.predicate ?? null, from, to);
+  const doc = payload?.doc;
+
+  async function saveNotes() {
+    if (!edge) return;
+    await send(`/api/edges/${edge.id}/doc/notes`, "PATCH", { notes });
+    setSaved("已保存 " + new Date().toLocaleTimeString());
+  }
+
+  async function regenerate() {
+    if (!edge) return;
+    setLoading(true);
+    try {
+      const p = await send<RelationDocPayload>(`/api/edges/${edge.id}/doc/regenerate`, "POST");
+      setPayload(p);
+      setSaved("已重新生成");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="drawer">
@@ -69,8 +119,65 @@ export default function RelationDrawer() {
       </header>
       <div className="body">
         <div className="md-preview">
-          <ReactMarkdown>{sentence}</ReactMarkdown>
+          <ReactMarkdown>{doc?.one_line || sentence}</ReactMarkdown>
         </div>
+
+        {loading && <div className="hintline">正在整理关系卡…</div>}
+
+        {doc && (
+          <>
+            {doc.evidence_quote && (
+              <div className="section">
+                <h4>依据</h4>
+                <blockquote>{doc.evidence_quote}</blockquote>
+              </div>
+            )}
+            {(doc.compare.same.length > 0 ||
+              doc.compare.different.length > 0 ||
+              doc.compare.boundary.length > 0) && (
+              <div className="section">
+                <h4>辨析</h4>
+                {doc.compare.same.length > 0 && (
+                  <div className="hintline">相同：{doc.compare.same.join("；")}</div>
+                )}
+                {doc.compare.different.length > 0 && (
+                  <div className="hintline">不同：{doc.compare.different.join("；")}</div>
+                )}
+                {doc.compare.boundary.length > 0 && (
+                  <div className="hintline">边界：{doc.compare.boundary.join("；")}</div>
+                )}
+              </div>
+            )}
+            {doc.counterexample && (
+              <div className="section">
+                <h4>反例 / 易混</h4>
+                <div className="hintline">{doc.counterexample}</div>
+              </div>
+            )}
+          </>
+        )}
+
+        {(edge.kind === "formal" || edge.kind === "suggest") && (
+          <div className="section">
+            <h4>我的备注</h4>
+            <textarea
+              className="md-edit"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="这条关系对你意味着什么…"
+            />
+            <div className="row" style={{ marginTop: 8 }}>
+              <button className="primary" onClick={saveNotes}>
+                保存
+              </button>
+              <button className="secondary" onClick={regenerate} disabled={loading}>
+                重新生成关系卡
+              </button>
+              <span className="hintline">{saved}</span>
+            </div>
+          </div>
+        )}
+
         {isHint ? (
           <div className="row" style={{ marginTop: 10 }}>
             <button

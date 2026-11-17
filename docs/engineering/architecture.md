@@ -100,6 +100,7 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 | worlds | GET/POST `/api/worlds`；GET/DELETE `/api/worlds/:id` | 4 | 世界列表/创建/读取/删除 |
 | graph | POST `/api/worlds/:id/extract`；POST `/api/worlds/:id/explore` | 2 | 文字抽取、方向落图 |
 | nodes | PATCH `/api/nodes/:id` | 1 | 节点编辑（定义/自由区等） |
+| docs | GET/POST `.../doc`、`.../doc/regenerate`、PATCH `.../doc/notes`（node/edge） | 6 | V3 节点卡/关系卡懒生成、备注、重生成 |
 | quizzes | GET `/api/nodes/:id/quiz`；POST `/api/nodes/:id/quiz/generate`；POST `/api/quiz/:id/answer` | 3 | 节点题/生成/判题 |
 | edges | POST `/api/edges/:id/accept`；PATCH `/api/edges/:id`；POST `/api/edges/:id/consume` | 3 | 接受建议/编辑 MD/消费方向 |
 | relations | POST `/api/worlds/:id/relations` | 1 | 手动关系 |
@@ -109,9 +110,9 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 | buildings | GET `/api/buildings/:id`；POST `/challenge`、`/submit`；PATCH `/api/buildings/:id` | 4 | 副本读取/挑战/提交/编辑 MD |
 | dev | POST `/api/dev/world`、`/api/dev/explore`、`/api/dev/anchor-first`、`/api/dev/dungeon-fixture` | 4 | 开发/实验；不是产品链路 |
 
-**注意**：`/api/dev/explore` 被注册了两次（同名）；Express 只会命中第一个，第二个不可达。P1 应删除重复注册并隔离 dev 路由。
+**注意**：`/api/dev/explore` 的重复注册已在 P1 删除，dev 路由已隔离到 `routes/dev.ts`。
 
-## 4. 数据表归属（13 张）
+## 4. 数据表归属（13 张核心 + 4 张 V3 卡片）
 
 | 表 | 归属 | 关键字段 | 谁写 | 谁读 |
 |---|---|---|---|---|
@@ -128,6 +129,10 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 | `daily_domain` | 领域日计数 | world/building/date/count | 领域挑战 | 每日上限 |
 | `hide_batches` | 隐藏批次 | node_ids/undone | hide/undo | 撤回/恢复 |
 | `meta` | 杂项 | k/v | 迁移/内部 | 迁移/内部 |
+| `node_docs` | 节点理解卡 | doc_json/notes_md/version/generated_at | `services/contentDocs.ts` | 节点卡 |
+| `relation_docs` | 关系对照卡 | doc_json/notes_md/version/generated_at | `services/contentDocs.ts` | 关系卡 |
+| `node_candidates` | 未准入节点 | name/evidence/confidence/status | 准入（下一阶段） | 候选确认 |
+| `generation_jobs` | 异步生成任务 | type/target_id/status | 生成（下一阶段） | worker/观测 |
 
 **表关系**：
 - `worlds 1—N nodes/edges/buildings/directions/source_spans/focus_stack/hide_batches`；
@@ -144,9 +149,9 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 | 方向生成/物化 | `providers/deepseek.ts suggestDirections`、`services/directions.ts materializeDirectionEdges`、`assetops.ts ensureDirectionFrontiers` | directions 表 + 自环边双写 |
 | frontier | `server/src/db.ts computeFrontier` | 只看 formal 出边 |
 | 副本检测/刷新 | `server/src/services/buildings.ts`、`server/src/routes/buildings.ts` | 只读 formal；语音不触发 |
-| 3D 渲染/线/路牌 | `web/src/components/World3D.tsx` | 721 行；边/节点/建筑/相机/点击混在一起 |
-| 抽屉/MD | `NodeDrawer.tsx`、`RelationDrawer.tsx`、`DungeonDrawer.tsx` | 节点 MD/关系 MD/副本 MD 分开；Dungeon 是产品名，API/DB 仍 building |
-| 流式状态/UI | `web/src/store.ts`、`InputBar.tsx` | store 混 API/UI/stream；InputBar 混音频/WS/UI |
+| 3D 渲染/线/路牌 | `web/src/components/World3D.tsx`、`World3DScene.tsx`、`World3DEdges.tsx` | 三文件分工，不再混在一起 |
+| 抽屉/理解卡 | `NodeDrawer.tsx`、`RelationDrawer.tsx`、`DungeonDrawer.tsx` | 节点卡/关系卡/副本；Dungeon 是产品名，API/DB 仍 building |
+| 流式状态/UI | `store/worldSlice.ts`、`store/streamSlice.ts`、`InputBar.tsx`、`hooks/useVoiceInput.ts` | 已按职责拆开 |
 | 布局 | `layout.ts`、`wfc.ts` | `/layout` UI 无入口 |
 
 ## 6. 已知架构问题

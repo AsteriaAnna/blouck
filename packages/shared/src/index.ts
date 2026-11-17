@@ -205,6 +205,53 @@ export type QuizDTO = {
   answer: string;
 };
 
+/** 节点理解卡：由关系/来源生成，notes 单独存，重生成不覆盖。 */
+export type NodeDocPosition = {
+  node_id: string;
+  predicate?: RelationPredicate | string | null;
+  why?: string;
+};
+
+export type NodeDoc = {
+  definition: string;
+  position: NodeDocPosition[];
+  boundary: string;
+  source_quote: string;
+  next_hint: string;
+  generated_at: number;
+};
+
+/** 关系对照卡：一句话定位 + 依据 + 辨析/反例。 */
+export type RelationCompare = {
+  same: string[];
+  different: string[];
+  boundary: string[];
+};
+
+export type RelationDoc = {
+  one_line: string;
+  predicate: RelationPredicate | string | null;
+  evidence_quote: string;
+  compare: RelationCompare;
+  counterexample: string;
+  generated_at: number;
+};
+
+export type DocStatus = "ready" | "missing" | "generating" | "failed" | "stale";
+
+export type NodeDocPayload = {
+  doc: NodeDoc | null;
+  notes_md: string;
+  status: DocStatus;
+};
+
+export type RelationDocPayload = {
+  doc: RelationDoc | null;
+  notes_md: string;
+  status: DocStatus;
+};
+
+
 export type WorldPayloadDTO = {
   world: WorldDTO;
   nodes: NodeDTO[];
