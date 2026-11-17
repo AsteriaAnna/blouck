@@ -5,8 +5,8 @@ import {
   getGraph,
   listBuildings,
   setNodePosition,
-} from "./db.js";
-import { placeAround, relax, type Placed } from "./placement.js";
+} from "../db.js";
+import { placeAround, relax, type Placed } from "../placement.js";
 
 const VOCAB = [
   "检索", "重排", "评测", "记忆", "工具调用", "多模态", "推理", "规划",

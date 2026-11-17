@@ -1,7 +1,7 @@
-import { addDirection, addEdge, addNode, computeFrontier, createSourceSpan, getGraph, getNode } from "./db.js";
-import { env } from "./env.js";
-import { deepseekLLM } from "./providers/deepseek.js";
-import { mockLLM } from "./providers/mock.js";
+import { addDirection, addEdge, addNode, computeFrontier, createSourceSpan, getGraph, getNode } from "../db.js";
+import { env } from "../env.js";
+import { deepseekLLM } from "../providers/deepseek.js";
+import { mockLLM } from "../providers/mock.js";
 
 /**
  * DEV：锚点优先的垂直切片（A 方案，三层串联）

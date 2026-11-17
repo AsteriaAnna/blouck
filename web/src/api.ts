@@ -18,106 +18,20 @@ export async function send<T>(
   return r.json();
 }
 
-export type World = {
-  id: string;
-  name: string;
-  root_node_id: string;
-  is_demo: number;
-  created_at: number;
-};
-
-export type Passed = { short: number; judge: number };
-
-export type NodeRow = {
-  id: string;
-  world_id: string;
-  name: string;
-  x: number;
-  y: number;
-  free_md: string;
-  hidden: number;
-  tier: number;
-  type: string;
-  definition: string;
-  aliases: string;
-  source_span_id: string | null;
-  frontier: number;
-  status?: "provisional" | "committed";
-  passed?: Passed;
-  /** 节点来源片段（只读，节点 MD 的“来源”引用） */
-  source_text?: string | null;
-  source_at?: number | null;
-};
-
-export type EdgeKind = "formal" | "source" | "suggest" | "direction";
-
-export type EdgeRow = {
-  id: string;
-  world_id: string;
-  src: string;
-  dst: string;
-  kind: EdgeKind;
-  label: string;
-  md: string;
-  question: string | null;
-  frontier_x?: number | null;
-  frontier_y?: number | null;
-  consumed?: number;
-  predicate?: string | null;
-  evidence?: string;
-  confidence?: number;
-  origin?: string;
-  claim_status?: string;
-  revision?: number;
-  /** 方向线生成时预先计划好的延伸节点 */
-  target_name?: string | null;
-  target_type?: string | null;
-  target_definition?: string | null;
-  target_aliases?: string | null;
-  target_predicate?: string | null;
-  target_label?: string | null;
-};
-
-export type BuildingRow = {
-  id: string;
-  world_id: string;
-  kind: "domain" | "flow";
-  anchor: string;
-  title: string;
-  sub: string;
-  md: string;
-  steps: string;
-  status: "detected" | "locked" | "playable" | "cleared" | "stale";
-  version?: number;
-  basis?: string;
-  fingerprint?: string;
-  x: number;
-  y: number;
-};
-
-export type DirectionRow = {
-  id: string;
-  world_id: string;
-  node_id: string;
-  question: string;
-  reason: string;
-  target_hint: string | null;
-  status: "open" | "consumed" | "archived";
-  created_at: number;
-};
-
-export type Quiz = {
-  id: string;
-  node_id: string;
-  kind: "short" | "judge";
-  prompt: string;
-  answer: string;
-};
-
-export type WorldPayload = {
-  world: World;
-  nodes: NodeRow[];
-  edges: EdgeRow[];
-  buildings: BuildingRow[];
-  directions?: DirectionRow[];
-};
+/**
+ * API DTO 来自 @blouck/shared，避免前后端各写一份。
+ * 这里保留旧名称（NodeRow/EdgeRow/...）作为别名，减少调用点改动。
+ */
+export type {
+  WorldDTO as World,
+  PassedDTO as Passed,
+  NodeDTO as NodeRow,
+  EdgeDTO as EdgeRow,
+  BuildingDTO as BuildingRow,
+  DirectionDTO as DirectionRow,
+  QuizDTO as Quiz,
+  WorldPayloadDTO as WorldPayload,
+  EdgeKind,
+  NodeType,
+  RelationPredicate,
+} from "@blouck/shared";

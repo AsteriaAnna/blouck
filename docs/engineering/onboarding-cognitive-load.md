@@ -6,7 +6,7 @@
 
 ## 0. 结论
 
-- **项目不算大，但上下文密度很高**：约 7.2k 行代码（server 4.8k + web 2.4k）、33 个后端路由、13 张表、10 份主文档（约 140KB）；真正的难点不是 LOC，而是**术语、状态、职责和历史设计分散**。
+- **项目不算大，但上下文密度很高**：约 7.2k 行代码（server 4.8k + web 2.4k）、32 个后端路由、13 张表、10 份主文档（约 140KB）；真正的难点不是 LOC，而是**术语、状态、职责和历史设计分散**。
 - **“能跑起来”很快，“能安全改核心链路”很慢**：
   - 本地跑起来：**0.5–1 天**；
   - 看懂主链路并做第一个小改动：**2–4 天**；
@@ -26,7 +26,7 @@
 | 指标 | 数值 | 说明 |
 |---|---|---|
 | 代码量 | ~7,196 行 | server 4,816 + web 2,380 |
-| 后端路由 | 33 | 其中 `/api/dev/*` 5 个、实验/无 UI 的若干 |
+| 后端路由 | 32 | 其中 `/api/dev/*` 5 个、实验/无 UI 的若干 |
 | 数据表 | 13 | worlds/nodes/edges/buildings/directions/quizzes/attempts/source_spans/focus_stack/domain_questions/hide_batches/daily_domain/meta |
 | 最大文件 | index.ts 1,626 / db.ts 787 / World3D.tsx 721 / InputBar.tsx 581 / store.ts 412 | 都超过“一屏能读完”的范围 |
 | 文档 | 10 份，约 140KB | 03/04/05/06/07/08/09 口径不同；09 是营销 Brief |
@@ -80,7 +80,7 @@
 
 | 文件 | 现在承担 | 问题 | 拆分建议 |
 |---|---|---|---|
-| `server/src/index.ts` (1,626) | 33 路由 + 节点/关系创建 + 方向生成/物化 + 副本检测 + 出题 + 布局 + dev 路由 | 路由和领域逻辑混在一起；改一个功能要读整个文件 | `routes/*` + `services/*`（extract/explore/directions/dungeons/relations） |
+| `server/src/index.ts` (1,626) | 32 路由 + 节点/关系创建 + 方向生成/物化 + 副本检测 + 出题 + 布局 + dev 路由 | 路由和领域逻辑混在一起；改一个功能要读整个文件 | `routes/*` + `services/*`（extract/explore/directions/dungeons/relations） |
 | `server/src/db.ts` (787) | schema + 迁移 + CRUD + 业务规则（commitStreamEdges/computeFrontier）+ demo seed | 持久层混业务；新人无法判断“改 SQL 还是改规则” | `db/schema.ts`、`db/repo/*`、`services/*`；迁移独立 |
 | `server/src/assetops.ts` (301) | 建筑位置 + 方向 frontier + 隐藏 + 导出 | 名字无意义，职责四合一 | `buildings/placement`、`directions/frontier`、`hide`、`export` |
 | `server/src/stream/session.ts` (268) | LLM 抽取 + parent 启发 + 写节点/边 + focus 栈 | 领域规则、LLM、DB 写混合；没有事务 | `stream/ingest` + `graph/writer`；事务封装 |
@@ -104,7 +104,7 @@
    - 03 实现、04 过程、05 早期草稿、06 需求、07 实现笔记、08 验证、09 营销；
    - 新人很容易把 04/05 当当前口径。
 4. **没有 API/状态图**：
-   - 33 个路由只在 index.ts 里；13 张表只在 db.ts 里；没有 route/table/state 一张图。
+   - 32 个路由只在 index.ts 里；13 张表只在 db.ts 里；没有 route/table/state 一张图。
 5. **测试不可复现**：
    - 仓库内无单测/集成测试；验收脚本在 `_verify`（工作区外）；`server/eval` 不是 CI。
    - 新人改核心逻辑后没有安全网，只能手点。
@@ -115,7 +115,7 @@
 
 | 时间 | 预期卡点 |
 |---|---|
-| 第 1 天 | 能 install/dev/打开示例世界；但不知道 33 个路由哪些是主链路、哪些是 dev/死代码 |
+| 第 1 天 | 能 install/dev/打开示例世界；但不知道 32 个路由哪些是主链路、哪些是 dev/死代码 |
 | 第 2 天 | 能改 UI 文案；但改“一条线”会卡在 kind/状态/表/渲染四层 |
 | 第 3 天 | 能看懂 `/extract` 一半；会被 direction 自环、frontier、materialize、quiz/dungeon 副作用打断 |
 | 第 1 周 | 能提交外围 PR；不敢改 commit/关系/方向核心逻辑；无法独立验证 |
@@ -125,7 +125,7 @@
 ### P0：1–2 天，不改行为，只降认知成本
 
 1. **加 `docs/engineering/glossary.md`**：产品词 ↔ 代码词 ↔ 状态 ↔ 数据表；四类线、边 kind、building/dungeon、source/sequence、suggest/hint、direction/exploration。
-2. **加 `docs/engineering/architecture.md`**：一张主链路图（语音/文字/探索/副本）、33 路由分组、13 张表归属、谁写谁读。
+2. **加 `docs/engineering/architecture.md`**：一张主链路图（语音/文字/探索/副本）、32 路由分组、13 张表归属、谁写谁读。
 3. **加 `docs/engineering/states.md`**：节点 provisional/committed；边 suggest/formal/consumed；方向 open/consumed；副本 detected/locked/playable/cleared/stale；明确迁移规则。
 4. **文档分区**：`docs/product/`（06、旧 baseline）、`docs/engineering/`（03、07、10）、`docs/history/`（04、05）、`docs/marketing/`（09）、`docs/baseline/`（旧设计原文）。00-index 只做入口。
 5. **标实验/死代码**：`docs/engineering/experimental.md` 列 anchorFirst、dev 路由、stream/preview、ghost、WFC/ELK、hide/export 的现状；不删先标。

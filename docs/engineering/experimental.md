@@ -8,14 +8,14 @@
 
 | 项 | 位置 | 状态 | 说明 | 建议 |
 |---|---|---|---|---|
-| 锚点优先链路 | `server/src/anchorFirst.ts`（318 行） | dev 原型，未进主链路 | 句子快判 + `pairFastLLM` + 慢判 + 决策；见 `docs/baseline/anchor-first-prototype.md` | P1 移到 `experiments/`；保留供关系准入实验 |
-| `/api/dev/anchor-first` | `index.ts` | dev 路由 | 可 apply=false 观察决策 | P1 移到 dev router/实验开关 |
-| `/api/worlds/:id/stream/preview` | `index.ts` | 未使用的 API | 用 `runAnchorFirst` 生成 ghost/决策；前端不调用 | P1 标 experimental 或删除 |
-| `/api/worlds/:id/stream/detect` | `index.ts` | 未使用的 API | 只抽候选、不判关系；前端不调用 | P1 标 experimental 或删除 |
-| `/api/dev/explore` | `index.ts` 注册两次 | 开发模拟；**重复路由** | 第一次 `simulateExplore`，第二次旧版占位；Express 只命中第一个，第二个不可达 | P1 删重复注册，保留一个 dev 路由 |
-| `/api/dev/world` | `index.ts` | dev fixture | 构造随机世界 | P1 移到 dev router |
-| `/api/dev/dungeon-fixture` | `index.ts` | dev fixture | 构造必然触发副本的世界 | P1 移到 dev router |
-| `server/src/explore.ts` | 123 行 | dev 模拟 | 只被 `/api/dev/explore` 用 | P1 移到 experiments/ |
+| 锚点优先链路 | `server/src/experiments/anchorFirst.ts` | dev 原型，未进主链路 | 句子快判 + `pairFastLLM` + 慢判 + 决策；见 `docs/baseline/anchor-first-prototype.md` | 已移入 `experiments/`；保留供关系准入实验 |
+| `/api/dev/anchor-first` | `index.ts` | dev 路由 | 可 apply=false 观察决策 | P1 后续移到 dev router/实验开关 |
+| `/api/worlds/:id/stream/preview` | `index.ts` | 未使用的 API | 用 `runAnchorFirst` 生成 ghost/决策；前端不调用 | 标 experimental 或删除 |
+| `/api/worlds/:id/stream/detect` | `index.ts` | 未使用的 API | 只抽候选、不判关系；前端不调用 | 标 experimental 或删除 |
+| `/api/dev/explore` | `index.ts` | 开发模拟 | 旧版占位重复路由已删除；现在只保留 `simulateExplore` 一个 handler | 已修复（P1） |
+| `/api/dev/world` | `index.ts` | dev fixture | 构造随机世界 | 移到 dev router |
+| `/api/dev/dungeon-fixture` | `index.ts` | dev fixture | 构造必然触发副本的世界 | 移到 dev router |
+| `server/src/experiments/exploreSim.ts` | 已移入 experiments | dev 模拟 | 只被 `/api/dev/explore` 用 | 已隔离 |
 
 ## 2. 幽灵/流式旧路径
 
@@ -52,16 +52,16 @@
 1. **dev 路由不是产品行为**：`/api/dev/*` 可以创建随机世界、模拟探索、跑锚点实验，不要据此推断主链路。
 2. **前端不可达的功能不是不存在**：hide/export/layout/quiz 的后端和 DB 仍在；改删除前要确认没有测试/导出依赖。
 3. **ghost 渲染还在不等于 ghost 可用**：没有生产者，`setGhosts` 只有清空。
-4. **重复路由**：`/api/dev/explore` 注册两次，第二个不可达；这是 P1 要修的代码问题。
+4. **重复路由（已修复）**：`/api/dev/explore` 曾注册两次，第二个不可达；P1 已删除旧 handler。
 5. **实验代码有价值**：`anchorFirst` 是关系准入的验证原型，不要直接删；先隔离，供 08 的实验计划使用。
 
 ## 6. P1 处置建议
 
 ```text
 server/src/experiments/
-  anchorFirst.ts
-  exploreSim.ts
-  devFixtures.ts
+  anchorFirst.ts      ✅ 已移入
+  exploreSim.ts       ✅ 已移入
+  devFixtures.ts      （待拆）
   (dev router 只在 NODE_ENV=development 注册)
 ```
 

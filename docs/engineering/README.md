@@ -6,10 +6,11 @@
 2. [glossary.md](glossary.md)：产品词 ↔ 代码词 ↔ 状态 ↔ 表；先解决“说的是不是同一件事”。
 3. [states.md](states.md)：节点/边/方向/副本状态机；改状态前必读。
 4. [experimental.md](experimental.md)：anchorFirst/dev/ghost/WFC/hide/export 等实验/死代码/隐藏功能。
-5. [implemented.md](implemented.md)：当前代码真正实现了什么（找 bug 以它和源码为准）。
-6. [line-implementation-notes.md](line-implementation-notes.md)：线系统的实现细节、当前 4 种 kind、迁移选项。
-7. [relation-gate-qa.md](relation-gate-qa.md)：锚点优先/关系准入验证、当前模型重跑、真实链路坑。
-8. [onboarding-cognitive-load.md](onboarding-cognitive-load.md)：新人认知成本与 P0/P1/P2 简化方案。
+5. [testing.md](testing.md)：测试命令、覆盖范围、CI、已知缺口。
+6. [implemented.md](implemented.md)：当前代码真正实现了什么（找 bug 以它和源码为准）。
+7. [line-implementation-notes.md](line-implementation-notes.md)：线系统的实现细节、当前 4 种 kind、迁移选项。
+8. [relation-gate-qa.md](relation-gate-qa.md)：锚点优先/关系准入验证、当前模型重跑、真实链路坑。
+9. [onboarding-cognitive-load.md](onboarding-cognitive-load.md)：新人认知成本与 P0/P1/P2 简化方案。
 
 ## 维护规则
 

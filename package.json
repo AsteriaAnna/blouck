@@ -7,6 +7,7 @@
     "dev": "pnpm -r --parallel run dev",
     "build": "pnpm -r run build",
     "start:server": "pnpm --filter @blouck/server start",
+    "test": "pnpm --filter @blouck/server test",
     "typecheck": "pnpm -r run typecheck"
   },
   "pnpm": {

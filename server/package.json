@@ -6,11 +6,13 @@
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/placement.test.ts src/dungeons.test.ts src/db.test.ts src/integration.test.ts",
     "eval": "tsx eval/run.ts",
     "eval:api": "tsx eval/run.ts --api",
     "eval:dungeons": "tsx eval/dungeons.ts"
   },
   "dependencies": {
+    "@blouck/shared": "workspace:*",
     "dotenv": "^16.4.7",
     "elkjs": "^0.12.1",
     "express": "^4.21.2",

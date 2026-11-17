@@ -16,10 +16,11 @@
 | 文档 | 用途 |
 |---|---|
 | [engineering/README.md](engineering/README.md) | 工程文档入口/阅读顺序 |
-| [engineering/architecture.md](engineering/architecture.md) | 进程、主链路、33 路由分组、13 张表归属、改功能去哪 |
+| [engineering/architecture.md](engineering/architecture.md) | 进程、主链路、32 路由分组、13 张表归属、改功能去哪 |
 | [engineering/glossary.md](engineering/glossary.md) | 产品词 ↔ 代码词 ↔ 状态 ↔ 表 |
 | [engineering/states.md](engineering/states.md) | 节点/边/方向/副本状态机 |
 | [engineering/experimental.md](engineering/experimental.md) | anchorFirst/dev/ghost/WFC/hide/export 等实验/死代码/隐藏功能 |
+| [engineering/testing.md](engineering/testing.md) | 测试命令、覆盖范围、CI、已知缺口 |
 | [engineering/implemented.md](engineering/implemented.md) | **当前代码真正实现了什么；找 bug 以它和源码为准** |
 | [engineering/line-implementation-notes.md](engineering/line-implementation-notes.md) | 四类线的当前实现与迁移选项 |
 | [engineering/relation-gate-qa.md](engineering/relation-gate-qa.md) | 关系准入 dev 验证、当前模型重跑、真实链路坑、是否偏离原设计 |

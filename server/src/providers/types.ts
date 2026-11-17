@@ -1,13 +1,7 @@
 /** 服务端 Provider 抽象：DeepSeek（语言）与豆包（流式 ASR）的预留位 */
 
-export type NodeType = "概念" | "方法" | "组件" | "指标" | "工具";
-export type RelationPredicate =
-  | "kindOf"
-  | "partOf"
-  | "prerequisite"
-  | "contrast"
-  | "alternative"
-  | "related";
+import type { EdgeKind, NodeType, RelationPredicate } from "@blouck/shared";
+export type { NodeType, RelationPredicate };
 
 export type ExtractEntity = {
   name: string;
@@ -20,7 +14,7 @@ export type ExtractEntity = {
 };
 
 export type ExtractRelation = {
-  type: "source" | "formal" | "suggest" | "direction";
+  type: EdgeKind;
   /** 知识语义谓词（关系 v2）；source/direction 可空 */
   predicate?: RelationPredicate;
   label: string;

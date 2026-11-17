@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import type { EdgeKind as SharedEdgeKind } from "@blouck/shared";
 import { env } from "./env.js";
 
 export type World = {
@@ -30,7 +31,7 @@ export type NodeRow = {
   created_at: number;
 };
 
-export type EdgeKind = "formal" | "source" | "suggest" | "direction";
+export type EdgeKind = SharedEdgeKind;
 
 export type EdgeRow = {
   id: string;
@@ -138,6 +139,13 @@ CREATE TABLE IF NOT EXISTS quizzes(
 CREATE TABLE IF NOT EXISTS attempts(
   id TEXT PRIMARY KEY, quiz_id TEXT NOT NULL, correct INTEGER NOT NULL, at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS directions(
+  id TEXT PRIMARY KEY, world_id TEXT NOT NULL, node_id TEXT NOT NULL,
+  question TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '',
+  target_hint TEXT, status TEXT NOT NULL DEFAULT 'open',
+  consumed_span_id TEXT, created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_directions_world ON directions(world_id);
 CREATE INDEX IF NOT EXISTS idx_nodes_world ON nodes(world_id);
 CREATE INDEX IF NOT EXISTS idx_edges_world ON edges(world_id);
 CREATE INDEX IF NOT EXISTS idx_quizzes_node ON quizzes(node_id);
@@ -230,13 +238,6 @@ CREATE TABLE IF NOT EXISTS focus_stack(
   stack TEXT NOT NULL DEFAULT '[]',
   updated_at INTEGER NOT NULL DEFAULT 0
 );
-CREATE TABLE IF NOT EXISTS directions(
-  id TEXT PRIMARY KEY, world_id TEXT NOT NULL, node_id TEXT NOT NULL,
-  question TEXT NOT NULL, reason TEXT NOT NULL DEFAULT '',
-  target_hint TEXT, status TEXT NOT NULL DEFAULT 'open',
-  consumed_span_id TEXT, created_at INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_directions_world ON directions(world_id);
 CREATE TABLE IF NOT EXISTS domain_questions(
   id TEXT PRIMARY KEY, building_id TEXT NOT NULL, kind TEXT NOT NULL,
   prompt TEXT NOT NULL, answer TEXT NOT NULL, aliases TEXT NOT NULL DEFAULT '[]',

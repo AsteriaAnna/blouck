@@ -7,6 +7,7 @@
 
 ```text
 pnpm monorepo
+├─ packages/shared/  前后端共享 DTO/enum/API 契约（@blouck/shared）
 ├─ server/  Node 24 + Express + ws + node:sqlite(WAL) + tsx
 │    default port 8787
 │    data/mvp.db（SQLite，WAL）
@@ -16,9 +17,9 @@ pnpm monorepo
 ```
 
 - 开发：`pnpm dev` 同时起 server + web；
+- 测试：`pnpm test`（单测 + mock 集成）；CI：`.github/workflows/ci.yml`；
 - 生产：当前**没有**静态托管/统一域名；前端 build 后需要单独托管，API 另起；
-- 没有鉴权；API key 只在 server `.env`；
-- 没有 CI；`typecheck`/`build` 是当前自动门。
+- 没有鉴权；API key 只在 server `.env`。
 
 ## 2. 主链路
 
@@ -91,7 +92,7 @@ POST /api/buildings/:id/submit → 判题/通关/cleared
 refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触发
 ```
 
-## 3. 路由分组（33 个注册）
+## 3. 路由分组（32 个注册）
 
 | 组 | 方法/路径 | 数量 | 主用途 |
 |---|---|---|---|
@@ -106,7 +107,7 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 | hide/export | POST `/api/worlds/:id/hide/preview`、`/hide`、`/hide/undo`；GET `/api/worlds/:id/export` | 4 | 隐藏/撤回/导出；UI 当前无入口 |
 | stream | POST `/api/worlds/:id/stream/segment`、`/commit`、`/detect`、`/preview` | 4 | segment/commit 主链路；detect/preview 当前前端未用 |
 | buildings | GET `/api/buildings/:id`；POST `/challenge`、`/submit`；PATCH `/api/buildings/:id` | 4 | 副本读取/挑战/提交/编辑 MD |
-| dev | POST `/api/dev/world`、`/api/dev/explore`（注册两次）、`/api/dev/anchor-first`、`/api/dev/dungeon-fixture` | 5 | 开发/实验；不是产品链路 |
+| dev | POST `/api/dev/world`、`/api/dev/explore`、`/api/dev/anchor-first`、`/api/dev/dungeon-fixture` | 4 | 开发/实验；不是产品链路 |
 
 **注意**：`/api/dev/explore` 被注册了两次（同名）；Express 只会命中第一个，第二个不可达。P1 应删除重复注册并隔离 dev 路由。
 
