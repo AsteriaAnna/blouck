@@ -79,6 +79,47 @@ export function learningTrend(worldId: string, days = 7): TrendPoint[] {
   return keys.map((k) => base.get(k)!);
 }
 
+export type WorldOverview = {
+  id: string;
+  name: string;
+  is_demo: number;
+  createdAt: number;
+  tasks: number;
+  lowQuality: number;
+  attempts: number;
+  correctRate: number;
+  avgExplanationScore: number;
+  cleared: number;
+  dungeons: number;
+  nodeCards: number;
+  directions: number;
+};
+
+/** 跨世界总览：首页/总览用，按创建时间倒序。 */
+export function learningOverview(): WorldOverview[] {
+  const worlds = db
+    .prepare("SELECT id,name,is_demo,created_at FROM worlds ORDER BY created_at DESC")
+    .all() as { id: string; name: string; is_demo: number; created_at: number }[];
+  return worlds.map((w) => {
+    const s = learningStats(w.id);
+    return {
+      id: w.id,
+      name: w.name,
+      is_demo: w.is_demo,
+      createdAt: w.created_at,
+      tasks: s.tasks.total,
+      lowQuality: s.tasks.lowQuality,
+      attempts: s.attempts.total,
+      correctRate: s.attempts.rate,
+      avgExplanationScore: s.attempts.avgExplanationScore,
+      cleared: s.dungeons.cleared,
+      dungeons: s.dungeons.total,
+      nodeCards: s.cards.nodeOpen,
+      directions: s.directions,
+    };
+  });
+}
+
 /** CSV 导出：近 N 天趋势，可直接给表格工具。 */
 export function learningCsv(worldId: string, days = 30): string {
   const rows = learningTrend(worldId, days);

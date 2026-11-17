@@ -1,5 +1,19 @@
 import { useEffect, useState } from "react";
+import { get } from "../api";
 import { useStore } from "../store";
+
+type Overview = {
+  id: string;
+  tasks: number;
+  lowQuality: number;
+  attempts: number;
+  correctRate: number;
+  avgExplanationScore: number;
+  cleared: number;
+  dungeons: number;
+  nodeCards: number;
+  directions: number;
+};
 
 export default function Home() {
   const worlds = useStore((s) => s.worlds);
@@ -7,10 +21,17 @@ export default function Home() {
   const createWorld = useStore((s) => s.createWorld);
   const [name, setName] = useState("");
   const [root, setRoot] = useState("");
+  const [overview, setOverview] = useState<Record<string, Overview>>({});
 
   useEffect(() => {
     loadWorlds();
   }, [loadWorlds]);
+
+  useEffect(() => {
+    get<{ worlds: Overview[] }>("/api/learning/overview")
+      .then((r) => setOverview(Object.fromEntries(r.worlds.map((w) => [w.id, w]))))
+      .catch(() => setOverview({}));
+  }, [worlds.length]);
 
   return (
     <div className="home">
@@ -28,6 +49,13 @@ export default function Home() {
             <div className="meta">
               {new Date(w.created_at).toLocaleString()} · 点击进入
             </div>
+            {overview[w.id] && (
+              <div className="hintline" style={{ marginTop: 4 }}>
+                任务 {overview[w.id].tasks} · 正确率 {Math.round(overview[w.id].correctRate * 100)}% ·
+                通关 {overview[w.id].cleared}/{overview[w.id].dungeons}
+                {overview[w.id].lowQuality > 0 ? ` · 低质量 ${overview[w.id].lowQuality}` : ""}
+              </div>
+            )}
           </div>
         ))}
         <div className="create-card">

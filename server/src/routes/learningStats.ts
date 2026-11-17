@@ -1,7 +1,11 @@
 import { Router } from "express";
-import { learningCsv, learningStats, learningTrend } from "../services/learningStats.js";
+import { learningCsv, learningOverview, learningStats, learningTrend } from "../services/learningStats.js";
 
 export const learningStatsRouter = Router();
+
+learningStatsRouter.get("/api/learning/overview", (_req, res) => {
+  res.json({ worlds: learningOverview() });
+});
 
 learningStatsRouter.get("/api/worlds/:id/learning/stats", (req, res) => {
   res.json(learningStats(req.params.id));

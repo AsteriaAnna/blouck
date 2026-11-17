@@ -11,7 +11,7 @@ process.env.DEEPSEEK_API_KEY = "";
 const { addEdge, addNode, createBuilding, createSourceSpan, createWorld, db, setBuildingStatus } =
   await import("./db.js");
 const { ensureUnderstandingTask } = await import("./services/understanding.js");
-const { learningStats, learningTrend, learningCsv } = await import("./services/learningStats.js");
+const { learningStats, learningTrend, learningCsv, learningOverview } = await import("./services/learningStats.js");
 const { trackEvent } = await import("./db/events.js");
 const { mockLLM } = await import("./providers/mock.js");
 const { answerUnderstandingTask } = await import("./services/understanding.js");
@@ -59,6 +59,12 @@ test("学习指标：任务/作答/卡片/方向/副本汇总", async () => {
   const lines = csv.trim().split("\n");
   assert.equal(lines.length, 8);
   assert.ok(lines[lines.length - 1].includes(",1,1,"));
+
+  const overview = learningOverview();
+  assert.equal(overview.length, 1);
+  assert.equal(overview[0].id, world.id);
+  assert.equal(overview[0].tasks, 2);
+  assert.equal(overview[0].cleared, 1);
 });
 
 test.after(() => {

@@ -81,6 +81,7 @@ hit node label=概念
 | 移动端布局 | ✅ | CDP 390×844：无横向溢出；抽屉 374px 内；地图控制不与输入台重叠 |
 | 横屏布局 | ✅ | CDP 844×390：无横向溢出；抽屉 828×374 内；map bottom 294 < input top 304 |
 | 指标导出 | ✅ | `learning/export?days=7` 返回 text/csv，8 行含表头；面板「导出 CSV」可按需下载 |
+| 跨世界总览 | ✅ | `GET /api/learning/overview`；CDP 首页显示任务/正确率/通关，errors=[] |
 | 真实 LLM 抽样 | ✅ | `pnpm quality:sample`：2 关系 × 2 题型均 100 分；修正 3 个启发式误判并加回归测试 |
 | 方向动画 | ✅ | 修复 consumed 方向占名额后：两帧截图 hash 不同、`sparkMoved=true` |
 | 2–3 天完成带测试小 PR | ✅ 有测试/CI/小 PR 先例 | 43 tests + CI workflow |
