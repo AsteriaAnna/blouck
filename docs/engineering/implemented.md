@@ -179,7 +179,7 @@ node_docs, relation_docs, node_candidates, generation_jobs
 - 质量自检重写：关系/节点任务首次生成后审计，<60 会带缺失 flags 让 LLM 重写一次；只有重写分更高才替换并删除低分题，否则保留原题。测试用 fake provider 验证 2 次调用、输出 ≥80、低分题被删。
 - 解释质量：作答时 `scoreExplanation` 按长度/推理词/rubric 覆盖/判题通过打分，写入 `understanding_attempts.rubric_score`；回复含 `explanation_score`，面板显示“解释分 N/100”；学习指标含 `avgExplanationScore`。
 - 导航渐进披露：`MapControls` 显示四类线计数；默认只显示提示 `hint_display` top2 + 方向 2 条，点击「展开：显示全部关系」显示全部（含 15 条提示/9 条方向）。`mapExpand` 存在 store，打开世界时重置为 false。CDP 实测计数/展开按钮/状态切换正常，errors=[]。
-- 语音→知识层：语音 final 走 `stream/segment` + `stream/commit`（不是 `/extract`）；新节点仍写 `source_span_id` 且边带 evidence，所以后续事实题能回源。集成测试新增断言：commit 的节点至少一个挂到 source_spans。
+- 语音→知识层：语音 final 走 `stream/segment` + `stream/commit`（不是 `/extract`）；新节点仍写 `source_span_id` 且边带 evidence，所以后续事实题能回源。集成测试新增断言：commit 的节点至少一个挂到 source_spans。`pnpm voice:check` 用 mock ASR 在浏览器实测：空世界 1→4 节点、3 个带 source_span、streamText 正常、errors=[]。
 - 首屏性能：`App` 对 `World` 做 `React.lazy`；构建从单包 1,338 kB 拆成首页 156.65 kB（gzip 50.64）+ World 1,179 kB（gzip 326.69）。CDP 实测首页无 canvas、进入世界后 map/canvas 正常，errors=[]；World chunk 仍 >500 kB 是 three.js 体量，但不再阻塞首页。
 - 移动端：`@media (max-width:760px)` 下抽屉变底部近全宽、输入台留安全区、地图控制上移避让、图例隐藏、按钮最小触控高度。CDP 390×844 实测 `scrollWidth=390`、drawer 374×836 内、map 控制不与输入台重叠、errors=[]；截图见本地 `_verify/mobile-world.png`（不在仓库）。
 - 横屏/矮屏：`@media (max-width:1000px) and (max-height:560px) and (orientation:landscape)` 下抽屉仍底部近全宽、图例隐藏、地图控制缩放到输入台上方；CDP 844×390 实测 `scrollWidth=844`、drawer 828×374 内、map bottom 294 < input top 304、errors=[]。

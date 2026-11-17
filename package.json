@@ -10,9 +10,12 @@
     "test": "pnpm --filter @blouck/server test",
     "e2e:v3": "node scripts/e2e-v3.mjs",
     "quality:sample": "node scripts/quality-sample.mjs",
-    "typecheck": "pnpm -r run typecheck"
+    "typecheck": "pnpm -r run typecheck",
+    "voice:check": "node scripts/voice-check.mjs"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }

@@ -32,6 +32,7 @@ CI：`.github/workflows/ci.yml`，push main / PR 跑 install → typecheck → t
 | V3 题目质量 | `server/src/understandingQuality.test.ts` | 证据/误解/干扰项/比较/非定义题；好题高分、定义题低分；真实措辞误判回归 |
 | V3 质量重写 | `server/src/understandingRepair.test.ts` | 关系/节点低分题重写一次；保留高分版本、删低分 |
 | 真实 LLM 抽样 | `scripts/quality-sample.mjs` | 本地调 provider，默认 2 关系 × 2 题型并查质量分；非 CI |
+| mock ASR E2E | `scripts/voice-check.mjs` | 浏览器点「试听」→ stream segment/commit → 新节点挂 source_spans；非 CI |
 | V3 学习指标 | `server/src/learningStats.test.ts` | 任务/作答/卡片/方向/副本汇总；平均解释分；近 7 日趋势；CSV；跨世界 overview |
 | V3 解释质量 | `server/src/explanationQuality.test.ts` | 空解释 0；完整解释高分；rubric 覆盖降分 |
 | V3 全链路 | `server/src/v3Loop.test.ts` | 源→关系→辨析→三关副本→cleared→指标 |

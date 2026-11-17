@@ -86,6 +86,7 @@ hit node label=概念
 | 指标导出 | ✅ | `learning/export?days=7` 返回 text/csv，8 行含表头；面板「导出 CSV」可按需下载 |
 | 跨世界总览 | ✅ | `GET /api/learning/overview`；CDP 首页显示任务/正确率/通关，errors=[] |
 | 语音→知识层 | ✅ | 集成测试：stream commit 节点至少一个挂 `source_spans`，可回源生成事实题 |
+| mock ASR 浏览器链路 | ✅ | `pnpm voice:check`：流式文本正常，节点 1→4，3 个挂 source_span，errors=[] |
 | 真实 LLM 抽样 | ✅ | `pnpm quality:sample`：2 关系 × 2 题型均 100 分；修正 3 个启发式误判并加回归测试 |
 | 方向动画 | ✅ | 修复 consumed 方向占名额后：两帧截图 hash 不同、`sparkMoved=true` |
 | 2–3 天完成带测试小 PR | ✅ 有测试/CI/小 PR 先例 | 43 tests + CI workflow |
