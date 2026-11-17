@@ -26,6 +26,14 @@ test("computeFrontier: 只看 formal 出边", () => {
   const nodes = getGraph(world.id).nodes;
   assert.equal(nodes.find((n) => n.id === a.id)?.frontier, 0);
   assert.equal(nodes.find((n) => n.id === b.id)?.frontier, 1);
+
+  const edges = getGraph(world.id).edges;
+  const formalEdge = edges.find((e) => e.kind === "formal");
+  assert.equal(formalEdge?.line_type, "relation");
+  assert.equal(formalEdge?.line_state, "confirmed");
+  const sourceEdge = edges.find((e) => e.kind === "source");
+  assert.equal(sourceEdge?.line_type, "sequence");
+  assert.equal(sourceEdge?.line_state, "provenance");
 });
 
 test("commitStreamEdges: 只提升 stream suggest，source 不动", () => {

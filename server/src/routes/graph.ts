@@ -389,19 +389,8 @@ graphRouter.post("/api/worlds/:id/extract", async (req, res) => {
         predicate: rel.predicate ?? null,
         label: rel.label,
       });
-      const e = addEdge(world.id, source.id, source.id, "direction", target.name, question, "", {
-        evidence,
-        confidence,
-        origin: "auto",
-        target_name: target.name,
-        target_type: target.type,
-        target_definition: target.definition,
-        target_aliases: target.aliases,
-        target_predicate: rel.predicate ?? null,
-        target_label: rel.label,
-      });
-      createdEdges.push(e);
-      graph.edges.push(e);
+      // 方向边是 directions 表的投影，由 materializeDirectionEdges 统一生成；
+      // 这里不再直接 addEdge(kind='direction')，避免双写。
       continue;
     }
 

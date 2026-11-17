@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { EdgeKind as SharedEdgeKind } from "@blouck/shared";
+import { deriveLineFields, type EdgeKind as SharedEdgeKind } from "@blouck/shared";
 import { db } from "./db/connection.js";
 import "./db/schema.js";
 export { createSourceSpan, getFocusStack, setFocusStack } from "./db/sources.js";
@@ -7,6 +7,7 @@ export type { SourceSpanRow } from "./db/sources.js";
 export { createDomainQuestions, listDomainQuestions } from "./db/domain.js";
 export type { DomainQuestionRow } from "./db/domain.js";
 export { addDirection, consumeDirection, listDirections } from "./db/directions.js";
+import { addDirection } from "./db/directions.js";
 export type { DirectionRow, DirectionTargetPlan } from "./db/directions.js";
 export { createBuilding, setBuildingStatus, updateBuildingMd } from "./db/buildings.js";
 export type { BuildingRow } from "./db/buildings.js";
@@ -107,9 +108,10 @@ export function getGraph(worldId: string) {
   const nodes = db
     .prepare("SELECT * FROM nodes WHERE world_id=? ORDER BY created_at")
     .all(worldId) as NodeRow[];
-  const edges = db
+  const rows = db
     .prepare("SELECT * FROM edges WHERE world_id=? ORDER BY created_at")
     .all(worldId) as EdgeRow[];
+  const edges = rows.map((e) => ({ ...e, ...deriveLineFields(e) })) as EdgeRow[];
   return { nodes, edges };
 }
 
@@ -225,8 +227,8 @@ export function seedDemoIfEmpty() {
   E(agent, rag, "formal", "调用");
   E(chunking, evaln, "suggest", "影响评测？");
   E(vectordb, ctx, "suggest", "可能相关？");
-  E(hallu, ctx, "direction", "", "为什么会产生幻觉？");
-  E(evaln, prompt, "direction", "", "怎么建立可信评测？");
+  addDirection(wid, hallu, "为什么会产生幻觉？", "示例方向");
+  addDirection(wid, evaln, "怎么建立可信评测？", "示例方向");
   createBuilding(
     wid,
     "domain",

@@ -50,6 +50,15 @@ test.before(async () => {
 });
 
 test("mock 全链路：世界 → extract → stream segment/commit", async () => {
+  const worlds = await api("/api/worlds");
+  const demo = worlds.worlds.find((w: any) => w.is_demo === 1);
+  if (demo) {
+    const demoGraph = await api(`/api/worlds/${demo.id}`);
+    const dirs = demoGraph.edges.filter((e: any) => e.kind === "direction");
+    assert.ok(dirs.length > 0, "seed demo should materialize direction edges");
+    assert.ok(dirs.every((e: any) => e.line_type === "exploration"));
+  }
+
   const created = await api("/api/worlds", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

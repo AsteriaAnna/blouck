@@ -48,6 +48,51 @@ export const LINE_KIND_TO_PRODUCT: Record<EdgeKind, string> = {
   direction: "探索线",
 };
 
+/**
+ * Canonical（产品）线型/状态。
+ * 数据库仍存 EdgeKind；新代码用这里的 line_type/line_state 表达产品语义。
+ * 迁移阶段：DB kind 不动 → API 附加 canonical 字段 → 前端逐步改用 canonical → 最后再改 DB。
+ */
+export type LineType = "relation" | "sequence" | "hint" | "exploration";
+export type LineState = "confirmed" | "proposed" | "provenance" | "planned" | "consumed";
+
+export const EDGE_KIND_TO_LINE_TYPE: Record<EdgeKind, LineType> = {
+  formal: "relation",
+  source: "sequence",
+  suggest: "hint",
+  direction: "exploration",
+};
+
+export const LINE_TYPE_LABEL: Record<LineType, string> = {
+  relation: "关系线",
+  sequence: "顺序线",
+  hint: "关联提示线",
+  exploration: "探索线",
+};
+
+export function deriveLineFields(edge: {
+  kind: EdgeKind;
+  consumed?: number | null;
+}): { line_type: LineType; line_state: LineState } {
+  const line_type = EDGE_KIND_TO_LINE_TYPE[edge.kind];
+  let line_state: LineState;
+  switch (line_type) {
+    case "relation":
+      line_state = "confirmed";
+      break;
+    case "hint":
+      line_state = "proposed";
+      break;
+    case "sequence":
+      line_state = "provenance";
+      break;
+    case "exploration":
+      line_state = edge.consumed ? "consumed" : "planned";
+      break;
+  }
+  return { line_type, line_state };
+}
+
 export type WorldDTO = {
   id: string;
   name: string;
@@ -97,6 +142,9 @@ export type EdgeDTO = {
   origin?: EdgeOrigin | string;
   claim_status?: string;
   revision?: number;
+  /** canonical 产品线型/状态（由 kind/consumed 派生，迁移期附加） */
+  line_type?: LineType;
+  line_state?: LineState;
   /** 方向线生成时预先计划好的延伸节点 */
   target_name?: string | null;
   target_type?: string | null;

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { EdgeKind as SharedEdgeKind } from "@blouck/shared";
+import type { EdgeKind as SharedEdgeKind, LineState, LineType } from "@blouck/shared";
 import { db } from "./connection.js";
 
 const now = () => Date.now();
@@ -32,6 +32,9 @@ export type EdgeRow = {
   target_aliases: string | null;
   target_predicate: string | null;
   target_label: string | null;
+  /** canonical 派生字段（迁移期可选；由 getGraph 附加） */
+  line_type?: LineType;
+  line_state?: LineState;
   created_at: number;
 };
 

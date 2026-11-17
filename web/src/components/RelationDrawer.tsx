@@ -1,4 +1,5 @@
 import ReactMarkdown from "react-markdown";
+import { LINE_TYPE_LABEL, deriveLineFields, type LineType } from "@blouck/shared";
 import { useStore } from "../store";
 
 const PRED_LABEL: Record<string, string> = {
@@ -10,16 +11,9 @@ const PRED_LABEL: Record<string, string> = {
   related: "相关",
 };
 
-const KIND_LABEL: Record<string, string> = {
-  formal: "正式关系",
-  source: "探索来源",
-  suggest: "待确认",
-  direction: "探索方向",
-};
-
 /** 用一句话说明两个节点是什么关系（按设计好的关系类型） */
-function relationSentence(kind: string, predicate: string | null, from: string, to: string) {
-  if (kind === "source") return `探索来源：「${to}」是从「${from}」探索出来的。`;
+function relationSentence(lineType: LineType, predicate: string | null, from: string, to: string) {
+  if (lineType === "sequence") return `顺序线：「${to}」是从「${from}」生成的来路。`;
   const type = predicate ?? "related";
   const label = PRED_LABEL[type] ?? "相关";
   switch (type) {
@@ -51,7 +45,10 @@ export default function RelationDrawer() {
   if (!edge) return null;
   const from = nodes.find((n) => n.id === edge.src)?.name ?? "?";
   const to = nodes.find((n) => n.id === edge.dst)?.name ?? "?";
-  const isDirection = edge.kind === "direction";
+  const line = { line_type: edge.line_type, line_state: edge.line_state, ...deriveLineFields(edge) };
+  const lineType = line.line_type;
+  const isDirection = lineType === "exploration";
+  const isHint = lineType === "hint";
   const plannedName = edge.target_name?.trim() || "";
   const plannedDef = edge.target_definition?.trim() || "";
   const sentence = isDirection
@@ -59,12 +56,12 @@ export default function RelationDrawer() {
       (plannedName
         ? `\n\n点「去探索」会直接生成预先规划好的节点：**${plannedName}**${plannedDef ? `——${plannedDef}` : ""}`
         : `\n\n这条方向是旧数据，点「去探索」时会先规划延伸节点，再落图。`)
-    : relationSentence(edge.kind, edge.predicate ?? null, from, to);
+    : relationSentence(lineType, edge.predicate ?? null, from, to);
 
   return (
     <div className="drawer">
       <header>
-        <div className="k">{KIND_LABEL[edge.kind] ?? edge.kind}</div>
+        <div className="k">{LINE_TYPE_LABEL[lineType]}</div>
         <h2>{isDirection ? from : `${from} → ${to}`}</h2>
         <button className="close" onClick={closeDrawer}>
           ×
@@ -74,7 +71,7 @@ export default function RelationDrawer() {
         <div className="md-preview">
           <ReactMarkdown>{sentence}</ReactMarkdown>
         </div>
-        {edge.kind === "suggest" ? (
+        {isHint ? (
           <div className="row" style={{ marginTop: 10 }}>
             <button
               className="primary"

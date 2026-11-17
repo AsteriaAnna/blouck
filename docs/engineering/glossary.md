@@ -36,6 +36,15 @@
 | 布局 | `layout` / `wfc` / `elk` | `nodes.x/y` | `/layout` 端点；UI 当前无入口 |
 | 锚点优先实验 | `anchorFirst` | 无 | `/api/dev/anchor-first`；不是主链路 |
 
+| 产品词 | 代码 token/派生字段 | 说明 |
+|---|---|---|
+| 关系线/顺序线/提示线/探索线 | `line_type`（canonical 派生） | canonical 产品线型，见 canonical-state.md |
+| 已确认/待确认/来路/计划/已消费 | `line_state`（canonical 派生） | `getGraph` 附加；DB 仍存 kind |
+| 关系线 | `formal` | 存储 kind；映射 relation |
+| 顺序线 / 来源线 | `source` | 存储 kind；映射 sequence |
+| 关联提示线 | `suggest` | 存储 kind；映射 hint |
+| 探索线 | `direction` | 存储 kind；映射 exploration |
+
 ## 3. 状态词
 
 | 状态 | 字段 | 取值 | 谁改 |
