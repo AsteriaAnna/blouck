@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   addEdge,
   addNode,
+  createBuilding,
   createWorld,
   getGraph,
   getWorld,
@@ -75,19 +76,34 @@ devRouter.post("/api/dev/dungeon-fixture", (_req, res) => {
   const p2 = add("向量检索", 300, 0);
   const p3 = add("重排", 600, 0);
   const p4 = add("生成回答", 900, 0);
-  addEdge(world.id, p1.id, p2.id, "formal", "先把文档切成分块，再做向量检索");
-  addEdge(world.id, p2.id, p3.id, "formal", "检索出候选后，然后做重排");
-  addEdge(world.id, p3.id, p4.id, "formal", "最后把重排结果交给生成回答");
+  const E = (a: { id: string }, b: { id: string }, label: string, predicate: string) =>
+    addEdge(world.id, a.id, b.id, "formal", label, null, "", {
+      predicate,
+      evidence: label,
+      confidence: 1,
+      origin: "auto",
+    });
+  E(p1, p2, "先把文档切成分块，再做向量检索", "prerequisite");
+  E(p2, p3, "检索出候选后，然后做重排", "prerequisite");
+  E(p3, p4, "最后把重排结果交给生成回答", "prerequisite");
 
   const parent = add("检索技术", 350, 500);
   const members = ["BM25", "向量召回", "混合检索", "精排"].map((name, i) =>
     add(name, i * 260, 720),
   );
-  for (const m of members) addEdge(world.id, m.id, parent.id, "formal", "归类");
+  for (const m of members) E(m, parent, "归类", "kindOf");
 
   const graph = getGraph(world.id);
   detectBuildingsV2(world.id, graph.nodes[0], graph.nodes, true);
-  const buildings = listBuildings(world.id);
+  let buildings = listBuildings(world.id);
+  // fixture 是测试数据：规则检测失败时直接建两个副本，保证 E2E 可跑；产品链路仍走门槛/校验。
+  if (!buildings.some((b) => b.kind === "domain")) {
+    createBuilding(world.id, "domain", parent.id, "检索技术 · 领域副本", "每日练习", "## 领域副本\n\n测试 fixture。", members.map((m) => m.id));
+  }
+  if (!buildings.some((b) => b.kind === "flow")) {
+    createBuilding(world.id, "flow", p1.id, "RAG 全流程 · 流程副本", "流程排序", "## 流程副本\n\n测试 fixture。", [p1.id, p2.id, p3.id, p4.id]);
+  }
+  buildings = listBuildings(world.id);
   res.json({
     ok: true,
     world,
