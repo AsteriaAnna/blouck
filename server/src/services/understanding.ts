@@ -1,4 +1,4 @@
-import { db } from "../db.js";
+import { db, getNode, refreshBuildingStatus, setNodeTier } from "../db.js";
 import type { EdgeRow } from "../db/edges.js";
 import {
   createUnderstandingTask,
@@ -310,6 +310,14 @@ export async function answerUnderstandingTask(
     feedback,
     rubricScore: eq.score,
   });
+  // 节点辨析答对即至少到第一档：理解路径可直接解锁副本，不强制走旧定义题。
+  if (correct && task.target_type === "node" && task.node_id) {
+    const node = getNode(task.node_id);
+    if (node && node.tier < 1) {
+      setNodeTier(node.id, 1);
+      refreshBuildingStatus(node.id);
+    }
+  }
   return {
     correct,
     choice_correct: choiceCorrect,

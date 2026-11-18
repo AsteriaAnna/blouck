@@ -120,6 +120,41 @@ test("mock 全链路：世界 → extract → stream segment/commit", async () =
     });
     assert.equal(manual.edge.origin, "manual");
     assert.equal(manual.edge.kind, "formal");
+
+    // 无证据手动关系只能是虚线假设；无证据建议不能升级 formal
+    let weakFrom: any;
+    let weakTo: any;
+    outer: for (let i = 0; i < graph.nodes.length; i++) {
+      for (let j = i + 1; j < graph.nodes.length; j++) {
+        const x = graph.nodes[i];
+        const y = graph.nodes[j];
+        const exists = graph.edges.some(
+          (e: any) =>
+            e.kind === "formal" &&
+            ((e.src === x.id && e.dst === y.id) || (e.src === y.id && e.dst === x.id)),
+        );
+        if (!exists) {
+          weakFrom = x;
+          weakTo = y;
+          break outer;
+        }
+      }
+    }
+    if (weakFrom) {
+      const weak = await api(`/api/worlds/${world.id}/relations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fromNodeId: weakFrom.id,
+          toNodeId: weakTo.id,
+          predicate: "related",
+          label: "假设相关",
+        }),
+      });
+      assert.equal(weak.edge.kind, "suggest");
+      const acceptRes = await fetch(`${base}/api/edges/${weak.edge.id}/accept`, { method: "POST" });
+      assert.equal(acceptRes.status, 400, "no-evidence suggest must not become formal");
+    }
   }
 
   const seg = await api(`/api/worlds/${world.id}/stream/segment`, {

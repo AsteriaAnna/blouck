@@ -3,6 +3,7 @@ import type { EdgeKind as SharedEdgeKind } from "@blouck/shared";
 import { db } from "./db/connection.js";
 import "./db/schema.js";
 export { createSourceSpan, getFocusStack, setFocusStack } from "./db/sources.js";
+import { createSourceSpan } from "./db/sources.js";
 export type { SourceSpanRow } from "./db/sources.js";
 export { createDomainQuestions, listDomainQuestions } from "./db/domain.js";
 export type { DomainQuestionRow } from "./db/domain.js";
@@ -180,71 +181,91 @@ export function refreshBuildingStatus(nodeId: string) {
   }
 }
 
-export function seedDemoIfEmpty() {
-  const count = db.prepare("SELECT COUNT(*) c FROM worlds").get() as { c: number };
-  if (count.c > 0) return;
+const DEMO_SOURCE = [
+  "RAG（检索增强生成）由检索与生成组成。",
+  "检索负责从向量数据库召回候选，生成负责基于上下文窗口产出回答。",
+  "检索之前需要先做文档解析和 Chunking，再用 Embedding 建立索引。",
+  "生成可能产生幻觉，需要用评测验证 RAG 的效果。",
+  "Prompt 控制生成时注入的检索结果，Agent 可以调用 RAG。",
+].join("");
+
+/** 干净 demo：所有 demo 节点都挂在同一份原文上，正式关系必须有 canonical predicate + 原文证据。 */
+export function seedDemoWorld(): World {
   const wid = uid();
-  const mk = (name: string, x: number, y: number) => {
-    const id = uid();
-    db.prepare(
-      "INSERT INTO nodes(id,world_id,name,x,y,free_md,hidden,tier,created_at) VALUES(?,?,?,?,?,?,0,0,?)",
-    ).run(id, wid, name, x, y, "", now());
-    return id;
-  };
-  const rag = mk("RAG", 520, 300);
-  const retrieval = mk("检索", 320, 210);
-  const embedding = mk("Embedding", 180, 330);
-  const chunking = mk("Chunking", 250, 470);
-  const vectordb = mk("向量数据库", 300, 100);
-  const generation = mk("生成", 760, 220);
-  const hallu = mk("幻觉", 880, 360);
-  const ctx = mk("上下文窗口", 780, 470);
-  const evaln = mk("评测", 600, 520);
-  const prompt = mk("Prompt", 620, 640);
-  const agent = mk("Agent", 980, 200);
-  const docparse = mk("文档解析", 120, 180);
+  const span = createSourceSpan(wid, DEMO_SOURCE);
+  const mk = (name: string, x: number, y: number, definition: string) =>
+    addNode(wid, name, x, y, "", { definition, sourceSpanId: span.id }).id;
+
+  const rag = mk("RAG", 520, 300, "检索增强生成：先检索外部信息，再让模型基于检索结果生成回答。");
+  const retrieval = mk("检索", 320, 210, "从外部知识源召回候选信息的过程。");
+  const embedding = mk("Embedding", 180, 330, "把文本映射成向量表示的方法。");
+  const chunking = mk("Chunking", 250, 470, "把长文档切分成可检索片段的步骤。");
+  const vectordb = mk("向量数据库", 300, 100, "存储和检索向量表示的数据库。");
+  const generation = mk("生成", 760, 220, "基于上下文产出回答的步骤。");
+  const hallu = mk("幻觉", 880, 360, "生成模型产出不符合事实或来源的内容。");
+  const ctx = mk("上下文窗口", 780, 470, "模型一次能看到的上下文长度上限。");
+  const evaln = mk("评测", 600, 520, "用指标和样本验证系统效果的环节。");
+  const prompt = mk("Prompt", 620, 640, "控制模型输入与生成行为的提示词。");
+  const agent = mk("Agent", 980, 200, "能调用工具、规划步骤并完成任务的智能体。");
+  const docparse = mk("文档解析", 120, 180, "把原始文档转成可处理文本的步骤。");
+
   db.prepare(
     "INSERT INTO worlds(id,name,root_node_id,is_demo,created_at) VALUES(?,?,?,1,?)",
   ).run(wid, "AI 产品学习（示例）", rag, now());
+
   const E = (
     a: string,
     b: string,
-    kind: EdgeKind,
-    label = "",
-    question: string | null = null,
-  ) => addEdge(wid, a, b, kind, label, question);
-  E(rag, retrieval, "formal", "依赖");
-  E(rag, generation, "formal", "组合");
-  E(retrieval, embedding, "formal", "依赖");
-  E(retrieval, chunking, "formal", "前置");
-  E(retrieval, vectordb, "formal", "使用");
-  E(chunking, docparse, "source", "本轮探索来源");
-  E(generation, hallu, "formal", "导致");
-  E(rag, ctx, "formal", "受限于");
-  E(evaln, rag, "formal", "验证");
-  E(prompt, rag, "formal", "控制");
-  E(agent, rag, "formal", "调用");
-  E(chunking, evaln, "suggest", "影响评测？");
-  E(vectordb, ctx, "suggest", "可能相关？");
+    predicate: string,
+    label: string,
+    evidence: string,
+  ) => addEdge(wid, a, b, "formal", label, null, "", { predicate, evidence, confidence: 1, origin: "auto" });
+
+  E(retrieval, rag, "partOf", "组成", "RAG（检索增强生成）由检索与生成组成。");
+  E(generation, rag, "partOf", "组成", "RAG（检索增强生成）由检索与生成组成。");
+  E(vectordb, retrieval, "prerequisite", "前置", "检索负责从向量数据库召回候选");
+  E(docparse, chunking, "prerequisite", "前置", "检索之前需要先做文档解析和 Chunking");
+  E(chunking, retrieval, "prerequisite", "前置", "检索之前需要先做文档解析和 Chunking");
+  E(embedding, retrieval, "prerequisite", "前置", "再用 Embedding 建立索引");
+  E(generation, hallu, "related", "可能产生", "生成可能产生幻觉");
+  E(evaln, rag, "related", "验证", "需要用评测验证 RAG 的效果");
+  E(prompt, generation, "related", "控制", "Prompt 控制生成时注入的检索结果");
+  E(agent, rag, "related", "调用", "Agent 可以调用 RAG");
+
   addDirection(wid, hallu, "为什么会产生幻觉？", "示例方向");
   addDirection(wid, evaln, "怎么建立可信评测？", "示例方向");
+
   createBuilding(
     wid,
     "domain",
     retrieval,
-    "领域副本",
-    "检索技术 · 每日 10 题",
-    "## 领域副本\n\n覆盖检索、向量、分块、重排。每天最多 10 道新题，跨天保留。",
-    [],
+    "检索技术 · 领域副本",
+    "领域每日练习 · 10 题 · 4 个概念",
+    "## 领域副本\n\n领域：**检索技术**\n\n成员：检索、向量数据库、Chunking、Embedding\n\n依据：原文明确描述检索与这些组件的关系。",
+    [retrieval, vectordb, chunking, embedding],
   );
   createBuilding(
     wid,
     "flow",
     rag,
-    "流程副本",
-    "RAG 全链路 · 连线题",
-    "## 流程副本\n\n把打乱的步骤按正确顺序连接。",
-    ["文档解析", "Chunking", "Embedding", "向量数据库", "检索", "生成"],
+    "RAG 全流程 · 流程副本",
+    "流程排序 · 5 步",
+    "## 流程副本\n\n过程：**RAG 全流程**\n\n顺序：文档解析 → Chunking → Embedding → 检索 → 生成\n\n依据：原文明确描述这些步骤的先后关系。",
+    [docparse, chunking, embedding, retrieval, generation],
   );
   computeFrontier(wid);
+  return getWorld(wid)!;
+}
+
+export function seedDemoIfEmpty() {
+  const count = db.prepare("SELECT COUNT(*) c FROM worlds").get() as { c: number };
+  if (count.c > 0) return;
+  seedDemoWorld();
+}
+
+/** 重建 demo：只删 demo 世界，不影响其他用户世界。 */
+export function repairDemoWorld(): World | null {
+  const demo = db.prepare("SELECT id FROM worlds WHERE is_demo=1").get() as { id: string } | undefined;
+  if (demo) deleteWorld(demo.id);
+  return seedDemoWorld();
 }

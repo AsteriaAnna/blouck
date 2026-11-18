@@ -114,7 +114,7 @@ refreshBuildingStatus / refreshStaleBuildings 由世界读取/隐藏/答题触�
 | hide/export | POST `/api/worlds/:id/hide/preview`、`/hide`、`/hide/undo`；GET `/api/worlds/:id/export` | 4 | 隐藏/撤回/导出；UI 当前无入口 |
 | stream | POST `/api/worlds/:id/stream/segment`、`/commit`、`/detect`、`/preview` | 4 | segment/commit 主链路；detect/preview 当前前端未用 |
 | buildings | GET `/api/buildings/:id`；POST `/challenge`、`/submit`；PATCH `/api/buildings/:id` | 4 | 副本读取/挑战/提交/编辑 MD |
-| dev | POST `/api/dev/world`、`/api/dev/explore`、`/api/dev/anchor-first`、`/api/dev/dungeon-fixture` | 4 | 开发/实验；不是产品链路 |
+| dev | POST `/api/dev/world`、`/api/dev/explore`、`/api/dev/anchor-first`、`/api/dev/dungeon-fixture`、`/api/dev/reseed-demo` | 5 | 开发/实验；不是产品链路 |
 
 **注意**：`/api/dev/explore` 的重复注册已在 P1 删除，dev 路由已隔离到 `routes/dev.ts`。
 

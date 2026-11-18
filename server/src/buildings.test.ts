@@ -9,7 +9,9 @@ process.env.DB_PATH = dbPath;
 process.env.DEEPSEEK_API_KEY = "";
 
 const {
+  addEdge,
   addNode,
+  computeFrontier,
   computeTier,
   createBuilding,
   createQuizzes,
@@ -21,6 +23,7 @@ const {
   refreshBuildingStatus,
   setNodeTier,
 } = await import("./db.js");
+const { dungeonReadiness } = await import("./services/buildings.js");
 
 test("答题链路：short+judge 正确 → tier=1 → 副本 playable", () => {
   const world = createWorld("answer-unlock-test", "根");
@@ -58,6 +61,32 @@ test("副本解锁：节点 tier>=1 后 domain/flow 从 detected → playable", 
   refreshBuildingStatus(a.id);
   assert.equal(getBuilding(domain.id)?.status, "playable");
   assert.equal(getBuilding(flow.id)?.status, "playable");
+});
+
+test("副本发现门槛：节点/证据关系不够时不检测", () => {
+  const world = createWorld("readiness", "根");
+  const a = addNode(world.id, "A", 0, 0);
+  const b = addNode(world.id, "B", 100, 0);
+  addEdge(world.id, a.id, b.id, "formal", "A→B", null, "", {
+    predicate: "related",
+    evidence: "A 与 B 有关",
+  });
+  assert.equal(dungeonReadiness(world.id).ready, false);
+
+  for (let i = 0; i < 8; i++) addNode(world.id, `N${i}`, i * 10, 200);
+  for (let i = 0; i < 4; i++) {
+    const src = addNode(world.id, `S${i}`, i * 20, 400);
+    const dst = addNode(world.id, `D${i}`, i * 20, 500);
+    addEdge(world.id, src.id, dst.id, "formal", `S${i}→D${i}`, null, "", {
+      predicate: "prerequisite",
+      evidence: `S${i} 先于 D${i}`,
+    });
+  }
+  computeFrontier(world.id);
+  const r = dungeonReadiness(world.id);
+  assert.equal(r.nodes >= 8, true);
+  assert.equal(r.evidenceEdges >= 4, true);
+  assert.equal(r.ready, true);
 });
 
 test.after(() => {

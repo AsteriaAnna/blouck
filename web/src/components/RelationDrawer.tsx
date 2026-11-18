@@ -127,9 +127,26 @@ export default function RelationDrawer() {
 
         {loading && <div className="hintline">正在整理关系卡…</div>}
 
+        {!edge.evidence?.trim() && (
+          <div className="section">
+            <div className="hintline" style={{ color: "#9a4f2f" }}>
+              {edge.kind === "suggest"
+                ? "这是假设线：还没有原文依据，不是已确认知识。补充依据后才能确认。"
+                : "这条关系缺少原文依据（旧数据）：它目前只是假设，不能作为事实题来源。"}
+            </div>
+          </div>
+        )}
+
+        {edge.evidence?.trim() && (
+          <div className="section">
+            <h4>依据（原文）</h4>
+            <blockquote>{edge.evidence}</blockquote>
+          </div>
+        )}
+
         {doc && (
           <>
-            {doc.evidence_quote && (
+            {doc.evidence_quote && doc.evidence_quote !== edge.evidence && (
               <div className="section">
                 <h4>依据</h4>
                 <blockquote>{doc.evidence_quote}</blockquote>

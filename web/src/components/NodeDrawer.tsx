@@ -105,14 +105,18 @@ export default function NodeDrawer() {
     if (!node || !world || !targetId) return;
     setRelMsg("");
     try {
-      await send(`/api/worlds/${world.id}/relations`, "POST", {
+      const r = await send<{ edge: { kind: string } }>(`/api/worlds/${world.id}/relations`, "POST", {
         fromNodeId: node.id,
         toNodeId: targetId,
         predicate,
         evidence,
       });
-      setRelMsg("已建立关系线");
-      track("manual_relation_create", { worldId: world.id, targetId: node.id, payload: { predicate } });
+      setRelMsg(r.edge?.kind === "suggest" ? "已建立假设线；补充原文依据后才能确认" : "已建立关系线");
+      track("manual_relation_create", {
+        worldId: world.id,
+        targetId: node.id,
+        payload: { predicate, kind: r.edge?.kind },
+      });
       await useStore.getState().openWorld(world.id);
     } catch (e: any) {
       setRelMsg(e.message ?? "建立关系失败");
@@ -132,6 +136,11 @@ export default function NodeDrawer() {
         </button>
       </header>
       <div className="body">
+        {!node.source_span_id && (
+          <div className="hintline" style={{ color: "#9a4f2f", marginBottom: 8 }}>
+            缺少来源原文：以下理解卡只是草稿，不能生成事实题。请补充原文后再建立关系/题目。
+          </div>
+        )}
         {loading && <div className="hintline">正在整理理解卡…</div>}
         {error && (
           <div className="hintline">
@@ -219,11 +228,16 @@ export default function NodeDrawer() {
           worldId={world?.id}
           targetId={node.id}
         />
+        <div className="hintline" style={{ marginTop: 6 }}>
+          答对节点辨析会升到至少第一档，可直接解锁副本。
+        </div>
 
-        <div className="section">
-          <h4>理解检查</h4>
-          <div className="hintline">
-            当前档位：{tier} · 简答 {passed.short} / 判断 {passed.judge}
+        <details className="section">
+          <summary>
+            复习模式（旧定义题，可选）· 当前档位 {tier} · 简答 {passed.short} / 判断 {passed.judge}
+          </summary>
+          <div className="hintline" style={{ marginTop: 6 }}>
+            继续升档可做旧定义题；主路径是上面的辨析任务。
           </div>
           {quizzes.length === 0 ? (
             <button className="secondary" onClick={() => generateQuiz(node.id)}>
@@ -251,7 +265,7 @@ export default function NodeDrawer() {
               </div>
             ))
           )}
-        </div>
+        </details>
 
         <div className="section">
           <h4>我的笔记</h4>

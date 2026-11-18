@@ -6,6 +6,7 @@ import {
   getGraph,
   getWorld,
   listBuildings,
+  repairDemoWorld,
 } from "../db.js";
 import { ensureBuildingPositions, ensureDirectionFrontiers } from "../assetops.js";
 import { simulateExplore } from "../experiments/exploreSim.js";
@@ -62,6 +63,10 @@ devRouter.post("/api/dev/anchor-first", async (req, res) => {
   }
 });
 
+devRouter.post("/api/dev/reseed-demo", (_req, res) => {
+  res.json({ ok: true, world: repairDemoWorld() });
+});
+
 devRouter.post("/api/dev/dungeon-fixture", (_req, res) => {
   const world = createWorld("副本测试世界", "RAG");
   const add = (name: string, x: number, y: number) => addNode(world.id, name, x, y);
@@ -81,7 +86,7 @@ devRouter.post("/api/dev/dungeon-fixture", (_req, res) => {
   for (const m of members) addEdge(world.id, m.id, parent.id, "formal", "归类");
 
   const graph = getGraph(world.id);
-  detectBuildingsV2(world.id, graph.nodes[0], graph.nodes);
+  detectBuildingsV2(world.id, graph.nodes[0], graph.nodes, true);
   const buildings = listBuildings(world.id);
   res.json({
     ok: true,

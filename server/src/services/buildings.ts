@@ -76,11 +76,33 @@ function longestFormalChain(nodes: NodeRow[], formalEdges: { src: string; dst: s
   return best;
 }
 
+/** 副本发现门槛：世界要先长大、有证据关系、有可探索边缘，才允许检测副本。 */
+export function dungeonReadiness(worldId: string): {
+  ready: boolean;
+  nodes: number;
+  evidenceEdges: number;
+  frontier: number;
+} {
+  const { nodes, edges } = getGraph(worldId);
+  const visible = nodes.filter((n) => !n.hidden);
+  const evidenceEdges = edges.filter(
+    (e) => e.kind === "formal" && e.src !== e.dst && (e.evidence ?? "").trim().length > 0,
+  ).length;
+  const frontier = visible.filter((n) => n.frontier === 1).length;
+  return {
+    ready: visible.length >= 8 && evidenceEdges >= 4 && frontier >= 1,
+    nodes: visible.length,
+    evidenceEdges,
+    frontier,
+  };
+}
+
 /**
  * 副本生成 v2：AI/规则只提候选，这里用硬校验（流程唯一序、每步来源、领域共同依据）。
  * 规则细节见 docs/design/dungeon-generation-rules.md。
  */
-export function detectBuildingsV2(worldId: string, _focus: NodeRow, _all: NodeRow[]) {
+export function detectBuildingsV2(worldId: string, _focus: NodeRow, _all: NodeRow[], force = false) {
+  if (!force && !dungeonReadiness(worldId).ready) return;
   const bs = listBuildings(worldId);
   const { nodes, edges } = getGraph(worldId);
   const dNodes = toDungeonNodes(nodes);
@@ -171,7 +193,8 @@ export function detectBuildingsV2(worldId: string, _focus: NodeRow, _all: NodeRo
 
 
 /** LLM 提出副本候选，程序硬校验；规则检测作为兜底 */
-export async function detectBuildingsLLM(worldId: string, focus: NodeRow) {
+export async function detectBuildingsLLM(worldId: string, focus: NodeRow, force = false) {
+  if (!force && !dungeonReadiness(worldId).ready) return;
   const bs = listBuildings(worldId);
   if (bs.some((b) => b.kind === "flow") && bs.some((b) => b.kind === "domain")) return;
   const graph = getGraph(worldId);

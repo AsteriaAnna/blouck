@@ -23,6 +23,12 @@ edgesRouter.post("/api/edges/:id/accept", async (req, res) => {
     | undefined;
   if (!edge) return res.status(404).json({ error: "edge not found" });
   if (edge.kind !== "suggest") return res.status(400).json({ error: "只能接受虚线建议" });
+  if (!edge.evidence.trim()) {
+    return res.status(400).json({
+      error: "这条建议没有原文证据，不能升级为正式关系；请先补充依据。",
+      code: "EVIDENCE_REQUIRED",
+    });
+  }
   const a = getNode(edge.src);
   const b = getNode(edge.dst);
   if (a && b) {
@@ -36,7 +42,7 @@ edgesRouter.post("/api/edges/:id/accept", async (req, res) => {
       suggestion.label,
       suggestion.md,
       suggestion.predicate,
-      edge.evidence || suggestion.md,
+      edge.evidence,
       edge.id,
     );
   } else {
@@ -75,10 +81,12 @@ edgesRouter.post("/api/worlds/:id/relations", async (req, res) => {
     .prepare("SELECT id FROM edges WHERE world_id=? AND src=? AND dst=? AND predicate=? AND kind='formal'")
     .get(world.id, from.id, to.id, predicate) as { id: string } | undefined;
   if (dup) return res.status(409).json({ error: "这两个概念之间已有同类正式关系" });
-  const edge = addEdge(world.id, from.id, to.id, "formal", label, null, md, {
+  // 有证据才是正式关系；没有证据只能建虚线假设，避免把“我觉得有关”写成知识。
+  const kind = evidence ? "formal" : "suggest";
+  const edge = addEdge(world.id, from.id, to.id, kind, label, evidence ? null : "这条关系有原文依据吗？", md, {
     predicate,
     evidence,
-    confidence: 0.9,
+    confidence: evidence ? 0.9 : 0.5,
     origin: "manual",
   });
   computeFrontier(world.id);

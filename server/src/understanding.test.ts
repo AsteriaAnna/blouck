@@ -8,7 +8,17 @@ const dbPath = path.join(os.tmpdir(), `blouck-understanding-${Date.now()}.db`);
 process.env.DB_PATH = dbPath;
 process.env.DEEPSEEK_API_KEY = "";
 
-const { addEdge, addNode, createSourceSpan, createWorld, db } = await import("./db.js");
+const {
+  addEdge,
+  addNode,
+  createBuilding,
+  createSourceSpan,
+  createWorld,
+  db,
+  getBuilding,
+  getNode,
+  setNodeTier,
+} = await import("./db.js");
 const { getUnderstandingTaskByEdge, getUnderstandingTaskByEdgeKind, getUnderstandingTaskByNode } = await import("./db/understanding.js");
 const {
   answerUnderstandingTask,
@@ -103,6 +113,30 @@ test("辨析变体：反例题/纠错题独立缓存", async () => {
   assert.equal(transfer.status, "ready");
   assert.ok(getUnderstandingTaskByEdgeKind(edge.id, "transfer"));
   assert.notEqual(transfer.task!.id, counter.task!.id);
+});
+
+test("节点辨析答对 → 至少第一档 → 解锁副本", async () => {
+  const world = createWorld("understanding-tier", "根");
+  const span = createSourceSpan(world.id, "RAG 包含检索。");
+  const a = addNode(world.id, "RAG", 0, 0, "", {
+    definition: "检索增强生成",
+    sourceSpanId: span.id,
+  });
+  const b = addNode(world.id, "检索", 100, 0, "", { definition: "召回" });
+  setNodeTier(b.id, 1);
+  const building = createBuilding(world.id, "domain", a.id, "领域", "", "", [a.id, b.id]);
+  const task = await ensureNodeUnderstandingTask(a.id, mockLLM);
+  assert.equal(task.status, "ready");
+  const row = getUnderstandingTaskByNode(a.id)!;
+  const result = await answerUnderstandingTask(
+    row.id,
+    row.correct_choice,
+    task.task!.rubric.join("；"),
+    mockLLM,
+  );
+  assert.ok(result?.correct);
+  assert.equal(getNode(a.id)?.tier, 1);
+  assert.equal(getBuilding(building.id)?.status, "playable");
 });
 
 test.after(() => {
