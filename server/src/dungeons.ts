@@ -12,7 +12,7 @@ const PROCESS_CUE = /(先|首先|再|然后|接着|之后|最后|第一步|第�
 const GENERIC_DOMAIN = new Set(["AI", "技术", "知识", "领域", "系统", "方法", "流程", "概念"]);
 
 export type DungeonNode = { id: string; name: string; hidden?: number };
-export type DungeonEdge = { src: string; dst: string; kind: string; label?: string; predicate?: string };
+export type DungeonEdge = { src: string; dst: string; kind: string; label?: string; predicate?: string; evidence?: string };
 
 export type FlowCandidate = {
   processName: string;
@@ -180,7 +180,12 @@ export function validateDomainCandidate(
 export function detectFlowCandidates(nodes: DungeonNode[], edges: DungeonEdge[]): FlowCandidate[] {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const usable = edges.filter(
-    (e) => e.kind === "formal" && e.label && PROCESS_CUE.test(e.label) && byId.has(e.src) && byId.has(e.dst),
+    (e) =>
+      e.kind === "formal" &&
+      (e.predicate === "prerequisite" || (e.label && PROCESS_CUE.test(e.label))) &&
+      (e.evidence ?? e.label ?? "").trim().length > 0 &&
+      byId.has(e.src) &&
+      byId.has(e.dst),
   );
   if (!usable.length) return [];
 
@@ -219,7 +224,7 @@ export function detectFlowCandidates(nodes: DungeonNode[], edges: DungeonEdge[])
       precedence: g.edges.map((e) => ({
         before: e.src,
         after: e.dst,
-        evidence: e.label ?? "",
+        evidence: e.evidence || e.label || "",
       })),
       confidence: 0.78,
       origin: "rule",
@@ -243,7 +248,9 @@ export function detectDomainCandidates(
   for (const e of edges) {
     if (e.kind !== "formal") continue;
     const isKindOf =
-      e.predicate === "kindOf" || (e.predicate == null && /kindof|归类/i.test(e.label ?? ""));
+      e.predicate === "kindOf" ||
+      e.predicate === "partOf" ||
+      (e.predicate == null && /kindof|归类|组成|包含/i.test(e.label ?? ""));
     if (!isKindOf) continue;
     const parent = e.dst;
     const member = e.src;
@@ -281,6 +288,7 @@ export function toDungeonEdges(edges: EdgeRow[]): DungeonEdge[] {
     kind: e.kind,
     label: e.label,
     predicate: e.predicate ?? undefined,
+    evidence: e.evidence,
   }));
 }
 

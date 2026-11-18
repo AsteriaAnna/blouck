@@ -446,13 +446,11 @@ graphRouter.post("/api/worlds/:id/extract", async (req, res) => {
     }
 
     if (source.id === target.id) continue;
+    // 关系线先过证据门：证据里必须同时出现两端概念；无证据不画线（不是“先画再解释”）。
+    if (!evidence || !evidence.includes(source.name) || !evidence.includes(target.name)) continue;
     const predicate = PREDICATES.has(rel.predicate ?? "") ? rel.predicate! : "related";
     let kind: "formal" | "suggest" = rel.type === "suggest" ? "suggest" : "formal";
-    if (kind === "formal" && (!evidence || confidence < 0.75)) kind = "suggest";
-    // 证据充分时，模型标成 suggest 也升级为正式（由证据+置信度决定线型）
-    if (kind === "suggest" && evidence && confidence >= 0.75 && predicate !== "related") {
-      kind = "formal";
-    }
+    if (kind === "formal" && confidence < 0.75) kind = "suggest";
     if (kind === "suggest" && confidence < 0.5) continue;
 
     // 谓词方向归一：前置按证据中出现的先后；组成把“整体→部分”换成“部分→整体”

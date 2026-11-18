@@ -8,6 +8,7 @@
 - **现在代码到底怎样** → [engineering/implemented.md](engineering/implemented.md)
 - **产品想要什么、体验如何** → [product/four-line-system.md](product/four-line-system.md)
 - **世界/线/卡/题/副本到底怎么设计** → [product/world-design.md](product/world-design.md)
+- **具体机制：先判定关系再画线、题目怎么来、副本怎么遍历** → [product/mechanism-spec.md](product/mechanism-spec.md)
 - **当前实现与设计偏离在哪、先修什么** → [engineering/design-gap-audit.md](engineering/design-gap-audit.md)
 - **新人为什么看不懂、怎么简化** → [engineering/onboarding-cognitive-load.md](engineering/onboarding-cognitive-load.md)
 - **锚点优先/关系准入验证过什么、有哪些坑** → [engineering/relation-gate-qa.md](engineering/relation-gate-qa.md)
@@ -39,6 +40,7 @@
 | [product/README.md](product/README.md) | 产品文档入口 |
 | [product/four-line-system.md](product/four-line-system.md) | 四类线体验与设计口径 v2.0（关系线/探索线/关联提示线/顺序线；关系 MD、节点 MD、副本体验；Q1–Q7） |
 | [product/world-design.md](product/world-design.md) | 当前设计/机制口径：视觉、MD 格式、线状态、题目来源、副本出现条件、需求 vs 方案 |
+| [product/mechanism-spec.md](product/mechanism-spec.md) | 具体实现机制：关系先判定再画线、suggest 触发条件、卡片/题目模板、领域/流程遍历与副本时机 |
 | [engineering/design-gap-audit.md](engineering/design-gap-audit.md) | 设计—实现偏差：无证据关系、demo 污染、MD 空心、副本过早出现 |
 
 ## 历史（理解“为什么不是另一种做法”）
