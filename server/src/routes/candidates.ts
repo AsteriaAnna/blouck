@@ -3,6 +3,7 @@ import {
   addEdge,
   addNode,
   computeFrontier,
+  db,
   getGraph,
   getNode,
   getWorld,
@@ -42,6 +43,12 @@ candidatesRouter.post("/api/candidates/:id/admit", (req, res) => {
   if (candidate.status !== "candidate") {
     return res.status(409).json({ error: "candidate already handled" });
   }
+  if (!candidate.evidence.trim()) {
+    return res.status(400).json({
+      error: "这个候选没有原文依据，不能确认为正式节点；请先补来源。",
+      code: "EVIDENCE_REQUIRED",
+    });
+  }
   const target = getNode(String(req.body?.targetNodeId ?? ""));
   if (!target || target.world_id !== candidate.world_id) {
     return res.status(400).json({ error: "targetNodeId must be in the same world" });
@@ -65,6 +72,11 @@ candidatesRouter.post("/api/candidates/:id/admit", (req, res) => {
     { id: target.id, x: target.x, y: target.y },
     { preferAngle: (graph.nodes.length * 1.7) % (Math.PI * 2) },
   );
+  const span = db
+    .prepare(
+      "SELECT id FROM source_spans WHERE world_id=? AND instr(text, ?) > 0 ORDER BY created_at DESC LIMIT 1",
+    )
+    .get(candidate.world_id, candidate.evidence) as { id: string } | undefined;
   const node = addNode(candidate.world_id, candidate.name, pos.x, pos.y, "", {
     type: candidate.type,
     definition: candidate.definition,
@@ -75,6 +87,7 @@ candidatesRouter.post("/api/candidates/:id/admit", (req, res) => {
         return [];
       }
     })(),
+    sourceSpanId: span?.id ?? null,
   });
   const edge = addEdge(
     candidate.world_id,
@@ -86,7 +99,7 @@ candidatesRouter.post("/api/candidates/:id/admit", (req, res) => {
     "",
     {
       predicate,
-      evidence: candidate.evidence || "用户确认候选",
+      evidence: candidate.evidence,
       confidence: 1,
       origin: "manual",
     },

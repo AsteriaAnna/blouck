@@ -42,6 +42,7 @@
 | [product/world-design.md](product/world-design.md) | 当前设计/机制口径：视觉、MD 格式、线状态、题目来源、副本出现条件、需求 vs 方案 |
 | [product/mechanism-spec.md](product/mechanism-spec.md) | 具体实现机制：关系先判定再画线、suggest 触发条件、卡片/题目模板、领域/流程遍历与副本时机 |
 | [engineering/design-gap-audit.md](engineering/design-gap-audit.md) | 设计—实现偏差：无证据关系、demo 污染、MD 空心、副本过早出现 |
+| [engineering/hollow-audit.md](engineering/hollow-audit.md) | 全机制空壳审计：关系/卡片/题/副本/导航/候选，P0/P1 与修复状态 |
 
 ## 历史（理解“为什么不是另一种做法”）
 

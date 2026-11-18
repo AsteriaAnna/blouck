@@ -249,7 +249,9 @@ export const createWorldSlice: StateCreator<State, [], [], WorldSlice> = (set, g
     set({
       buildings: getState().buildings.map((b) => (b.id === id ? { ...b, status: r.status } : b)),
     });
-    getState().showToast(r.correct ? "通关！流程副本已保存" : "顺序不对，再试一次");
+    getState().showToast(
+      r.correct ? "复习完成：顺序正确（不计入通关，通关请用辨析副本）" : "顺序不对，再试一次",
+    );
     if (r.correct) getState().openBuilding(id);
   },
 
@@ -258,7 +260,9 @@ export const createWorldSlice: StateCreator<State, [], [], WorldSlice> = (set, g
     set({
       buildings: getState().buildings.map((b) => (b.id === id ? { ...b, status: r.status } : b)),
     });
-    getState().showToast(r.correct ? `通过（${r.score}）` : `未通过（${r.score}）`);
+    getState().showToast(
+      r.correct ? `复习完成（${r.score}），不计入通关` : `未通过（${r.score}）`,
+    );
     getState().openBuilding(id);
   },
 });

@@ -4,7 +4,6 @@ import {
   getBuilding,
   getNode,
   listDomainQuestions,
-  setBuildingStatus,
   updateBuildingMd,
   type NodeRow,
 } from "../db.js";
@@ -101,8 +100,8 @@ buildingsRouter.post("/api/buildings/:id/submit", async (req, res) => {
     );
     const correct =
       order.length === expected.length && order.every((x, i) => x === expected[i]);
-    if (correct) setBuildingStatus(b.id, "cleared");
-    return res.json({ correct, expected, status: correct ? "cleared" : b.status });
+    // 旧排序题只做复习，不再直接 mark cleared；通关必须走辨析副本序列。
+    return res.json({ correct, expected, status: b.status, practice: true });
   }
 
   const day = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Shanghai" });
@@ -136,11 +135,12 @@ buildingsRouter.post("/api/buildings/:id/submit", async (req, res) => {
     }
   }
   const passed = answers.length > 0 && ok / answers.length >= 0.6;
-  if (passed) setBuildingStatus(b.id, "cleared");
+  // 旧定义题/字符判分只做复习，不能成为 cleared 的另一条路径。
   return res.json({
     correct: passed,
     score: `${ok}/${answers.length}`,
-    status: passed ? "cleared" : b.status,
+    status: b.status,
+    practice: true,
   });
 });
 

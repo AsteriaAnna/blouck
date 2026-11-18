@@ -190,6 +190,8 @@ node_docs, relation_docs, node_candidates, generation_jobs
 - 单指旋转：CDP 触摸拖动实测相机 x/y/z 变化、`distance` 保持 2363，`mapZoom` 仍为 far。顺带修复：原来用相机高度判断拉近，旋转会误触发“镜头拉近”；改为用 `到 target 距离 / fit 基线` 判断，捏合/滚轮仍能切 near。
 - 按缩放披露：`MapCameraProbe` 用“到 target 距离 / `CameraFit` 基线距离 × 0.8”判断 `mapZoom`；远看提示 top2/方向 2，拉近提示 top6/方向 4。旋转不改变距离，不会误触发 near。CDP 实测 far→near→far，文案生效，errors=[]。
 - 关系证据门：`POST /api/edges/:id/accept` 无原文 evidence 直接 400；无证据手动关系建为 `suggest`（虚线假设）而不是 formal；不再把 LLM 的 `suggestion.md` 写入 evidence。
+- 候选确认：`/api/candidates/:id/admit` 要求候选 evidence 非空；节点尝试挂回 world 内包含该 evidence 的 source_span；不再写 `"用户确认候选"` 假证据。
+- 旧定义题/旧副本题：`GET /api/nodes/:id/quiz` 不再自动生成（只读，显式按钮才生成）；domain/flow submit 改为 practice-only（`practice:true`），不再 `cleared`，通关只走辨析序列。
 - demo 重建：`seedDemoWorld` 用一份原文 + 12 节点 + 10 条 canonical 关系；所有节点挂 source_span，所有 formal 有 predicate/evidence；删除伪关系“向量数据库↔上下文窗口”。`/api/dev/reseed-demo` 可重建 demo（不动其他世界）。
 - 副本门槛：`dungeonReadiness` 要求可见节点≥8、有证据 formal 边≥4、frontier≥1；`detectBuildingsLLM/V2` 默认受门槛限制，dev fixture 用 `force` 绕过。
 - 关系卡：`edge.evidence` 直接在卡上显示“依据（原文）”，不等异步文档；旧数据无依据时显示“假设/缺少依据”，不再断言。

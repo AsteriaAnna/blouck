@@ -28,19 +28,8 @@ nodesRouter.patch("/api/nodes/:id", (req, res) => {
 nodesRouter.get("/api/nodes/:id/quiz", async (req, res) => {
   const node = getNode(req.params.id);
   if (!node) return res.status(404).json({ error: "node not found" });
-  let quizzes = listQuizzes(node.id);
-  if (!quizzes.length) {
-    try {
-      const items = await llm.generateQuiz({
-        name: node.name,
-        md: `定义：${node.definition}\n笔记：${node.free_md}`,
-      });
-      createQuizzes(node.id, items.slice(0, 15));
-      quizzes = listQuizzes(node.id);
-    } catch (err) {
-      console.warn("[quiz] 打开节点时生成失败：", err);
-    }
-  }
+  // 只读：打开节点不再偷偷用定义生成题目。旧定义题只能在复习模式里显式生成。
+  const quizzes = listQuizzes(node.id);
   res.json({
     quizzes: quizzes.map(({ answer, ...q }) => q),
     passed: countPassed(node.id),
