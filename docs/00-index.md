@@ -5,6 +5,7 @@
 
 ## 一句话导航
 
+- **要动手改代码：只看这一份** → [engineering/implementation-plan.md](engineering/implementation-plan.md)
 - **现在代码到底怎样** → [engineering/implemented.md](engineering/implemented.md)
 - **产品想要什么、体验如何** → [product/four-line-system.md](product/four-line-system.md)
 - **世界/线/卡/题/副本到底怎么设计** → [product/world-design.md](product/world-design.md)
@@ -18,6 +19,7 @@
 
 | 文档 | 用途 |
 |---|---|
+| [engineering/implementation-plan.md](engineering/implementation-plan.md) | **落地执行文档**：P1–P8 每步改哪些文件/表/接口/测试/验收；先看这份 |
 | [engineering/README.md](engineering/README.md) | 工程文档入口/阅读顺序 |
 | [engineering/onboarding.md](engineering/onboarding.md) | 新人 1 小时跑通 + 主链路/13 表/改动定位/验收 |
 | [engineering/acceptance.md](engineering/acceptance.md) | 本次验收记录：环境/门禁/demo API/UI smoke/目标对照 |
